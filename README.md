@@ -9,6 +9,10 @@
 
 两种模式共用同一套本地控制台、礼物映射规则和下游指令通道。
 
+## 界面预览
+
+![Bililive-YOKONEX 控制台预览](docs/assets/github-home.png)
+
 ## 功能概览
 
 - 支持官方 `open-live` 链路，适合接入 B 站直播开放平台玩法
@@ -153,6 +157,7 @@ pytest tests/test_frontend_assets.py -v
 
 - [使用说明](docs/使用说明.md)
 - [下游 WebSocket API 文档](docs/WEBSOCKET_API.md)
+- [Release 发布指南](docs/release-guide.md)
 
 ## 常见问题
 
