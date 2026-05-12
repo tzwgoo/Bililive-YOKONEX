@@ -13,6 +13,7 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "windows-latest" in workflow
     assert "contents: write" in workflow
     assert "pyinstaller" in workflow
+    assert "python -m PyInstaller" in workflow
     assert "Copy-Item" in workflow
     assert "Compress-Archive" in workflow
     assert "gh release create" in workflow
