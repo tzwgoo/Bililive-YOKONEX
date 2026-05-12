@@ -26,6 +26,8 @@ dist/
 
 logs/
 tmp_*.log
+job-*-logs.txt
+job-*-logs.zip
 
 .idea/
 .vscode/
