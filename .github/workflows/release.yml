@@ -81,7 +81,7 @@ jobs:
             "run_app.py" *>&1 | Tee-Object -FilePath "build_logs/pyinstaller.log"
 
           if ($LASTEXITCODE -ne 0) {
-            throw "PyInstaller 构建失败，退出码: $LASTEXITCODE"
+            throw "PyInstaller build failed with exit code: $LASTEXITCODE"
           }
 
           New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "config") | Out-Null
@@ -93,7 +93,7 @@ jobs:
 
           $exePath = Join-Path $packageRoot "BiliLive-YOKONEX.exe"
           if (-not (Test-Path $exePath)) {
-            throw "构建输出缺少 EXE：$exePath"
+            throw "Missing EXE output: $exePath"
           }
 
       - name: 上传构建调试日志
