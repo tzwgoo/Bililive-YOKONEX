@@ -1,11 +1,17 @@
 [
   {
-    "gift_id": 1001,
-    "gift_name": "小花花",
+    "min_price": 0,
+    "max_price": 99,
     "command_slot": "command_one"
   },
   {
-    "gift_name": "牛哇牛哇",
+    "min_price": 100,
+    "max_price": 999,
     "command_slot": "command_two"
+  },
+  {
+    "min_price": 1000,
+    "max_price": null,
+    "command_slot": "command_ten"
   }
 ]

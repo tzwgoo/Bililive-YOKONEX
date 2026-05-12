@@ -5,6 +5,7 @@ const roomId = document.getElementById("room-id");
 const anchorName = document.getElementById("anchor-name");
 const configLoaded = document.getElementById("config-loaded");
 const sessionModeSelect = document.getElementById("session-mode");
+const triggerModeSelect = document.getElementById("trigger-mode");
 const sessionValueLabel = document.getElementById("session-value-label");
 const sessionValueInput = document.getElementById("session-value-input");
 const startBtn = document.getElementById("start-btn");
@@ -29,8 +30,13 @@ const likeCount = document.getElementById("like-count");
 const lastEventAt = document.getElementById("last-event-at");
 const lastHeartbeatAt = document.getElementById("last-heartbeat-at");
 const lastCommandMessage = document.getElementById("last-command-message");
+const triggerModeLabel = document.getElementById("trigger-mode-label");
 const commandWsUrlStorageKey = "biliLive.commandWsUrl";
 const commandUidStorageKey = "biliLive.commandUid";
+const triggerModeOptions = {
+  by_quantity: "按礼物数量触发",
+  single: "单次触发",
+};
 const sessionModeOptions = {
   open_live: {
     label: "主播身份码",
@@ -97,8 +103,9 @@ function renderEvent(event) {
   if (event.event_type === "gift") {
     const dispatch = event.command_dispatch || {};
     const dispatchClass = dispatch.ok === false ? " dispatch-failed" : dispatch.command_id ? " dispatch-success" : "";
+    const dispatchTimes = dispatch.trigger_count > 1 ? ` · 触发 ${dispatch.trigger_count} 次` : "";
     const commandText = dispatch.command_id
-      ? `<small class="dispatch-chip${dispatchClass}">槽位 ${dispatch.command_id} · ${dispatch.message || "已处理"}</small>`
+      ? `<small class="dispatch-chip${dispatchClass}">槽位 ${dispatch.command_id}${dispatchTimes} · ${dispatch.message || "已处理"}</small>`
       : "";
     prependEvent(
       giftEvents,
@@ -132,6 +139,7 @@ async function refreshStatus() {
   updateStatusTone(statusPill, data.status);
   messageText.textContent = data.message || "运行正常";
   modeLabel.textContent = data.mode_label || "官方 open-live";
+  triggerModeLabel.textContent = triggerModeOptions[data.trigger_mode] || triggerModeOptions.by_quantity;
   roomId.textContent = data.room_id || "-";
   anchorName.textContent = data.anchor_name || "-";
   configLoaded.textContent = data.config_loaded ? "已加载" : "缺失";
@@ -143,6 +151,9 @@ async function refreshStatus() {
   if (data.mode && sessionModeOptions[data.mode]) {
     sessionModeSelect.value = data.mode;
     updateSessionModeForm();
+  }
+  if (data.trigger_mode && triggerModeOptions[data.trigger_mode]) {
+    triggerModeSelect.value = data.trigger_mode;
   }
 }
 
@@ -181,6 +192,7 @@ startBtn.addEventListener("click", async () => {
     body: JSON.stringify({
       mode: sessionModeSelect.value,
       value: sessionValueInput.value,
+      trigger_mode: triggerModeSelect.value,
     }),
   });
   const payload = await response.json().catch(() => ({}));

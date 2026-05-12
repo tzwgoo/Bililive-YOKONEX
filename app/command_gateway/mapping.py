@@ -22,24 +22,20 @@ ALLOWED_COMMAND_SLOTS = {
 class GiftCommandMapper:
     def __init__(self, rules: list[dict[str, Any]] | None = None) -> None:
         self.rules = rules or []
-        self._commands_by_gift_id: dict[int, str] = {}
-        self._commands_by_gift_name: dict[str, str] = {}
+        self._price_rules: list[tuple[int, int | None, str]] = []
 
         for rule in self.rules:
             command_slot = str(rule.get("command_slot", "")).strip()
             if command_slot not in ALLOWED_COMMAND_SLOTS:
                 continue
 
-            gift_id = rule.get("gift_id")
-            if gift_id not in (None, ""):
-                try:
-                    self._commands_by_gift_id[int(gift_id)] = command_slot
-                except (TypeError, ValueError):
-                    pass
-
-            gift_name = str(rule.get("gift_name", "")).strip()
-            if gift_name:
-                self._commands_by_gift_name[gift_name] = command_slot
+            min_price = self._coerce_price(rule.get("min_price"))
+            if min_price is None:
+                continue
+            max_price = self._coerce_price(rule.get("max_price"), allow_none=True)
+            if max_price is not None and max_price < min_price:
+                continue
+            self._price_rules.append((min_price, max_price, command_slot))
 
     @classmethod
     def from_file(cls, path: str | Path) -> "GiftCommandMapper":
@@ -55,16 +51,23 @@ class GiftCommandMapper:
         return cls(payload)
 
     def resolve_command_id(self, gift_payload: dict[str, Any]) -> str | None:
-        gift_id = gift_payload.get("gift_id")
-        if gift_id not in (None, ""):
-            try:
-                command_id = self._commands_by_gift_id.get(int(gift_id))
-            except (TypeError, ValueError):
-                command_id = None
-            if command_id:
-                return command_id
-
-        gift_name = str(gift_payload.get("gift_name", "")).strip()
-        if gift_name:
-            return self._commands_by_gift_name.get(gift_name)
+        price = self._coerce_price(
+            gift_payload.get("r_price", gift_payload.get("price")),
+        )
+        if price is None:
+            return None
+        for min_price, max_price, command_slot in self._price_rules:
+            if price < min_price:
+                continue
+            if max_price is not None and price > max_price:
+                continue
+            return command_slot
         return None
+
+    def _coerce_price(self, value: Any, *, allow_none: bool = False) -> int | None:
+        if value in (None, ""):
+            return None if allow_none else None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None

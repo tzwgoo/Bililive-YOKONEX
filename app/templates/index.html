@@ -42,6 +42,13 @@
                 <option value="third_party">第三方房间消息流</option>
               </select>
             </div>
+            <div class="field">
+              <label for="trigger-mode">触发模式</label>
+              <select id="trigger-mode">
+                <option value="by_quantity">按礼物数量触发</option>
+                <option value="single">单次触发</option>
+              </select>
+            </div>
             <div class="field session-value-field">
               <label for="session-value-input" id="session-value-label">主播身份码</label>
               <input id="session-value-input" type="text" placeholder="请输入主播身份码 code" />
@@ -100,6 +107,7 @@
           </div>
           <dl>
             <div><dt>当前模式</dt><dd id="mode-label">官方 open-live</dd></div>
+            <div><dt>触发模式</dt><dd id="trigger-mode-label">按礼物数量触发</dd></div>
             <div><dt>配置状态</dt><dd id="config-loaded">未加载</dd></div>
             <div><dt>房间号</dt><dd id="room-id">-</dd></div>
             <div><dt>主播昵称</dt><dd id="anchor-name">-</dd></div>

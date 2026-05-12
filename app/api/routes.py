@@ -19,6 +19,7 @@ router = APIRouter()
 class StartSessionRequest(BaseModel):
     mode: str
     value: str
+    trigger_mode: str = "by_quantity"
 
 
 class ConnectCommandRequest(BaseModel):
@@ -52,6 +53,7 @@ async def start_session(request: Request, payload: StartSessionRequest) -> dict:
         await request.app.state.session_service.start(
             mode=payload.mode,
             value=payload.value,
+            trigger_mode=payload.trigger_mode,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

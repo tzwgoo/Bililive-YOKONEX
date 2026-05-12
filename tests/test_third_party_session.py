@@ -93,6 +93,46 @@ async def test_third_party_session_consumes_gift_and_dispatches_command() -> Non
 
 
 @pytest.mark.anyio
+async def test_third_party_session_consumes_combo_gift_and_dispatches_command() -> None:
+    event_hub = EventHub()
+    gift_dispatcher = FakeGiftDispatcher()
+    ws_client = FakeThirdPartyWsClient(
+        messages=[
+            {
+                "cmd": "COMBO_SEND",
+                "data": {
+                    "gift_id": 31039,
+                    "gift_name": "牛哇牛哇",
+                    "combo_num": 3,
+                    "uname": "测试用户",
+                    "price": 100,
+                    "combo_total_coin": 300,
+                    "timestamp": 1714113037,
+                },
+            }
+        ]
+    )
+    service = ThirdPartyLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=gift_dispatcher,
+        ws_client=ws_client,
+        room_info_fetcher=fake_room_info_fetcher,
+    )
+
+    await service.start(value="123456")
+    await asyncio.sleep(0.05)
+
+    events = event_hub.snapshot()
+
+    assert gift_dispatcher.called_with is not None
+    assert events[-1]["event_type"] == "gift"
+    assert events[-1]["cmd"] == "COMBO_SEND"
+    assert events[-1]["payload"]["gift_num"] == 3
+
+    await service.stop()
+
+
+@pytest.mark.anyio
 async def test_third_party_session_stop_disconnects_ws_client() -> None:
     ws_client = FakeThirdPartyWsClient()
     service = ThirdPartyLiveSessionService(

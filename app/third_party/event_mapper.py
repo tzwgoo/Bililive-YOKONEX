@@ -8,7 +8,7 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
     if not cmd:
         return None
 
-    if cmd == "SEND_GIFT":
+    if cmd in {"SEND_GIFT", "COMBO_SEND"}:
         data = message.get("data", {})
         return {
             "source": "third_party_ws",
@@ -21,9 +21,14 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
             "payload": {
                 "gift_id": _as_int(data.get("giftId") or data.get("gift_id")),
                 "gift_name": str(data.get("giftName") or data.get("gift_name") or ""),
-                "gift_num": _as_int(data.get("num") or data.get("gift_num") or 0),
+                "gift_num": _as_int(data.get("combo_num") or data.get("num") or data.get("gift_num") or 0),
                 "price": _as_int(data.get("price")),
-                "r_price": _as_int(data.get("total_coin") or data.get("r_price") or data.get("price")),
+                "r_price": _as_int(
+                    data.get("combo_total_coin")
+                    or data.get("total_coin")
+                    or data.get("r_price")
+                    or data.get("price")
+                ),
             },
         }
 
