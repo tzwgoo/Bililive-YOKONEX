@@ -16,6 +16,10 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "python -m PyInstaller" in workflow
     assert "Copy-Item" in workflow
     assert "Compress-Archive" in workflow
+    assert "python --version" in workflow
+    assert "Get-Command python" in workflow
+    assert "upload-artifact" in workflow
+    assert "if: failure()" in workflow
     assert "gh release create" in workflow
     assert "gh release upload" in workflow
     assert "BiliLive-YOKONEX.exe" in workflow

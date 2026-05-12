@@ -29,6 +29,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: 构建环境诊断
+        shell: powershell
+        run: |
+          python --version
+          pip --version
+          Get-Command python
+          Get-Command pip
+          python -m pip show pyinstaller
+          Get-ChildItem -Path .
+
       - name: 运行关键测试
         shell: powershell
         run: |
@@ -40,6 +50,7 @@ jobs:
         shell: powershell
         run: |
           python -m pip install pyinstaller
+          New-Item -ItemType Directory -Force -Path "build_logs" | Out-Null
 
           $distRoot = Join-Path $PWD "dist"
           $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
@@ -67,7 +78,7 @@ jobs:
             --hidden-import "bilibili_api.clients.CurlCFFIClient" `
             --add-data "app/templates;app/templates" `
             --add-data "app/static;app/static" `
-            "run_app.py"
+            "run_app.py" *>&1 | Tee-Object -FilePath "build_logs/pyinstaller.log"
 
           if ($LASTEXITCODE -ne 0) {
             throw "PyInstaller 构建失败，退出码: $LASTEXITCODE"
@@ -84,6 +95,17 @@ jobs:
           if (-not (Test-Path $exePath)) {
             throw "构建输出缺少 EXE：$exePath"
           }
+
+      - name: 上传构建调试日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-debug-${{ github.ref_name }}
+          path: |
+            build_logs/**
+            build/**
+            BiliLive-YOKONEX.spec
+          if-no-files-found: warn
 
       - name: 打包完整发布目录
         shell: powershell
