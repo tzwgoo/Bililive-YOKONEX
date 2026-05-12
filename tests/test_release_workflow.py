@@ -14,6 +14,7 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "contents: write" in workflow
     assert "pyinstaller" in workflow
     assert "python -m PyInstaller" in workflow
+    assert workflow.count("pip install pyinstaller") == 1
     assert "Copy-Item" in workflow
     assert "Compress-Archive" in workflow
     assert "python --version" in workflow
