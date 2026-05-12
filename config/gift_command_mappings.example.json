@@ -2,10 +2,10 @@
   {
     "gift_id": 1001,
     "gift_name": "小花花",
-    "command_id": "player_hurt"
+    "command_slot": "command_one"
   },
   {
     "gift_name": "牛哇牛哇",
-    "command_id": "player_attack"
+    "command_slot": "command_two"
   }
 ]

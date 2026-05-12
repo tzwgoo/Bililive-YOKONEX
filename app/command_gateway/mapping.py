@@ -5,6 +5,20 @@ from pathlib import Path
 from typing import Any
 
 
+ALLOWED_COMMAND_SLOTS = {
+    "command_one",
+    "command_two",
+    "command_three",
+    "command_four",
+    "command_five",
+    "command_six",
+    "command_seven",
+    "command_eight",
+    "command_nine",
+    "command_ten",
+}
+
+
 class GiftCommandMapper:
     def __init__(self, rules: list[dict[str, Any]] | None = None) -> None:
         self.rules = rules or []
@@ -12,20 +26,20 @@ class GiftCommandMapper:
         self._commands_by_gift_name: dict[str, str] = {}
 
         for rule in self.rules:
-            command_id = str(rule.get("command_id", "")).strip()
-            if not command_id:
+            command_slot = str(rule.get("command_slot", "")).strip()
+            if command_slot not in ALLOWED_COMMAND_SLOTS:
                 continue
 
             gift_id = rule.get("gift_id")
             if gift_id not in (None, ""):
                 try:
-                    self._commands_by_gift_id[int(gift_id)] = command_id
+                    self._commands_by_gift_id[int(gift_id)] = command_slot
                 except (TypeError, ValueError):
                     pass
 
             gift_name = str(rule.get("gift_name", "")).strip()
             if gift_name:
-                self._commands_by_gift_name[gift_name] = command_id
+                self._commands_by_gift_name[gift_name] = command_slot
 
     @classmethod
     def from_file(cls, path: str | Path) -> "GiftCommandMapper":

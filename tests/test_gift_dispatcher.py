@@ -33,11 +33,11 @@ def test_dispatcher_is_enabled_when_command_session_connected() -> None:
 async def test_dispatcher_sends_command_via_logged_in_command_session() -> None:
     command_session = FakeCommandSession()
     dispatcher = GiftCommandDispatcher(
-        mapper=GiftCommandMapper([{"gift_id": 1001, "command_id": "player_hurt"}]),
+        mapper=GiftCommandMapper([{"gift_id": 1001, "command_slot": "command_one"}]),
         command_session=command_session,
     )
 
     result = await dispatcher.dispatch_gift_event({"payload": {"gift_id": 1001, "gift_name": "小花花"}})
 
-    assert command_session.called_with == "player_hurt"
+    assert command_session.called_with == "command_one"
     assert result["success"] is True
