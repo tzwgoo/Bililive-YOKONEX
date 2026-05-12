@@ -88,7 +88,7 @@ pytest -v
 ## 新增
 
 - 支持官方 open-live 与第三方房间消息流双模式监听
-- 支持礼物命中后下发自定义 command_id
+- 支持礼物命中后下发固定指令槽位 `command_one` 到 `command_ten`
 - 支持本地 Web 控制台管理监听与指令通道
 
 ## 修复

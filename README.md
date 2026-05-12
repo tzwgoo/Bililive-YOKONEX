@@ -1,6 +1,6 @@
 # Bililive-YOKONEX
 
-一个基于 `Python + FastAPI` 的本地直播互动控制台，用来接入 Bilibili 直播事件，并把礼物事件映射成你自定义的 `command_id` 发往下游 WebSocket 指令服务。
+一个基于 `Python + FastAPI` 的本地直播互动控制台，用来接入 Bilibili 直播事件，并把礼物事件映射成固定指令槽位 `command_one` 到 `command_ten` 发往下游 WebSocket 指令服务。
 
 当前支持两种监听模式：
 
@@ -19,7 +19,7 @@
 - 支持第三方房间消息流，适合快速监听普通直播间的礼物、弹幕、点赞
 - 支持本地 Web 控制台，直接在浏览器中启动、停止、查看状态
 - 支持手动登录下游 WebSocket 指令通道
-- 支持礼物映射配置，按 `gift_id / gift_name` 命中后发送自定义 `command_id`
+- 支持礼物映射配置，按 `gift_id / gift_name` 命中后发送固定指令槽位 `command_one` 到 `command_ten`
 - 支持实时展示礼物、弹幕、点赞事件
 - 支持打包为 Windows `exe`
 
@@ -90,7 +90,7 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
   {
     "gift_id": 33988,
     "gift_name": "人气票",
-    "command_id": "gift_33988"
+    "command_slot": "command_one"
   }
 ]
 ```
@@ -99,8 +99,18 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
 
 - 优先按 `gift_id` 精确匹配
 - 如果没有 `gift_id` 命中，再按 `gift_name` 匹配
-- `command_id` 完全由你自己定义
-- 下游服务只负责接收 `command_id`，不需要知道 B 站礼物逻辑
+- `command_slot` 只允许使用以下 10 个固定值：
+  - `command_one`
+  - `command_two`
+  - `command_three`
+  - `command_four`
+  - `command_five`
+  - `command_six`
+  - `command_seven`
+  - `command_eight`
+  - `command_nine`
+  - `command_ten`
+- 下游服务接收到的 `commandId` 就是映射中的 `command_slot`
 
 ## 启动服务
 

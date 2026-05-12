@@ -98,7 +98,7 @@ function renderEvent(event) {
     const dispatch = event.command_dispatch || {};
     const dispatchClass = dispatch.ok === false ? " dispatch-failed" : dispatch.command_id ? " dispatch-success" : "";
     const commandText = dispatch.command_id
-      ? `<small class="dispatch-chip${dispatchClass}">指令 ${dispatch.command_id} · ${dispatch.message || "已处理"}</small>`
+      ? `<small class="dispatch-chip${dispatchClass}">槽位 ${dispatch.command_id} · ${dispatch.message || "已处理"}</small>`
       : "";
     prependEvent(
       giftEvents,
