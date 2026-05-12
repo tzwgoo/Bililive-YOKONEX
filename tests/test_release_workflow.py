@@ -13,7 +13,8 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "windows-latest" in workflow
     assert "contents: write" in workflow
     assert "pyinstaller" in workflow
-    assert "python -m PyInstaller" in workflow
+    assert "PyInstaller" in workflow
+    assert 'Start-Process `' in workflow
     assert workflow.count("pip install pyinstaller") == 1
     assert "Copy-Item" in workflow
     assert "Compress-Archive" in workflow
@@ -32,8 +33,11 @@ def test_release_workflow_powershell_run_blocks_use_ascii_error_messages() -> No
         Path(__file__).resolve().parent.parent / ".github" / "workflows" / "release.yml"
     ).read_text(encoding="utf-8")
 
-    assert "$PSNativeCommandUseErrorActionPreference = $false" in workflow
-    assert "$pyInstallerExitCode = $LASTEXITCODE" in workflow
+    assert 'Start-Process `' in workflow
+    assert '-FilePath "python"' in workflow
+    assert "-RedirectStandardOutput $stdoutLog" in workflow
+    assert "-RedirectStandardError $stderrLog" in workflow
+    assert "$pyInstallerExitCode = $pyInstallerProcess.ExitCode" in workflow
     assert 'throw "PyInstaller build failed with exit code: $pyInstallerExitCode"' in workflow
     assert 'throw "Missing EXE output: $exePath"' in workflow
     assert 'throw "PyInstaller 构建失败' not in workflow

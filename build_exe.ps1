@@ -7,36 +7,62 @@ python -m pip install pyinstaller
 
 $distRoot = Join-Path $projectRoot "dist"
 $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
-$previousNativePreference = $PSNativeCommandUseErrorActionPreference
-$PSNativeCommandUseErrorActionPreference = $false
+$buildLogDir = Join-Path $projectRoot "build_logs"
+$stdoutLog = Join-Path $buildLogDir "pyinstaller.stdout.log"
+$stderrLog = Join-Path $buildLogDir "pyinstaller.stderr.log"
+$combinedLog = Join-Path $buildLogDir "pyinstaller.log"
+
+New-Item -ItemType Directory -Force -Path $buildLogDir | Out-Null
 
 if (Test-Path $packageRoot) {
     Remove-Item -Recurse -Force $packageRoot
 }
 
-pyinstaller `
-  --noconfirm `
-  --clean `
-  --onedir `
-  --name "BiliLive-YOKONEX" `
-  --exclude-module PyQt5 `
-  --exclude-module PyQt6 `
-  --exclude-module PySide2 `
-  --exclude-module PySide6 `
-  --exclude-module matplotlib `
-  --exclude-module IPython `
-  --exclude-module jupyter_client `
-  --exclude-module jupyter_core `
-  --exclude-module tkinter `
-  --hidden-import "bilibili_api.clients.HTTPXClient" `
-  --hidden-import "bilibili_api.clients.AioHTTPClient" `
-  --hidden-import "bilibili_api.clients.CurlCFFIClient" `
-  --add-data "app/templates;app/templates" `
-  --add-data "app/static;app/static" `
-  "run_app.py"
+$pyInstallerArgs = @(
+    "-m",
+    "PyInstaller",
+    "--noconfirm",
+    "--clean",
+    "--onedir",
+    "--name", "BiliLive-YOKONEX",
+    "--exclude-module", "PyQt5",
+    "--exclude-module", "PyQt6",
+    "--exclude-module", "PySide2",
+    "--exclude-module", "PySide6",
+    "--exclude-module", "matplotlib",
+    "--exclude-module", "IPython",
+    "--exclude-module", "jupyter_client",
+    "--exclude-module", "jupyter_core",
+    "--exclude-module", "tkinter",
+    "--hidden-import", "bilibili_api.clients.HTTPXClient",
+    "--hidden-import", "bilibili_api.clients.AioHTTPClient",
+    "--hidden-import", "bilibili_api.clients.CurlCFFIClient",
+    "--add-data", "app/templates;app/templates",
+    "--add-data", "app/static;app/static",
+    "run_app.py"
+)
 
-$pyInstallerExitCode = $LASTEXITCODE
-$PSNativeCommandUseErrorActionPreference = $previousNativePreference
+$pyInstallerProcess = Start-Process `
+    -FilePath "python" `
+    -ArgumentList $pyInstallerArgs `
+    -WorkingDirectory $projectRoot `
+    -RedirectStandardOutput $stdoutLog `
+    -RedirectStandardError $stderrLog `
+    -NoNewWindow `
+    -PassThru `
+    -Wait
+
+if (Test-Path $combinedLog) {
+    Remove-Item $combinedLog -Force
+}
+if (Test-Path $stdoutLog) {
+    Get-Content $stdoutLog | Tee-Object -FilePath $combinedLog -Append
+}
+if (Test-Path $stderrLog) {
+    Get-Content $stderrLog | Tee-Object -FilePath $combinedLog -Append
+}
+
+$pyInstallerExitCode = $pyInstallerProcess.ExitCode
 
 if ($pyInstallerExitCode -ne 0) {
     throw "PyInstaller build failed with exit code: $pyInstallerExitCode"
