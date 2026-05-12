@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+httpx
+websockets
+python-dotenv
+pydantic
+jinja2
+aiohttp
+bilibili-api-python>=17.4.1
+pytest
+pytest-asyncio

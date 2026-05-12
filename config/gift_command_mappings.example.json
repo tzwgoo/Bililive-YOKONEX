@@ -1,0 +1,11 @@
+[
+  {
+    "gift_id": 1001,
+    "gift_name": "小花花",
+    "command_id": "player_hurt"
+  },
+  {
+    "gift_name": "牛哇牛哇",
+    "command_id": "player_attack"
+  }
+]
