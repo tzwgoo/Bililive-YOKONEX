@@ -1,0 +1,72 @@
+name: Release Windows EXE
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG_NAME: ${{ github.ref_name }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 运行关键测试
+        shell: powershell
+        run: |
+          pytest tests/test_frontend_assets.py -v
+          pytest tests/test_build_script.py -v
+          pytest tests/test_release_workflow.py -v
+
+      - name: 构建 EXE
+        shell: powershell
+        run: |
+          .\build_exe.ps1
+
+      - name: 打包完整发布目录
+        shell: powershell
+        run: |
+          $zipName = "Bililive-YOKONEX-$env:TAG_NAME-win-x64.zip"
+          $zipPath = Join-Path $PWD $zipName
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+          Compress-Archive -Path "dist/BiliLive-YOKONEX/*" -DestinationPath $zipPath
+          Write-Output "ZIP_PATH=$zipPath" >> $env:GITHUB_ENV
+          Write-Output "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+
+      - name: 创建或更新 Release
+        shell: powershell
+        run: |
+          gh release view "$env:TAG_NAME" > $null 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "$env:TAG_NAME" --title "$env:TAG_NAME" --generate-notes
+          }
+
+      - name: 上传 Release 文件
+        shell: powershell
+        run: |
+          gh release upload "$env:TAG_NAME" `
+            "dist/BiliLive-YOKONEX/BiliLive-YOKONEX.exe" `
+            "dist/BiliLive-YOKONEX/.env.example" `
+            "dist/BiliLive-YOKONEX/config/gift_command_mappings.json" `
+            "$env:ZIP_PATH" `
+            --clobber

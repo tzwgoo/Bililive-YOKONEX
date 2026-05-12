@@ -2,6 +2,28 @@
 
 这份文档用于把 `Bililive-YOKONEX` 发布到 GitHub Releases，并附带 Windows 可执行文件。
 
+## 当前推荐方式
+
+当前仓库已经配置了 GitHub Actions 自动发布工作流。推荐使用“推送 tag 自动发布”：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+工作流文件：
+
+- `.github/workflows/release.yml`
+
+它会自动完成：
+
+1. 安装 Python 与项目依赖
+2. 运行关键测试
+3. 执行 `build_exe.ps1`
+4. 打包 `dist/BiliLive-YOKONEX/`
+5. 创建同名 GitHub Release
+6. 上传 `exe`、默认配置文件和 zip 包
+
 ## 发布前检查
 
 发布前建议先完成以下步骤：
@@ -32,6 +54,8 @@ pytest -v
 - `v1.0.0`：正式稳定版本
 
 ## GitHub Release 手动发布流程
+
+如果你暂时不想走自动发布，也可以继续手动发布。
 
 1. 打开仓库主页  
    [https://github.com/tzwgoo/Bililive-YOKONEX](https://github.com/tzwgoo/Bililive-YOKONEX)

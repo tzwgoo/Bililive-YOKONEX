@@ -139,6 +139,26 @@ uvicorn app.main:app --reload
 
 - `dist/BiliLive-YOKONEX/BiliLive-YOKONEX.exe`
 
+## 自动发布 Release
+
+仓库已经支持“推送版本标签后自动构建 Windows `exe` 并创建 GitHub Release”。
+
+发布方式：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+触发后，GitHub Actions 会自动：
+
+- 在 `windows-latest` 上安装依赖
+- 运行关键测试
+- 执行 `build_exe.ps1`
+- 生成完整 zip 包
+- 创建同名 Release
+- 上传 `exe`、默认配置文件和 zip 包
+
 ## 测试
 
 运行全量测试：
