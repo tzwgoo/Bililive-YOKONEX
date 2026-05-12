@@ -54,6 +54,8 @@ jobs:
 
           $distRoot = Join-Path $PWD "dist"
           $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
+          $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+          $PSNativeCommandUseErrorActionPreference = $false
 
           if (Test-Path $packageRoot) {
             Remove-Item -Recurse -Force $packageRoot
@@ -80,8 +82,11 @@ jobs:
             --add-data "app/static;app/static" `
             "run_app.py" *>&1 | Tee-Object -FilePath "build_logs/pyinstaller.log"
 
-          if ($LASTEXITCODE -ne 0) {
-            throw "PyInstaller build failed with exit code: $LASTEXITCODE"
+          $pyInstallerExitCode = $LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+
+          if ($pyInstallerExitCode -ne 0) {
+            throw "PyInstaller build failed with exit code: $pyInstallerExitCode"
           }
 
           New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "config") | Out-Null

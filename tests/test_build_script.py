@@ -8,3 +8,6 @@ def test_build_script_includes_bilibili_client_hidden_imports() -> None:
 
     assert "bilibili_api.clients.HTTPXClient" in script
     assert "bilibili_api.clients.AioHTTPClient" in script
+    assert "$PSNativeCommandUseErrorActionPreference = $false" in script
+    assert "$pyInstallerExitCode = $LASTEXITCODE" in script
+    assert 'throw "PyInstaller build failed with exit code: $pyInstallerExitCode"' in script

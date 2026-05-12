@@ -7,6 +7,8 @@ python -m pip install pyinstaller
 
 $distRoot = Join-Path $projectRoot "dist"
 $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
+$previousNativePreference = $PSNativeCommandUseErrorActionPreference
+$PSNativeCommandUseErrorActionPreference = $false
 
 if (Test-Path $packageRoot) {
     Remove-Item -Recurse -Force $packageRoot
@@ -33,8 +35,11 @@ pyinstaller `
   --add-data "app/static;app/static" `
   "run_app.py"
 
-if ($LASTEXITCODE -ne 0) {
-    throw "PyInstaller 构建失败，退出码: $LASTEXITCODE"
+$pyInstallerExitCode = $LASTEXITCODE
+$PSNativeCommandUseErrorActionPreference = $previousNativePreference
+
+if ($pyInstallerExitCode -ne 0) {
+    throw "PyInstaller build failed with exit code: $pyInstallerExitCode"
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "config") | Out-Null
@@ -46,7 +51,7 @@ Copy-Item (Join-Path $projectRoot "docs\*.md") (Join-Path $packageRoot "docs") -
 
 $exePath = Join-Path $packageRoot "BiliLive-YOKONEX.exe"
 if (-not (Test-Path $exePath)) {
-    throw "构建输出缺少 EXE：$exePath"
+    throw "Missing EXE output: $exePath"
 }
 
 Write-Host ""
