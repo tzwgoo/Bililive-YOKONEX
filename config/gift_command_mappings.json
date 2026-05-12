@@ -1,152 +1,52 @@
 [
   {
-    "gift_id": 33988,
-    "gift_name": "人气票",
+    "min_price": 0,
+    "max_price": 99,
     "command_slot": "command_one"
   },
   {
-    "gift_id": 35545,
-    "gift_name": "情书",
+    "min_price": 100,
+    "max_price": 999,
     "command_slot": "command_two"
   },
   {
-    "gift_id": 32251,
-    "gift_name": "心动盲盒",
+    "min_price": 1000,
+    "max_price": 4999,
     "command_slot": "command_three"
   },
   {
-    "gift_id": 31164,
-    "gift_name": "粉丝团灯牌",
+    "min_price": 5000,
+    "max_price": 9999,
     "command_slot": "command_four"
   },
   {
-    "gift_id": 35525,
-    "gift_name": "甜滋滋",
+    "min_price": 10000,
+    "max_price": 19999,
     "command_slot": "command_five"
   },
   {
-    "gift_id": 35567,
-    "gift_name": "梦幻邮轮",
+    "min_price": 20000,
+    "max_price": 49999,
     "command_slot": "command_six"
   },
   {
-    "gift_id": 35566,
-    "gift_name": "落日飞车",
+    "min_price": 50000,
+    "max_price": 99999,
     "command_slot": "command_seven"
   },
   {
-    "gift_id": 35502,
-    "gift_name": "bilibili世界",
+    "min_price": 100000,
+    "max_price": 199999,
     "command_slot": "command_eight"
   },
   {
-    "gift_id": 35521,
-    "gift_name": "心动时刻",
+    "min_price": 200000,
+    "max_price": 999999,
     "command_slot": "command_nine"
   },
   {
-    "gift_id": 35206,
-    "gift_name": "幸运盲盒",
-    "command_slot": "command_ten"
-  },
-  {
-    "gift_id": 35542,
-    "gift_name": "钻石戒指",
-    "command_slot": "command_one"
-  },
-  {
-    "gift_id": 35541,
-    "gift_name": "bilibili星跃",
-    "command_slot": "command_two"
-  },
-  {
-    "gift_id": 31122,
-    "gift_name": "星愿水晶球",
-    "command_slot": "command_three"
-  },
-  {
-    "gift_id": 35577,
-    "gift_name": "冰晶吊坠",
-    "command_slot": "command_four"
-  },
-  {
-    "gift_id": 13000,
-    "gift_name": "发红包",
-    "command_slot": "command_five"
-  },
-  {
-    "gift_id": 35520,
-    "gift_name": "比心",
-    "command_slot": "command_six"
-  },
-  {
-    "gift_id": 35516,
-    "gift_name": "灿烂烟花",
-    "command_slot": "command_seven"
-  },
-  {
-    "gift_id": 35535,
-    "gift_name": "私人飞机",
-    "command_slot": "command_eight"
-  },
-  {
-    "gift_id": 35533,
-    "gift_name": "水晶鞋",
-    "command_slot": "command_nine"
-  },
-  {
-    "gift_id": 34636,
-    "gift_name": "舰长一号",
-    "command_slot": "command_ten"
-  },
-  {
-    "gift_id": 34315,
-    "gift_name": "喜欢你",
-    "command_slot": "command_one"
-  },
-  {
-    "gift_id": 34500,
-    "gift_name": "你真好看",
-    "command_slot": "command_two"
-  },
-  {
-    "gift_id": 35576,
-    "gift_name": "金牛娃娃",
-    "command_slot": "command_three"
-  },
-  {
-    "gift_id": 35519,
-    "gift_name": "音乐盒",
-    "command_slot": "command_four"
-  },
-  {
-    "gift_id": 33012,
-    "gift_name": "666",
-    "command_slot": "command_five"
-  },
-  {
-    "gift_id": 34296,
-    "gift_name": "做我的小猫",
-    "command_slot": "command_six"
-  },
-  {
-    "gift_id": 30873,
-    "gift_name": "花式夸夸",
-    "command_slot": "command_seven"
-  },
-  {
-    "gift_id": 35536,
-    "gift_name": "撒花",
-    "command_slot": "command_eight"
-  },
-  {
-    "gift_id": 31039,
-    "gift_name": "牛哇牛哇",
-    "command_slot": "command_nine"
-  },
-  {
-    "gift_id": 34381,
-    "gift_name": "飞屋环游",
+    "min_price": 1000000,
+    "max_price": null,
     "command_slot": "command_ten"
   }
 ]

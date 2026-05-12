@@ -23,6 +23,31 @@ def test_map_send_gift_to_standard_gift_event() -> None:
     assert event["payload"]["gift_name"] == "辣条"
 
 
+def test_map_combo_send_to_standard_gift_event() -> None:
+    event = map_third_party_message(
+        {
+            "cmd": "COMBO_SEND",
+            "data": {
+                "gift_id": 31039,
+                "gift_name": "牛哇牛哇",
+                "combo_num": 3,
+                "uname": "测试用户",
+                "price": 100,
+                "combo_total_coin": 300,
+                "timestamp": 1714113037,
+            },
+        },
+        room_id=123456,
+    )
+
+    assert event is not None
+    assert event["event_type"] == "gift"
+    assert event["cmd"] == "COMBO_SEND"
+    assert event["payload"]["gift_name"] == "牛哇牛哇"
+    assert event["payload"]["gift_num"] == 3
+    assert event["payload"]["r_price"] == 300
+
+
 def test_map_danmaku_to_standard_event() -> None:
     message = {
         "cmd": "DANMU_MSG",

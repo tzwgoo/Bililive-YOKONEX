@@ -16,10 +16,12 @@ def test_frontend_contains_dual_mode_controls() -> None:
     index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
 
     assert "session-mode" in index_html
+    assert "trigger-mode" in index_html
     assert "open_live" in index_html
     assert "third_party" in index_html
     assert "mode: sessionModeSelect.value" in app_js
     assert "value: sessionValueInput.value" in app_js
+    assert "trigger_mode: triggerModeSelect.value" in app_js
 
 
 def test_event_panels_use_fixed_height_scroll_layout() -> None:

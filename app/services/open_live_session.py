@@ -39,11 +39,12 @@ class OpenLiveSessionService:
         self.last_command_message = ""
         self.last_event_at = 0
         self.last_heartbeat_at = 0
+        self.trigger_mode = "by_quantity"
         self._heartbeat_task: asyncio.Task | None = None
         self._consume_task: asyncio.Task | None = None
         self._interaction_ended = False
 
-    async def start(self, *, value: str) -> None:
+    async def start(self, *, value: str, trigger_mode: str = "by_quantity") -> None:
         code = value.strip()
         if self.config_error:
             raise ValueError(self.config_error)
@@ -54,6 +55,9 @@ class OpenLiveSessionService:
         if self.status in {SessionStatus.STARTING, SessionStatus.RUNNING, SessionStatus.RECONNECTING}:
             raise ValueError("当前已有会话正在运行")
 
+        self.trigger_mode = trigger_mode
+        if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_trigger_mode"):
+            self.gift_dispatcher.set_trigger_mode(trigger_mode)
         self.status = SessionStatus.STARTING
         self.last_error = ""
         self.last_command_id = ""
@@ -119,6 +123,7 @@ class OpenLiveSessionService:
             "last_heartbeat_at": self.last_heartbeat_at,
             "last_command_id": self.last_command_id,
             "last_command_message": self.last_command_message,
+            "trigger_mode": self.trigger_mode,
             "command_dispatch_enabled": bool(
                 self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False)
             ),

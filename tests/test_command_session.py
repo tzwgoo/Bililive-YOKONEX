@@ -57,3 +57,30 @@ async def test_disconnect_resets_connection_state() -> None:
     assert payload["status"] == "idle"
     assert payload["user_id"] == ""
     assert payload["can_connect"] is True
+
+
+def test_disconnecting_status_allows_reconnect_button() -> None:
+    service = CommandSessionService(client_factory=FakeCommandClient)
+    service.status = "disconnecting"
+
+    payload = service.get_status_payload()
+
+    assert payload["can_connect"] is True
+    assert payload["can_disconnect"] is False
+
+
+@pytest.mark.anyio
+async def test_connect_during_disconnecting_replaces_old_connection() -> None:
+    service = CommandSessionService(client_factory=FakeCommandClient)
+    await service.connect(ws_url="ws://127.0.0.1:43001/", uid="123456", token="token")
+    previous_client = service._client
+    service.status = "disconnecting"
+
+    await service.connect(ws_url="ws://127.0.0.1:43001/", uid="game_999999", token="token-2")
+
+    payload = service.get_status_payload()
+    assert previous_client is not None
+    assert previous_client.disconnected is True
+    assert payload["status"] == "connected"
+    assert payload["uid"] == "game_999999"
+    assert payload["can_connect"] is False

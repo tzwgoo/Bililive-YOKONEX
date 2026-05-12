@@ -35,10 +35,11 @@ class ThirdPartyLiveSessionService:
         self.last_heartbeat_at = 0
         self.last_command_id = ""
         self.last_command_message = ""
+        self.trigger_mode = "by_quantity"
         self._consume_task: asyncio.Task | None = None
         self._stop_requested = False
 
-    async def start(self, *, value: str) -> None:
+    async def start(self, *, value: str, trigger_mode: str = "by_quantity") -> None:
         room_id = value.strip()
         if not room_id:
             raise ValueError("房间号不能为空")
@@ -50,6 +51,9 @@ class ThirdPartyLiveSessionService:
             raise ValueError("房间号必须是数字") from exc
 
         self.room_id = normalized_room_id
+        self.trigger_mode = trigger_mode
+        if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_trigger_mode"):
+            self.gift_dispatcher.set_trigger_mode(trigger_mode)
         self.anchor_name = ""
         self.last_error = ""
         self.last_command_id = ""
@@ -89,6 +93,7 @@ class ThirdPartyLiveSessionService:
             "last_heartbeat_at": self.last_heartbeat_at,
             "last_command_id": self.last_command_id,
             "last_command_message": self.last_command_message,
+            "trigger_mode": self.trigger_mode,
             "command_dispatch_enabled": bool(
                 self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False)
             ),

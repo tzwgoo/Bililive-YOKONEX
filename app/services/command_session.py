@@ -37,15 +37,17 @@ class CommandSessionService:
             "last_login_at": self.last_login_at,
             "last_command_id": self.last_command_id,
             "last_command_message": self.last_command_message,
-            "can_connect": self.status in {"idle", "error"},
+            "can_connect": self.status in {"idle", "error", "disconnecting"},
             "can_disconnect": self.status == "connected",
         }
 
     async def connect(self, *, ws_url: str, uid: str, token: str) -> dict[str, Any]:
-        if self.status in {"connecting", "connected", "disconnecting"}:
+        if self.status in {"connecting", "connected"}:
             raise ValueError("当前指令通道已有连接正在处理")
         if not ws_url.strip() or not uid.strip() or not token.strip():
             raise ValueError("WS URL、UID、TOKEN 不能为空")
+        if self.status == "disconnecting":
+            await self._reset_client()
 
         self.status = "connecting"
         self.message = ""
@@ -79,10 +81,8 @@ class CommandSessionService:
 
         self.status = "disconnecting"
         try:
-            if self._client is not None and hasattr(self._client, "disconnect"):
-                await self._client.disconnect()
+            await self._reset_client()
         finally:
-            self._client = None
             self.status = "idle"
             self.message = ""
             self.user_id = ""
@@ -95,3 +95,8 @@ class CommandSessionService:
         self.last_command_id = command_id
         self.last_command_message = result.get("message", "")
         return result
+
+    async def _reset_client(self) -> None:
+        if self._client is not None and hasattr(self._client, "disconnect"):
+            await self._client.disconnect()
+        self._client = None

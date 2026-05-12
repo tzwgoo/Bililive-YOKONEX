@@ -19,7 +19,8 @@
 - 支持第三方房间消息流，适合快速监听普通直播间的礼物、弹幕、点赞
 - 支持本地 Web 控制台，直接在浏览器中启动、停止、查看状态
 - 支持手动登录下游 WebSocket 指令通道
-- 支持礼物映射配置，按 `gift_id / gift_name` 命中后发送固定指令槽位 `command_one` 到 `command_ten`
+- 支持礼物映射配置，按礼物单价区间命中固定指令槽位 `command_one` 到 `command_ten`
+- 支持页面切换礼物触发模式：`单次触发` 或 `按礼物数量触发`
 - 支持实时展示礼物、弹幕、点赞事件
 - 支持打包为 Windows `exe`
 
@@ -88,17 +89,23 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
 ```json
 [
   {
-    "gift_id": 33988,
-    "gift_name": "人气票",
+    "min_price": 0,
+    "max_price": 99,
     "command_slot": "command_one"
+  },
+  {
+    "min_price": 100,
+    "max_price": 999,
+    "command_slot": "command_two"
   }
 ]
 ```
 
 规则说明：
 
-- 优先按 `gift_id` 精确匹配
-- 如果没有 `gift_id` 命中，再按 `gift_name` 匹配
+- 取礼物事件里的单个礼物价格，优先使用 `r_price`，没有时回退到 `price`
+- 如果价格落在某个 `min_price ~ max_price` 区间内，就命中对应的 `command_slot`
+- `max_price` 可以填 `null`，表示“不设上限”
 - `command_slot` 只允许使用以下 10 个固定值：
   - `command_one`
   - `command_two`
@@ -110,7 +117,10 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
   - `command_eight`
   - `command_nine`
   - `command_ten`
-- 下游服务接收到的 `commandId` 就是映射中的 `command_slot`
+- 页面支持两种触发模式：
+  - `按礼物数量触发`：按 `gift_num` 连续触发多次
+  - `单次触发`：每条礼物事件只触发一次
+- 下游服务接收到的 `commandId` 就是命中的 `command_slot`
 
 ## 启动服务
 
@@ -127,13 +137,16 @@ uvicorn app.main:app --reload
 1. 打开页面，选择监听模式：
    - `官方 open-live`
    - `第三方房间消息流`
-2. 在“指令通道”区域输入 `WS URL / UID / TOKEN`
-3. 点击“登录指令通道”
-4. 官方模式下输入主播身份码 `code`
-5. 第三方模式下输入直播间房间长 ID `room_id`
-6. 点击“启动监听”
-7. 当收到礼物、弹幕、点赞事件时，页面会实时刷新
-8. 当礼物命中映射规则时，程序会向下游发送 `sendCommand`
+2. 选择礼物触发模式：
+   - `按礼物数量触发`
+   - `单次触发`
+3. 在“指令通道”区域输入 `WS URL / UID / TOKEN`
+4. 点击“登录指令通道”
+5. 官方模式下输入主播身份码 `code`
+6. 第三方模式下输入直播间房间长 ID `room_id`
+7. 点击“启动监听”
+8. 当收到礼物、弹幕、点赞事件时，页面会实时刷新
+9. 当礼物价格命中映射区间时，程序会向下游发送 `sendCommand`
 
 ## 打包为 EXE
 

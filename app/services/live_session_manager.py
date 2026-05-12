@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.gift_dispatcher import normalize_trigger_mode
+
 
 class LiveSessionManager:
     MODE_OPEN_LIVE = "open_live"
@@ -17,10 +19,12 @@ class LiveSessionManager:
         self.third_party_session = third_party_session
         self.mode = self.MODE_OPEN_LIVE
         self._active_mode: str | None = None
+        self.trigger_mode = "by_quantity"
 
-    async def start(self, *, mode: str, value: str) -> None:
+    async def start(self, *, mode: str, value: str, trigger_mode: str = "by_quantity") -> None:
         normalized_mode = self._normalize_mode(mode)
         normalized_value = value.strip()
+        normalized_trigger_mode = normalize_trigger_mode(trigger_mode)
         if not normalized_value:
             raise ValueError("启动参数不能为空")
 
@@ -28,7 +32,11 @@ class LiveSessionManager:
             await self.stop()
 
         self.mode = normalized_mode
-        await self._get_service(normalized_mode).start(value=normalized_value)
+        self.trigger_mode = normalized_trigger_mode
+        await self._get_service(normalized_mode).start(
+            value=normalized_value,
+            trigger_mode=normalized_trigger_mode,
+        )
         self._active_mode = normalized_mode
 
     async def stop(self) -> None:
@@ -42,6 +50,7 @@ class LiveSessionManager:
         payload = dict(self._get_service(service_mode).get_status_payload())
         payload["mode"] = self.mode
         payload["mode_label"] = self.MODE_LABELS[self.mode]
+        payload["trigger_mode"] = self.trigger_mode
         return payload
 
     def _get_service(self, mode: str) -> Any:

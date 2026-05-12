@@ -60,6 +60,7 @@ class FakeSessionManager:
             "message": "",
             "mode": "open_live",
             "mode_label": "官方 open-live",
+            "trigger_mode": "by_quantity",
             "game_id": "",
             "room_id": 0,
             "anchor_name": "",
@@ -78,12 +79,13 @@ class FakeSessionManager:
     def get_status_payload(self) -> dict:
         return self.status
 
-    async def start(self, *, mode: str, value: str) -> None:
-        self.start_called_with = {"mode": mode, "value": value}
+    async def start(self, *, mode: str, value: str, trigger_mode: str) -> None:
+        self.start_called_with = {"mode": mode, "value": value, "trigger_mode": trigger_mode}
         self.status = {
             **self.status,
             "status": "running",
             "mode": mode,
+            "trigger_mode": trigger_mode,
             "can_start": False,
             "can_stop": True,
         }
@@ -108,6 +110,7 @@ def test_status_endpoint_returns_idle_state() -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "idle"
     assert response.json()["mode"] == "open_live"
+    assert response.json()["trigger_mode"] == "by_quantity"
 
 
 def test_command_status_endpoint_returns_idle_state() -> None:
@@ -153,6 +156,7 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
         json={
             "mode": "third_party",
             "value": "123456",
+            "trigger_mode": "single",
         },
     )
 
@@ -160,6 +164,7 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
     assert fake_session_manager.start_called_with == {
         "mode": "third_party",
         "value": "123456",
+        "trigger_mode": "single",
     }
 
 
