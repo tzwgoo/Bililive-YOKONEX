@@ -13,7 +13,7 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "windows-latest" in workflow
     assert "contents: write" in workflow
     assert "build_exe.ps1" in workflow
-    assert "ExecutionPolicy Bypass" in workflow
+    assert "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass" in workflow
     assert "Compress-Archive" in workflow
     assert "gh release create" in workflow
     assert "gh release upload" in workflow

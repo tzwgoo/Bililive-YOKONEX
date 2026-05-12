@@ -39,7 +39,8 @@ jobs:
       - name: 构建 EXE
         shell: powershell
         run: |
-          powershell -ExecutionPolicy Bypass -File .\build_exe.ps1
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+          .\build_exe.ps1
 
       - name: 打包完整发布目录
         shell: powershell
