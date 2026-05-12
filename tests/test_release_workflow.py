@@ -25,3 +25,14 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "gh release upload" in workflow
     assert "BiliLive-YOKONEX.exe" in workflow
     assert "Bililive-YOKONEX-" in workflow
+
+
+def test_release_workflow_powershell_run_blocks_use_ascii_error_messages() -> None:
+    workflow = (
+        Path(__file__).resolve().parent.parent / ".github" / "workflows" / "release.yml"
+    ).read_text(encoding="utf-8")
+
+    assert 'throw "PyInstaller build failed with exit code: $LASTEXITCODE"' in workflow
+    assert 'throw "Missing EXE output: $exePath"' in workflow
+    assert 'throw "PyInstaller 构建失败' not in workflow
+    assert 'throw "构建输出缺少 EXE' not in workflow
