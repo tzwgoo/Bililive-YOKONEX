@@ -150,17 +150,80 @@ jobs:
       - name: 创建或更新 Release
         shell: powershell
         run: |
-          gh release view "$env:TAG_NAME" > $null 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            gh release create "$env:TAG_NAME" --title "$env:TAG_NAME" --generate-notes
+          $releaseLogDir = Join-Path $PWD "release_logs"
+          New-Item -ItemType Directory -Force -Path $releaseLogDir | Out-Null
+
+          $viewStdoutLog = Join-Path $releaseLogDir "gh-release-view.stdout.log"
+          $viewStderrLog = Join-Path $releaseLogDir "gh-release-view.stderr.log"
+          $createStdoutLog = Join-Path $releaseLogDir "gh-release-create.stdout.log"
+          $createStderrLog = Join-Path $releaseLogDir "gh-release-create.stderr.log"
+
+          $releaseViewProcess = Start-Process `
+            -FilePath "gh" `
+            -ArgumentList @("release", "view", $env:TAG_NAME) `
+            -WorkingDirectory $PWD `
+            -RedirectStandardOutput $viewStdoutLog `
+            -RedirectStandardError $viewStderrLog `
+            -NoNewWindow `
+            -PassThru `
+            -Wait
+
+          if ($releaseViewProcess.ExitCode -ne 0) {
+            $releaseCreateProcess = Start-Process `
+              -FilePath "gh" `
+              -ArgumentList @("release", "create", $env:TAG_NAME, "--title", $env:TAG_NAME, "--generate-notes") `
+              -WorkingDirectory $PWD `
+              -RedirectStandardOutput $createStdoutLog `
+              -RedirectStandardError $createStderrLog `
+              -NoNewWindow `
+              -PassThru `
+              -Wait
+
+            if ($releaseCreateProcess.ExitCode -ne 0) {
+              if (Test-Path $createStdoutLog) {
+                Get-Content $createStdoutLog
+              }
+              if (Test-Path $createStderrLog) {
+                Get-Content $createStderrLog
+              }
+              throw "gh release create failed with exit code: $($releaseCreateProcess.ExitCode)"
+            }
           }
 
       - name: 上传 Release 文件
         shell: powershell
         run: |
-          gh release upload "$env:TAG_NAME" `
-            "dist/BiliLive-YOKONEX/BiliLive-YOKONEX.exe" `
-            "dist/BiliLive-YOKONEX/.env.example" `
-            "dist/BiliLive-YOKONEX/config/gift_command_mappings.json" `
-            "$env:ZIP_PATH" `
-            --clobber
+          $releaseLogDir = Join-Path $PWD "release_logs"
+          New-Item -ItemType Directory -Force -Path $releaseLogDir | Out-Null
+
+          $uploadStdoutLog = Join-Path $releaseLogDir "gh-release-upload.stdout.log"
+          $uploadStderrLog = Join-Path $releaseLogDir "gh-release-upload.stderr.log"
+
+          $releaseUploadProcess = Start-Process `
+            -FilePath "gh" `
+            -ArgumentList @(
+              "release",
+              "upload",
+              $env:TAG_NAME,
+              "dist/BiliLive-YOKONEX/BiliLive-YOKONEX.exe",
+              "dist/BiliLive-YOKONEX/.env.example",
+              "dist/BiliLive-YOKONEX/config/gift_command_mappings.json",
+              $env:ZIP_PATH,
+              "--clobber"
+            ) `
+            -WorkingDirectory $PWD `
+            -RedirectStandardOutput $uploadStdoutLog `
+            -RedirectStandardError $uploadStderrLog `
+            -NoNewWindow `
+            -PassThru `
+            -Wait
+
+          if ($releaseUploadProcess.ExitCode -ne 0) {
+            if (Test-Path $uploadStdoutLog) {
+              Get-Content $uploadStdoutLog
+            }
+            if (Test-Path $uploadStderrLog) {
+              Get-Content $uploadStderrLog
+            }
+            throw "gh release upload failed with exit code: $($releaseUploadProcess.ExitCode)"
+          }

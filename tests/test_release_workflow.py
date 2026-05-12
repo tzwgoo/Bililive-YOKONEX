@@ -22,8 +22,9 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "Get-Command python" in workflow
     assert "upload-artifact" in workflow
     assert "if: failure()" in workflow
-    assert "gh release create" in workflow
-    assert "gh release upload" in workflow
+    assert '"release", "create"' in workflow
+    assert '"upload",' in workflow
+    assert '-FilePath "gh"' in workflow
     assert "BiliLive-YOKONEX.exe" in workflow
     assert "Bililive-YOKONEX-" in workflow
 
@@ -38,6 +39,8 @@ def test_release_workflow_powershell_run_blocks_use_ascii_error_messages() -> No
     assert "-RedirectStandardOutput $stdoutLog" in workflow
     assert "-RedirectStandardError $stderrLog" in workflow
     assert "$pyInstallerExitCode = $pyInstallerProcess.ExitCode" in workflow
+    assert 'gh release create failed with exit code:' in workflow
+    assert 'gh release upload failed with exit code:' in workflow
     assert 'throw "PyInstaller build failed with exit code: $pyInstallerExitCode"' in workflow
     assert 'throw "Missing EXE output: $exePath"' in workflow
     assert 'throw "PyInstaller 构建失败' not in workflow
