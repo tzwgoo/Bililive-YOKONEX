@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -17,6 +18,7 @@ router = APIRouter()
 class StartSessionRequest(BaseModel):
     mode: str
     value: str
+    connection_mode: str = "im"
     output_mode: str = "im"
     trigger_mode: str = "by_quantity"
     like_multiple: int = 100
@@ -35,11 +37,39 @@ class ConnectBluetoothRequest(BaseModel):
     device_id: str
 
 
+class BluetoothRuleUpdateItem(BaseModel):
+    id: str
+    enabled: bool
+    waveform_id: str
+
+
+class UpdateBluetoothRulesRequest(BaseModel):
+    rules: list[BluetoothRuleUpdateItem]
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
         name="index.html",
+        context={},
+    )
+
+
+@router.get("/bluetooth/studio", response_class=HTMLResponse)
+async def bluetooth_studio(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="bluetooth_studio.html",
+        context={},
+    )
+
+
+@router.get("/bluetooth/overlay", response_class=HTMLResponse)
+async def bluetooth_overlay(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="bluetooth_overlay.html",
         context={},
     )
 
@@ -57,6 +87,16 @@ async def get_command_status(request: Request) -> dict:
 @router.get("/api/bluetooth/status")
 async def get_bluetooth_status(request: Request) -> dict:
     return request.app.state.bluetooth_service.get_status_payload()
+
+
+@router.get("/api/bluetooth/studio")
+async def get_bluetooth_studio_data(request: Request) -> dict:
+    return request.app.state.bluetooth_service.get_studio_payload()
+
+
+@router.get("/api/bluetooth/overlay/status")
+async def get_bluetooth_overlay_status(request: Request) -> dict:
+    return request.app.state.bluetooth_service.get_overlay_payload()
 
 
 @router.post("/api/bluetooth/scan")
@@ -82,7 +122,7 @@ async def scan_bluetooth_devices(request: Request) -> dict:
 async def connect_bluetooth_device(request: Request, payload: ConnectBluetoothRequest) -> dict:
     try:
         status = await request.app.state.bluetooth_service.connect(payload.device_id)
-    except ValueError as exc:
+    except (ValueError, RuntimeError, TimeoutError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "success": True,
@@ -101,13 +141,45 @@ async def disconnect_bluetooth_device(request: Request) -> dict:
     }
 
 
+@router.post("/api/bluetooth/rules")
+async def update_bluetooth_rules(request: Request, payload: UpdateBluetoothRulesRequest) -> dict:
+    try:
+        return request.app.state.bluetooth_service.save_rules(
+            [item.model_dump() for item in payload.rules]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/api/bluetooth/overlay/stream")
+async def bluetooth_overlay_stream(request: Request, once: bool = False) -> StreamingResponse:
+    bluetooth_service = request.app.state.bluetooth_service
+
+    async def generate():
+        last_revision = -1
+        while True:
+            if await request.is_disconnected():
+                break
+            payload = bluetooth_service.get_overlay_payload()
+            revision = int(payload.get("revision", 0) or 0)
+            if revision != last_revision:
+                last_revision = revision
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                if once:
+                    break
+            await asyncio.sleep(0.12)
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
 @router.post("/api/session/start")
 async def start_session(request: Request, payload: StartSessionRequest) -> dict:
     try:
+        normalized_connection_mode = payload.connection_mode or payload.output_mode
         await request.app.state.session_service.start(
             mode=payload.mode,
             value=payload.value,
-            output_mode=payload.output_mode,
+            output_mode=normalized_connection_mode,
             trigger_mode=payload.trigger_mode,
             like_multiple=payload.like_multiple,
             danmaku_enabled=payload.danmaku_enabled,

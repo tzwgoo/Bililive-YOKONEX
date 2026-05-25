@@ -48,13 +48,6 @@
                     <option value="third_party">第三方房间消息流</option>
                   </select>
                 </div>
-                <div class="field">
-                  <label for="output-mode">输出方式</label>
-                  <select id="output-mode">
-                    <option value="im">IM 指令</option>
-                    <option value="bluetooth">蓝牙</option>
-                  </select>
-                </div>
                 <div class="field session-value-field">
                   <label for="session-value-input" id="session-value-label">主播身份码</label>
                   <input id="session-value-input" type="text" placeholder="请输入主播身份码 code" />
@@ -114,39 +107,88 @@
         </article>
 
         <aside class="sidebar-stack">
-          <article class="panel controls control-panel command-panel">
+          <article class="panel controls control-panel command-panel" id="connection-mode-panel">
             <div class="section-head">
               <div>
-                <p class="section-kicker">Command Gateway</p>
-                <h2>指令通道</h2>
-                <p class="subtitle">先手动登录下游 WebSocket 指令通道，再让礼物、点赞和弹幕触发各自的命令。</p>
+                <p class="section-kicker">Connection Mode</p>
+                <h2>连接方式</h2>
+                <p class="subtitle">在同一个入口里切换 IM 指令或蓝牙连接，连接成功后再启动直播监听。</p>
               </div>
-              <div class="status-pill" id="command-status-pill">idle</div>
             </div>
             <div class="control-grid command-grid">
               <div class="field field-span-2">
-                <label for="command-ws-url">WS URL</label>
-                <input id="command-ws-url" type="text" placeholder="ws://103.236.55.92:43001/" />
-              </div>
-              <div class="field">
-                <label for="command-uid">UID</label>
-                <input id="command-uid" type="text" placeholder="请输入下游服务 UID" />
-              </div>
-              <div class="field">
-                <label for="command-token">TOKEN</label>
-                <input id="command-token" type="password" placeholder="请输入下游服务 TOKEN" />
+                <label for="connection-mode">连接方式</label>
+                <select id="connection-mode">
+                  <option value="im">IM 指令</option>
+                  <option value="bluetooth">蓝牙</option>
+                </select>
               </div>
             </div>
-            <div class="buttons">
-              <button id="command-connect-btn">登录指令通道</button>
-              <button id="command-disconnect-btn" class="secondary">退出指令通道</button>
-            </div>
-            <p class="hint" id="command-message-text">未登录</p>
-            <div class="meta-inline">
-              <span>当前 UID：<strong id="command-status-uid">-</strong></span>
-              <span>当前 User ID：<strong id="command-user-id">-</strong></span>
-              <span>最近登录时间：<strong id="command-last-login-at">-</strong></span>
-            </div>
+
+            <section id="command-connection-section">
+              <div class="section-head section-head-compact">
+                <div>
+                  <p class="section-kicker">Command Gateway</p>
+                  <h3>IM 指令连接</h3>
+                </div>
+                <div class="status-pill" id="command-status-pill">idle</div>
+              </div>
+              <div class="control-grid command-grid">
+                <div class="field field-span-2">
+                  <label for="command-ws-url">WS URL</label>
+                  <input id="command-ws-url" type="text" placeholder="ws://103.236.55.92:43001/" />
+                </div>
+                <div class="field">
+                  <label for="command-uid">UID</label>
+                  <input id="command-uid" type="text" placeholder="请输入下游服务 UID" />
+                </div>
+                <div class="field">
+                  <label for="command-token">TOKEN</label>
+                  <input id="command-token" type="password" placeholder="请输入下游服务 TOKEN" />
+                </div>
+              </div>
+              <div class="buttons">
+                <button id="command-connect-btn">登录指令通道</button>
+                <button id="command-disconnect-btn" class="secondary">退出指令通道</button>
+              </div>
+              <p class="hint" id="command-message-text">未登录</p>
+              <div class="meta-inline">
+                <span>当前 UID：<strong id="command-status-uid">-</strong></span>
+                <span>当前 User ID：<strong id="command-user-id">-</strong></span>
+                <span>最近登录时间：<strong id="command-last-login-at">-</strong></span>
+              </div>
+            </section>
+
+            <section id="bluetooth-connection-section">
+              <div class="section-head section-head-compact">
+                <div>
+                  <p class="section-kicker">EMS Bluetooth</p>
+                  <h3>蓝牙连接</h3>
+                </div>
+                <div class="status-pill" id="bluetooth-status-pill">idle</div>
+              </div>
+              <div class="buttons">
+                <button id="bluetooth-scan-btn">扫描设备</button>
+                <button id="bluetooth-disconnect-btn" class="secondary">断开设备</button>
+                <a class="button-link secondary-link" href="/bluetooth/overlay" target="_blank" rel="noopener noreferrer">OBS 小窗</a>
+                <a class="button-link secondary-link" href="/bluetooth/studio">波形与事件规则</a>
+              </div>
+              <p class="hint" id="bluetooth-message-text">未连接</p>
+              <div class="bluetooth-grid">
+                <section class="bluetooth-card">
+                  <div class="stream-head">
+                    <h3>设备列表</h3>
+                  </div>
+                  <div id="bluetooth-devices" class="mini-list"></div>
+                </section>
+                <section class="bluetooth-card">
+                  <div class="stream-head">
+                    <h3>事件规则</h3>
+                  </div>
+                  <div id="bluetooth-rules" class="mini-list"></div>
+                </section>
+              </div>
+            </section>
           </article>
 
           <article class="panel meta meta-sidebar">
@@ -157,7 +199,7 @@
               </div>
             </div>
             <dl>
-              <div><dt>输出方式</dt><dd id="output-mode-label">IM 指令</dd></div>
+              <div><dt>连接方式</dt><dd id="connection-mode-label">IM 指令</dd></div>
               <div><dt>触发模式</dt><dd id="trigger-mode-label">按礼物数量触发</dd></div>
               <div><dt>点赞倍数</dt><dd id="like-multiple-label">100</dd></div>
               <div><dt>弹幕开关</dt><dd id="danmaku-enabled-label">关闭</dd></div>
@@ -169,44 +211,6 @@
             </dl>
           </article>
         </aside>
-      </section>
-
-      <section class="bluetooth-shell">
-        <article class="panel bluetooth-panel">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">EMS Bluetooth</p>
-              <h2>EMS 蓝牙连接</h2>
-              <p class="subtitle">先完成设备扫描和连接，再逐步把直播事件绑定到 EMS 波形上。</p>
-            </div>
-            <div class="status-pill" id="bluetooth-status-pill">idle</div>
-          </div>
-          <div class="buttons">
-            <button id="bluetooth-scan-btn">扫描设备</button>
-            <button id="bluetooth-disconnect-btn" class="secondary">断开设备</button>
-          </div>
-          <p class="hint" id="bluetooth-message-text">未连接</p>
-          <div class="bluetooth-grid">
-            <section class="bluetooth-card">
-              <div class="stream-head">
-                <h3>设备列表</h3>
-              </div>
-              <div id="bluetooth-devices" class="mini-list"></div>
-            </section>
-            <section class="bluetooth-card">
-              <div class="stream-head">
-                <h3>波形库</h3>
-              </div>
-              <div id="bluetooth-waveforms" class="mini-list"></div>
-            </section>
-            <section class="bluetooth-card">
-              <div class="stream-head">
-                <h3>事件规则</h3>
-              </div>
-              <div id="bluetooth-rules" class="mini-list"></div>
-            </section>
-          </div>
-        </article>
       </section>
 
       <section class="grid">

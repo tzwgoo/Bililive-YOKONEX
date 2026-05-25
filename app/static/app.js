@@ -3,7 +3,7 @@ const messageText = document.getElementById("message-text");
 const roomId = document.getElementById("room-id");
 const anchorName = document.getElementById("anchor-name");
 const sessionModeSelect = document.getElementById("session-mode");
-const outputModeSelect = document.getElementById("output-mode");
+const connectionModeSelect = document.getElementById("connection-mode");
 const triggerModeSelect = document.getElementById("trigger-mode");
 const likeMultipleInput = document.getElementById("like-multiple");
 const danmakuEnabledSelect = document.getElementById("danmaku-enabled");
@@ -23,13 +23,14 @@ const commandDisconnectBtn = document.getElementById("command-disconnect-btn");
 const commandStatusUid = document.getElementById("command-status-uid");
 const commandUserId = document.getElementById("command-user-id");
 const commandLastLoginAt = document.getElementById("command-last-login-at");
+const commandConnectionSection = document.getElementById("command-connection-section");
 const bluetoothStatusPill = document.getElementById("bluetooth-status-pill");
 const bluetoothMessageText = document.getElementById("bluetooth-message-text");
 const bluetoothScanBtn = document.getElementById("bluetooth-scan-btn");
 const bluetoothDisconnectBtn = document.getElementById("bluetooth-disconnect-btn");
 const bluetoothDevices = document.getElementById("bluetooth-devices");
-const bluetoothWaveforms = document.getElementById("bluetooth-waveforms");
 const bluetoothRules = document.getElementById("bluetooth-rules");
+const bluetoothConnectionSection = document.getElementById("bluetooth-connection-section");
 
 const giftEvents = document.getElementById("gift-events");
 const danmakuEvents = document.getElementById("danmaku-events");
@@ -38,7 +39,7 @@ const giftCount = document.getElementById("gift-count");
 const danmakuCount = document.getElementById("danmaku-count");
 const likeCount = document.getElementById("like-count");
 const lastEventAt = document.getElementById("last-event-at");
-const outputModeLabel = document.getElementById("output-mode-label");
+const connectionModeLabel = document.getElementById("connection-mode-label");
 const triggerModeLabel = document.getElementById("trigger-mode-label");
 const likeMultipleLabel = document.getElementById("like-multiple-label");
 const danmakuEnabledLabel = document.getElementById("danmaku-enabled-label");
@@ -49,17 +50,19 @@ const commandWsUrlStorageKey = "biliLive.commandWsUrl";
 const commandUidStorageKey = "biliLive.commandUid";
 const commandTokenStorageKey = "biliLive.commandToken";
 const sessionModeStorageKey = "biliLive.sessionMode";
-const outputModeStorageKey = "biliLive.outputMode";
+const sessionValueStorageKey = "biliLive.sessionValue";
+const connectionModeStorageKey = "biliLive.connectionMode";
 const triggerModeStorageKey = "biliLive.triggerMode";
 const likeMultipleStorageKey = "biliLive.likeMultiple";
 const danmakuEnabledStorageKey = "biliLive.danmakuEnabled";
 const danmakuKeywordsStorageKey = "biliLive.danmakuKeywords";
 const danmakuCooldownSecondsStorageKey = "biliLive.danmakuCooldownSeconds";
+const bluetoothOverlayWindowName = "biliLiveBluetoothOverlay";
 const triggerModeOptions = {
   by_quantity: "按礼物数量触发",
   single: "单次触发",
 };
-const outputModeOptions = {
+const connectionModeOptions = {
   im: "IM 指令",
   bluetooth: "蓝牙",
 };
@@ -99,7 +102,8 @@ function persistCommandForm() {
 
 function restoreSessionDraft() {
   const savedSessionMode = window.localStorage.getItem(sessionModeStorageKey);
-  const savedOutputMode = window.localStorage.getItem(outputModeStorageKey);
+  const savedSessionValue = window.localStorage.getItem(sessionValueStorageKey);
+  const savedConnectionMode = window.localStorage.getItem(connectionModeStorageKey);
   const savedTriggerMode = window.localStorage.getItem(triggerModeStorageKey);
   const savedLikeMultiple = window.localStorage.getItem(likeMultipleStorageKey);
   const savedDanmakuEnabled = window.localStorage.getItem(danmakuEnabledStorageKey);
@@ -108,8 +112,11 @@ function restoreSessionDraft() {
   if (savedSessionMode && sessionModeOptions[savedSessionMode]) {
     sessionModeSelect.value = savedSessionMode;
   }
-  if (savedOutputMode && outputModeOptions[savedOutputMode]) {
-    outputModeSelect.value = savedOutputMode;
+  if (savedSessionValue) {
+    sessionValueInput.value = savedSessionValue;
+  }
+  if (savedConnectionMode && connectionModeOptions[savedConnectionMode]) {
+    connectionModeSelect.value = savedConnectionMode;
   }
   if (savedTriggerMode && triggerModeOptions[savedTriggerMode]) {
     triggerModeSelect.value = savedTriggerMode;
@@ -134,7 +141,8 @@ function restoreSessionDraft() {
 
 function persistSessionDraft() {
   window.localStorage.setItem(sessionModeStorageKey, sessionModeSelect.value);
-  window.localStorage.setItem(outputModeStorageKey, outputModeSelect.value);
+  window.localStorage.setItem(sessionValueStorageKey, sessionValueInput.value);
+  window.localStorage.setItem(connectionModeStorageKey, connectionModeSelect.value);
   window.localStorage.setItem(triggerModeStorageKey, triggerModeSelect.value);
   const normalizedLikeMultiple = String(Math.max(1, Number(likeMultipleInput.value || 100) || 100));
   likeMultipleInput.value = normalizedLikeMultiple;
@@ -149,7 +157,7 @@ function persistSessionDraft() {
 function updateStatusDraftLabels(
   isRunning,
   serverMode,
-  serverOutputMode,
+  serverConnectionMode,
   serverTriggerMode,
   serverLikeMultiple,
   serverDanmakuEnabled,
@@ -158,7 +166,7 @@ function updateStatusDraftLabels(
   serverDanmakuCooldownSeconds
 ) {
   if (isRunning) {
-    outputModeLabel.textContent = outputModeOptions[serverOutputMode] || outputModeOptions.im;
+    connectionModeLabel.textContent = connectionModeOptions[serverConnectionMode] || connectionModeOptions.im;
     triggerModeLabel.textContent = triggerModeOptions[serverTriggerMode] || triggerModeOptions.by_quantity;
     likeMultipleLabel.textContent = String(serverLikeMultiple || 100);
     danmakuEnabledLabel.textContent = serverDanmakuEnabled ? "开启" : "关闭";
@@ -167,7 +175,7 @@ function updateStatusDraftLabels(
     return;
   }
 
-  outputModeLabel.textContent = outputModeOptions[outputModeSelect.value] || outputModeOptions.im;
+  connectionModeLabel.textContent = connectionModeOptions[connectionModeSelect.value] || connectionModeOptions.im;
   triggerModeLabel.textContent = triggerModeOptions[triggerModeSelect.value] || triggerModeOptions.by_quantity;
   likeMultipleLabel.textContent = String(Math.max(1, Number(likeMultipleInput.value || 100) || 100));
   danmakuEnabledLabel.textContent = danmakuEnabledSelect.value === "true" ? "开启" : "关闭";
@@ -191,6 +199,13 @@ function updateSessionModeForm() {
   const modeConfig = sessionModeOptions[mode] || sessionModeOptions.open_live;
   sessionValueLabel.textContent = modeConfig.label;
   sessionValueInput.placeholder = modeConfig.placeholder;
+}
+
+function updateConnectionModeForm() {
+  const mode = connectionModeSelect.value;
+  const isBluetooth = mode === "bluetooth";
+  commandConnectionSection.hidden = isBluetooth;
+  bluetoothConnectionSection.hidden = !isBluetooth;
 }
 
 function updateEventCounts() {
@@ -298,8 +313,10 @@ async function refreshStatus() {
     if (data.trigger_mode && triggerModeOptions[data.trigger_mode]) {
       triggerModeSelect.value = data.trigger_mode;
     }
-    if (data.output_mode && outputModeOptions[data.output_mode]) {
-      outputModeSelect.value = data.output_mode;
+    if (data.connection_mode && connectionModeOptions[data.connection_mode]) {
+      connectionModeSelect.value = data.connection_mode;
+    } else if (data.output_mode && connectionModeOptions[data.output_mode]) {
+      connectionModeSelect.value = data.output_mode;
     }
     if (data.like_multiple) {
       likeMultipleInput.value = String(data.like_multiple);
@@ -314,14 +331,13 @@ async function refreshStatus() {
       danmakuCooldownSecondsInput.value = String(data.danmaku_cooldown_seconds);
     }
     persistSessionDraft();
-  } else {
-    restoreSessionDraft();
   }
   updateSessionModeForm();
+  updateConnectionModeForm();
   updateStatusDraftLabels(
     data.can_stop,
     data.mode,
-    data.output_mode,
+    data.connection_mode || data.output_mode,
     data.trigger_mode,
     data.like_multiple,
     data.danmaku_enabled,
@@ -366,31 +382,21 @@ function renderBluetoothDevices(devices) {
     .join("");
 }
 
-function renderBluetoothWaveforms(waveforms) {
-  if (!Array.isArray(waveforms) || waveforms.length === 0) {
-    bluetoothWaveforms.innerHTML = '<p class="mini-empty">暂无波形配置。</p>';
-    return;
-  }
-  bluetoothWaveforms.innerHTML = waveforms
-    .map((waveform) => {
-      const stepCount = Array.isArray(waveform.steps) ? waveform.steps.length : 0;
-      const tag = waveform.builtin ? "内置" : "自定义";
-      return `<article class="mini-item"><div><strong>${escapeHtml(waveform.name)}</strong><small>${escapeHtml(tag)} · ${stepCount} 步</small></div></article>`;
-    })
-    .join("");
-}
-
 function renderBluetoothRules(rules) {
   if (!Array.isArray(rules) || rules.length === 0) {
     bluetoothRules.innerHTML = '<p class="mini-empty">暂无事件规则。</p>';
     return;
   }
   bluetoothRules.innerHTML = rules
-    .map((rule) => `<article class="mini-item"><div><strong>${escapeHtml(rule.event_type || "unknown")}</strong><small>${rule.enabled ? "已启用" : "未启用"} · 波形 ${escapeHtml(rule.waveform_id || "-")}</small></div></article>`)
+    .map((rule) => `<article class="mini-item"><div><strong>${escapeHtml(rule.rule_label || rule.event_label || rule.event_type || "unknown")}</strong><small>${rule.enabled ? "已启用" : "未启用"} · 波形 ${escapeHtml(rule.waveform_name || rule.waveform_id || "-")}</small></div></article>`)
     .join("");
 }
 
-async function connectBluetoothDevice(deviceId) {
+function openBluetoothOverlayWindow() {
+  return window.open("/bluetooth/overlay", bluetoothOverlayWindowName, "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no");
+}
+
+async function connectBluetoothDevice(deviceId, overlayWindow = null) {
   const response = await fetch("/api/bluetooth/connect", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -398,9 +404,16 @@ async function connectBluetoothDevice(deviceId) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (overlayWindow && !overlayWindow.closed) {
+      overlayWindow.close();
+    }
     bluetoothMessageText.textContent = payload.detail || "蓝牙连接失败";
     await refreshBluetoothStatus();
     return;
+  }
+  if (overlayWindow && !overlayWindow.closed) {
+    overlayWindow.location.replace("/bluetooth/overlay");
+    overlayWindow.focus();
   }
   await refreshBluetoothStatus();
 }
@@ -413,7 +426,6 @@ async function refreshBluetoothStatus() {
   bluetoothMessageText.textContent = data.message || "未连接";
   bluetoothDisconnectBtn.disabled = !data.connected;
   renderBluetoothDevices(data.devices || []);
-  renderBluetoothWaveforms(data.waveforms || []);
   renderBluetoothRules(data.rules || []);
 }
 
@@ -432,7 +444,8 @@ startBtn.addEventListener("click", async () => {
     body: JSON.stringify({
       mode: sessionModeSelect.value,
       value: sessionValueInput.value,
-      output_mode: outputModeSelect.value,
+      connection_mode: connectionModeSelect.value,
+      output_mode: connectionModeSelect.value,
       trigger_mode: triggerModeSelect.value,
       like_multiple: Math.max(1, Number(likeMultipleInput.value || 100) || 100),
       danmaku_enabled: danmakuEnabledSelect.value === "true",
@@ -509,7 +522,8 @@ bluetoothDevices.addEventListener("click", async (event) => {
     return;
   }
   target.setAttribute("disabled", "disabled");
-  await connectBluetoothDevice(deviceId);
+  const overlayWindow = openBluetoothOverlayWindow();
+  await connectBluetoothDevice(deviceId, overlayWindow);
 });
 
 sessionModeSelect.addEventListener("change", () => {
@@ -518,8 +532,11 @@ sessionModeSelect.addEventListener("change", () => {
   updateStatusDraftLabels(false);
 });
 
-outputModeSelect.addEventListener("change", () => {
+sessionValueInput.addEventListener("input", persistSessionDraft);
+
+connectionModeSelect.addEventListener("change", () => {
   persistSessionDraft();
+  updateConnectionModeForm();
   updateStatusDraftLabels(false);
 });
 
@@ -528,6 +545,11 @@ triggerModeSelect.addEventListener("change", () => {
 });
 
 likeMultipleInput.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+likeMultipleInput.addEventListener("input", () => {
   persistSessionDraft();
   updateStatusDraftLabels(false);
 });
@@ -542,10 +564,24 @@ danmakuKeywordsInput.addEventListener("change", () => {
   updateStatusDraftLabels(false);
 });
 
+danmakuKeywordsInput.addEventListener("input", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
 danmakuCooldownSecondsInput.addEventListener("change", () => {
   persistSessionDraft();
   updateStatusDraftLabels(false);
 });
+
+danmakuCooldownSecondsInput.addEventListener("input", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+commandWsUrlInput.addEventListener("input", persistCommandForm);
+commandUidInput.addEventListener("input", persistCommandForm);
+commandTokenInput.addEventListener("input", persistCommandForm);
 
 commandWsUrlInput.addEventListener("change", persistCommandForm);
 commandUidInput.addEventListener("change", persistCommandForm);
@@ -567,6 +603,7 @@ async function refreshDashboard() {
 restoreCommandForm();
 restoreSessionDraft();
 updateSessionModeForm();
+updateConnectionModeForm();
 updateEventCounts();
 refreshDashboard();
 setInterval(refreshDashboard, 5000);

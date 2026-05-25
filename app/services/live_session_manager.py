@@ -96,6 +96,8 @@ class LiveSessionManager:
         payload = dict(self._get_service(service_mode).get_status_payload())
         payload["mode"] = self.mode
         payload["mode_label"] = self.MODE_LABELS[self.mode]
+        payload["connection_mode"] = self.output_mode
+        payload["connection_mode_label"] = self.OUTPUT_MODE_LABELS[self.output_mode]
         payload["output_mode"] = self.output_mode
         payload["output_mode_label"] = self.OUTPUT_MODE_LABELS[self.output_mode]
         payload["trigger_mode"] = self.trigger_mode

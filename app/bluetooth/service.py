@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
 from app.bluetooth.models import BluetoothConnectionStatus
 from app.bluetooth.models import BluetoothConfigPayload
 from app.bluetooth.models import BluetoothDevice
+from app.bluetooth.models import BluetoothEventRule
 from app.bluetooth.models import payload_to_dict
 from app.bluetooth.runtime.base import BluetoothRuntime
 from app.bluetooth.runtime.memory_runtime import MemoryBluetoothRuntime
@@ -13,6 +15,12 @@ from app.bluetooth.storage import BluetoothSettingsStore
 
 
 logger = logging.getLogger(__name__)
+
+RULE_GROUP_LABELS = {
+    "gift": "礼物事件",
+    "like": "点赞事件",
+    "danmaku": "弹幕事件",
+}
 
 
 class BluetoothService:
@@ -34,6 +42,8 @@ class BluetoothService:
         try:
             runtime = create_real_bluetooth_runtime(
                 scan_timeout_seconds=payload.bluetooth_settings.scan_timeout_seconds,
+                connect_timeout_seconds=payload.bluetooth_settings.connect_timeout_seconds,
+                auto_reconnect=payload.bluetooth_settings.auto_reconnect,
             )
         except Exception as exc:  # pragma: no cover - verified through factory fallback test
             logger.warning("真实蓝牙运行时初始化失败，已降级到内存运行时: %s", exc)
@@ -90,10 +100,15 @@ class BluetoothService:
 
     def get_status_payload(self) -> dict:
         status = self.runtime.get_status()
+        waveform_name_map = {
+            item.id: item.name
+            for item in self.payload.ems_waveforms
+        }
         return {
             "runtime_backend": getattr(self.runtime, "backend_name", "unknown"),
             "enabled": self.payload.bluetooth_settings.enabled,
             "connected": status.connected,
+            "battery_level": status.battery_level,
             "message": status.message,
             "device": None if status.device is None else {
                 "device_id": status.device.device_id,
@@ -114,11 +129,133 @@ class BluetoothService:
                 for item in self.runtime.get_devices()
             ],
             "waveforms": payload_to_dict(self.payload)["ems_waveforms"],
-            "rules": payload_to_dict(self.payload)["bluetooth_event_rules"],
+            "rules": [
+                {
+                    **item,
+                    "event_label": RULE_GROUP_LABELS.get(str(item.get("event_type", "")), str(item.get("event_type", "unknown"))),
+                    "rule_label": _build_rule_label(item),
+                    "waveform_name": waveform_name_map.get(str(item.get("waveform_id", "")), str(item.get("waveform_id", "-") or "-")),
+                }
+                for item in payload_to_dict(self.payload)["bluetooth_event_rules"]
+            ],
+        }
+
+    def get_overlay_payload(self) -> dict:
+        payload = self.runtime.get_overlay_payload()
+        return {
+            "connected": bool(payload.get("connected", False)),
+            "device_name": str(payload.get("device_name", "") or ""),
+            "waveform_name": str(payload.get("waveform_name", "") or ""),
+            "battery_level": _normalize_battery_level(payload.get("battery_level")),
+            "channel_a": max(0, int(payload.get("channel_a", 0) or 0)),
+            "channel_b": max(0, int(payload.get("channel_b", 0) or 0)),
+            "step_index": max(0, int(payload.get("step_index", 0) or 0)),
+            "step_count": max(0, int(payload.get("step_count", 0) or 0)),
+            "updated_at": float(payload.get("updated_at", 0) or 0),
+            "history": [
+                {
+                    "channel_a": max(0, int(item.get("channel_a", 0) or 0)),
+                    "channel_b": max(0, int(item.get("channel_b", 0) or 0)),
+                }
+                for item in payload.get("history", [])
+                if isinstance(item, dict)
+            ][-90:],
+            "revision": max(0, int(payload.get("revision", 0) or 0)),
+        }
+
+    def get_studio_payload(self) -> dict:
+        waveforms = payload_to_dict(self.payload)["ems_waveforms"]
+        waveform_name_map = {
+            item.id: item.name
+            for item in self.payload.ems_waveforms
+        }
+        grouped_rules: list[dict] = []
+        for event_type, label in RULE_GROUP_LABELS.items():
+            rules = [
+                {
+                    "id": item.id,
+                    "event_type": item.event_type,
+                    "rule_label": _build_rule_label(
+                        {
+                            "id": item.id,
+                            "event_type": item.event_type,
+                            "filters": item.filters,
+                        }
+                    ),
+                    "enabled": item.enabled,
+                    "waveform_id": item.waveform_id,
+                    "waveform_name": waveform_name_map.get(item.waveform_id, item.waveform_id or "-"),
+                    "cooldown_seconds": item.cooldown_seconds,
+                    "filters": item.filters,
+                }
+                for item in self.payload.bluetooth_event_rules
+                if item.event_type == event_type
+            ]
+            grouped_rules.append(
+                {
+                    "group_id": event_type,
+                    "group_label": label,
+                    "rules": rules,
+                }
+            )
+        return {
+            "waveforms": waveforms,
+            "rule_groups": grouped_rules,
+        }
+
+    def save_rules(self, rules: list[dict]) -> dict:
+        waveform_ids = {item.id for item in self.payload.ems_waveforms}
+        rule_map = {item.id: item for item in self.payload.bluetooth_event_rules}
+        updated_count = 0
+        for item in rules:
+            rule_id = str(item.get("id", "") or "")
+            waveform_id = str(item.get("waveform_id", "") or "")
+            if rule_id not in rule_map:
+                raise ValueError(f"未找到规则: {rule_id}")
+            if waveform_id not in waveform_ids:
+                raise ValueError(f"未找到波形: {waveform_id}")
+            current = rule_map[rule_id]
+            current.enabled = bool(item.get("enabled", current.enabled))
+            current.waveform_id = waveform_id
+            updated_count += 1
+        self.store.save(self.payload)
+        return {
+            "success": True,
+            "updated_count": updated_count,
+            "rule_groups": self.get_studio_payload()["rule_groups"],
         }
 
 
-def create_real_bluetooth_runtime(*, scan_timeout_seconds: int) -> BluetoothRuntime:
+def create_real_bluetooth_runtime(
+    *,
+    scan_timeout_seconds: int,
+    connect_timeout_seconds: int,
+    auto_reconnect: bool,
+) -> BluetoothRuntime:
     from app.bluetooth.runtime.bleak_runtime import BleakBluetoothRuntime
 
-    return BleakBluetoothRuntime(scan_timeout_seconds=scan_timeout_seconds)
+    return BleakBluetoothRuntime(
+        scan_timeout_seconds=scan_timeout_seconds,
+        connect_timeout_seconds=connect_timeout_seconds,
+        auto_reconnect=auto_reconnect,
+    )
+
+
+def _build_rule_label(rule: dict) -> str:
+    rule_id = str(rule.get("id", "") or "")
+    if rule_id in GIFT_TIER_BY_RULE_ID:
+        tier = GIFT_TIER_BY_RULE_ID[rule_id]
+        if tier.max_price is None:
+            return f"{tier.label} · {tier.min_price}+"
+        return f"{tier.label} · {tier.min_price}-{tier.max_price}"
+    event_type = str(rule.get("event_type", "") or "")
+    return RULE_GROUP_LABELS.get(event_type, event_type or "unknown")
+
+
+def _normalize_battery_level(value) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return max(0, min(int(value), 100))
+    except (TypeError, ValueError):
+        return None

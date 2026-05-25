@@ -84,6 +84,12 @@ class OpenLiveSessionService:
                 command_id=danmaku_command_id,
                 cooldown_seconds=danmaku_cooldown_seconds,
             )
+        if self.bluetooth_dispatcher is not None and hasattr(self.bluetooth_dispatcher, "configure"):
+            self.bluetooth_dispatcher.configure(
+                danmaku_enabled=danmaku_enabled,
+                danmaku_keywords=danmaku_keywords,
+                danmaku_cooldown_seconds=danmaku_cooldown_seconds,
+            )
         self.status = SessionStatus.STARTING
         self.last_error = ""
         self.last_command_id = ""
@@ -93,6 +99,8 @@ class OpenLiveSessionService:
             self.gift_dispatcher.reset_runtime_state()
         if self.danmaku_dispatcher is not None and hasattr(self.danmaku_dispatcher, "reset_runtime_state"):
             self.danmaku_dispatcher.reset_runtime_state()
+        if self.bluetooth_dispatcher is not None and hasattr(self.bluetooth_dispatcher, "reset_runtime_state"):
+            self.bluetooth_dispatcher.reset_runtime_state()
         start_payload = await self.api_client.start(app_id=self.settings.app_id, code=code)
         data = start_payload.get("data", {})
         game_info = data.get("game_info", {})

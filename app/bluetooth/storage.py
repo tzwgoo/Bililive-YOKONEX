@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app.bluetooth.ems_builtin_waveforms import is_preset_waveform_id
+from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
+from app.bluetooth.gift_tiers import build_default_gift_rules
 from app.bluetooth.models import BluetoothConfigPayload
 from app.bluetooth.models import BluetoothEventRule
 from app.bluetooth.models import BluetoothSettings
@@ -27,18 +30,25 @@ class BluetoothSettingsStore:
         settings = BluetoothSettings(
             enabled=bool(settings_data.get("enabled", defaults.bluetooth_settings.enabled)),
             scan_timeout_seconds=max(1, int(settings_data.get("scan_timeout_seconds", defaults.bluetooth_settings.scan_timeout_seconds))),
+            connect_timeout_seconds=max(1, int(settings_data.get("connect_timeout_seconds", defaults.bluetooth_settings.connect_timeout_seconds))),
             auto_reconnect=bool(settings_data.get("auto_reconnect", defaults.bluetooth_settings.auto_reconnect)),
             last_connected_device_id=str(settings_data.get("last_connected_device_id", "")),
             last_connected_device_name=str(settings_data.get("last_connected_device_name", "")),
             default_target_device_id=str(settings_data.get("default_target_device_id", "")),
         )
 
-        waveforms = [
+        normalized_input_waveforms = [
             _normalize_waveform(item)
             for item in payload.get("ems_waveforms", [])
             if isinstance(item, dict)
         ]
-        if not waveforms:
+        if normalized_input_waveforms:
+            custom_waveforms = [
+                waveform for waveform in normalized_input_waveforms
+                if waveform.id.lower() != "ems-default-pulse" and not is_preset_waveform_id(waveform.id)
+            ]
+            waveforms = [*defaults.ems_waveforms, *custom_waveforms]
+        else:
             waveforms = defaults.ems_waveforms
 
         rules = [
@@ -48,6 +58,8 @@ class BluetoothSettingsStore:
         ]
         if not rules:
             rules = defaults.bluetooth_event_rules
+        else:
+            rules = _migrate_legacy_default_rules(rules)
 
         return BluetoothConfigPayload(
             bluetooth_settings=settings,
@@ -69,7 +81,13 @@ def _normalize_waveform(item: dict) -> EmsWaveform:
         EmsWaveformStep(
             duration_ms=max(1, int(step.get("duration_ms", 200))),
             channel_a=max(0, int(step.get("channel_a", 40))),
+            channel_a_mode=max(1, int(step.get("channel_a_mode", step.get("a_mode", 1)))),
+            channel_a_frequency=max(1, int(step.get("channel_a_frequency", step.get("a_frequency", 10)))),
+            channel_a_pulse_width=max(1, int(step.get("channel_a_pulse_width", step.get("a_pulse_width", 5)))),
             channel_b=max(0, int(step.get("channel_b", 40))),
+            channel_b_mode=max(1, int(step.get("channel_b_mode", step.get("b_mode", 1)))),
+            channel_b_frequency=max(1, int(step.get("channel_b_frequency", step.get("b_frequency", 10)))),
+            channel_b_pulse_width=max(1, int(step.get("channel_b_pulse_width", step.get("b_pulse_width", 5)))),
         )
         for step in steps
         if isinstance(step, dict)
@@ -81,6 +99,8 @@ def _normalize_waveform(item: dict) -> EmsWaveform:
         name=str(item.get("name", "自定义波形")),
         builtin=bool(item.get("builtin", False)),
         editable=bool(item.get("editable", True)),
+        execution_mode=str(item.get("execution_mode", "fixed") or "fixed").lower(),
+        loop_count=max(1, int(item.get("loop_count", 1))),
         steps=normalized_steps,
     )
 
@@ -96,3 +116,52 @@ def _normalize_rule(item: dict) -> BluetoothEventRule:
         filters=filters if isinstance(filters, dict) else {},
     )
 
+
+def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
+    rules = _migrate_legacy_gift_default_rule(rules)
+    rule_map = {rule.id: rule for rule in rules}
+    for rule_id in ("like-default", "danmaku-default"):
+        rule = rule_map.get(rule_id)
+        if rule is None:
+            continue
+        if rule_id == "like-default" and rule.event_type == "like" and rule.waveform_id == "ems-preset-01" and rule.enabled is False:
+            rule.enabled = True
+        if rule_id == "danmaku-default" and rule.event_type == "danmaku" and rule.waveform_id == "ems-preset-03" and rule.enabled is False:
+            rule.enabled = True
+    return rules
+
+
+def _migrate_legacy_gift_default_rule(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
+    if any(rule.id in GIFT_TIER_BY_RULE_ID for rule in rules):
+        return rules
+
+    gift_default = next((rule for rule in rules if rule.id == "gift-default" and rule.event_type == "gift"), None)
+    if gift_default is None:
+        return rules
+
+    is_default_waveform = gift_default.waveform_id == "ems-preset-06"
+    is_default_filters = not gift_default.filters
+    default_rules = build_default_gift_rules(enabled=True)
+    if not is_default_waveform or not is_default_filters:
+        default_rules = [
+            {
+                **item,
+                "enabled": gift_default.enabled,
+                "waveform_id": gift_default.waveform_id,
+            }
+            for item in build_default_gift_rules(enabled=gift_default.enabled)
+        ]
+
+    migrated_rules = [
+        BluetoothEventRule(
+            id=str(item["id"]),
+            enabled=bool(item["enabled"]),
+            event_type=str(item["event_type"]),
+            waveform_id=str(item["waveform_id"]),
+            cooldown_seconds=int(item["cooldown_seconds"]),
+            filters=dict(item["filters"]),
+        )
+        for item in default_rules
+    ]
+    remaining_rules = [rule for rule in rules if rule.id != "gift-default"]
+    return [*migrated_rules, *remaining_rules]

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>波形与事件规则</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="page studio-page">
+      <section class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Bluetooth Studio</p>
+          <h1>波形与事件规则</h1>
+          <p class="subtitle">在独立页面里查看 EMS 波形曲线，并为礼物、点赞、弹幕规则选择对应的波形。</p>
+          <div class="hero-tags">
+            <span>波形曲线预览</span>
+            <span>事件规则绑定</span>
+            <span>独立管理页</span>
+          </div>
+        </div>
+        <div class="hero-side">
+          <a class="hero-link" href="/">返回监听控制台</a>
+          <button id="studio-save-btn">保存规则</button>
+        </div>
+      </section>
+
+      <section class="studio-layout">
+        <article class="panel studio-panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Waveform Library</p>
+              <h2>波形库</h2>
+            </div>
+          </div>
+          <div id="studio-waveform-library" class="studio-waveform-library"></div>
+        </article>
+
+        <article class="panel studio-panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Event Rules</p>
+              <h2>事件规则</h2>
+            </div>
+          </div>
+          <p class="hint" id="studio-message-text">修改完成后点击“保存规则”。</p>
+          <div id="studio-rule-groups" class="studio-rule-groups"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/bluetooth_studio.js"></script>
+  </body>
+</html>

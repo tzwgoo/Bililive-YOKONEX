@@ -80,6 +80,12 @@ class ThirdPartyLiveSessionService:
                 command_id=danmaku_command_id,
                 cooldown_seconds=danmaku_cooldown_seconds,
             )
+        if self.bluetooth_dispatcher is not None and hasattr(self.bluetooth_dispatcher, "configure"):
+            self.bluetooth_dispatcher.configure(
+                danmaku_enabled=danmaku_enabled,
+                danmaku_keywords=danmaku_keywords,
+                danmaku_cooldown_seconds=danmaku_cooldown_seconds,
+            )
         self.anchor_name = ""
         self.last_error = ""
         self.last_command_id = ""
@@ -90,6 +96,8 @@ class ThirdPartyLiveSessionService:
             self.gift_dispatcher.reset_runtime_state()
         if self.danmaku_dispatcher is not None and hasattr(self.danmaku_dispatcher, "reset_runtime_state"):
             self.danmaku_dispatcher.reset_runtime_state()
+        if self.bluetooth_dispatcher is not None and hasattr(self.bluetooth_dispatcher, "reset_runtime_state"):
+            self.bluetooth_dispatcher.reset_runtime_state()
         await self._hydrate_room_profile()
         self.status = SessionStatus.STARTING
         self._consume_task = asyncio.create_task(self._consume_loop())

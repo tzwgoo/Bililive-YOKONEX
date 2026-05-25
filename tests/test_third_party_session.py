@@ -44,6 +44,7 @@ class FakeDanmakuDispatcher:
 class FakeBluetoothDispatcher:
     def __init__(self) -> None:
         self.called_with: dict | None = None
+        self.config: dict | None = None
 
     async def dispatch(self, event: dict) -> dict:
         self.called_with = event
@@ -53,6 +54,9 @@ class FakeBluetoothDispatcher:
             "success": True,
             "message": "蓝牙波形触发成功",
         }
+
+    def configure(self, **kwargs) -> None:
+        self.config = kwargs
 
 
 class FakeThirdPartyWsClient:
@@ -383,5 +387,34 @@ async def test_third_party_session_dispatches_bluetooth_waveform() -> None:
     assert bluetooth_dispatcher.called_with is not None
     assert events[-1]["bluetooth_dispatch"]["waveform_id"] == "ems-default-pulse"
     assert "command_dispatch" not in events[-1]
+
+    await service.stop()
+
+
+@pytest.mark.anyio
+async def test_third_party_session_configures_bluetooth_danmaku_keywords() -> None:
+    event_hub = EventHub()
+    bluetooth_dispatcher = FakeBluetoothDispatcher()
+    ws_client = FakeThirdPartyWsClient()
+    service = ThirdPartyLiveSessionService(
+        event_hub=event_hub,
+        bluetooth_dispatcher=bluetooth_dispatcher,
+        ws_client=ws_client,
+        room_info_fetcher=fake_room_info_fetcher,
+    )
+
+    await service.start(
+        value="123456",
+        output_mode="bluetooth",
+        danmaku_enabled=True,
+        danmaku_keywords="开火,冲冲冲",
+        danmaku_cooldown_seconds=6,
+    )
+
+    assert bluetooth_dispatcher.config == {
+        "danmaku_enabled": True,
+        "danmaku_keywords": "开火,冲冲冲",
+        "danmaku_cooldown_seconds": 6,
+    }
 
     await service.stop()

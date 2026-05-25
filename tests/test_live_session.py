@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.config import Settings
@@ -9,11 +11,32 @@ from app.models import SessionStatus
 
 
 class FakeApiClient:
+    async def start(self, *, app_id: int, code: str) -> dict:
+        return {
+            "data": {
+                "game_info": {"game_id": f"game-{code}"},
+                "websocket_info": {
+                    "auth_body": "auth-demo",
+                    "wss_link": ["wss://example.test/socket"],
+                },
+                "anchor_info": {
+                    "room_id": 123456,
+                    "uname": "测试主播",
+                },
+            }
+        }
+
+    async def heartbeat(self, *, game_id: str) -> dict:
+        return {"code": 0, "message": "ok", "data": {"game_id": game_id}}
+
     async def end(self, *, app_id: int, game_id: str) -> dict:
         return {"code": 0, "message": "ok", "data": {}}
 
 
 class FakeWsClient:
+    async def connect_and_consume(self, *, wss_links: list[str], auth_body: str, on_event) -> None:
+        await asyncio.sleep(0)
+
     async def disconnect(self) -> None:
         return None
 
@@ -46,6 +69,7 @@ class FakeDanmakuDispatcher:
 class FakeBluetoothDispatcher:
     def __init__(self) -> None:
         self.called_with: dict | None = None
+        self.config: dict | None = None
 
     async def dispatch(self, event: dict) -> dict:
         self.called_with = event
@@ -55,6 +79,9 @@ class FakeBluetoothDispatcher:
             "success": True,
             "message": "蓝牙波形触发成功",
         }
+
+    def configure(self, **kwargs) -> None:
+        self.config = kwargs
 
 
 @pytest.fixture
@@ -274,3 +301,22 @@ async def test_handle_gift_event_does_not_dispatch_bluetooth_in_im_mode(fake_dep
     assert service.gift_dispatcher.called_with == event
     assert service.bluetooth_dispatcher.called_with is None
     assert "bluetooth_dispatch" not in event
+
+
+@pytest.mark.anyio
+async def test_start_configures_bluetooth_danmaku_keywords(fake_dependencies: dict) -> None:
+    service = LiveSessionService(**fake_dependencies)
+
+    await service.start(
+        value="code-demo",
+        output_mode="bluetooth",
+        danmaku_enabled=True,
+        danmaku_keywords="开火,冲冲冲",
+        danmaku_cooldown_seconds=5,
+    )
+
+    assert service.bluetooth_dispatcher.config == {
+        "danmaku_enabled": True,
+        "danmaku_keywords": "开火,冲冲冲",
+        "danmaku_cooldown_seconds": 5,
+    }

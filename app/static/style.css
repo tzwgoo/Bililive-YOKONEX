@@ -242,7 +242,7 @@ p {
 
 .bluetooth-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -452,6 +452,25 @@ p {
   flex-wrap: wrap;
   gap: 12px;
   margin: 18px 0 12px;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  min-height: 48px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.secondary-link {
+  background: #332823;
+  color: #f7ebe1;
+  box-shadow: 0 10px 20px rgba(51, 40, 35, 0.2);
 }
 
 button {
@@ -710,9 +729,114 @@ button.secondary {
   color: var(--signal-red);
 }
 
+.studio-page {
+  max-width: 1480px;
+}
+
+.hero-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  color: #fff6ef;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.studio-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  gap: 18px;
+}
+
+.studio-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.studio-waveform-library,
+.studio-rule-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.studio-waveform-card,
+.studio-rule-group {
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 240, 233, 0.9));
+}
+
+.studio-waveform-head h3,
+.studio-rule-group h3 {
+  margin-bottom: 4px;
+}
+
+.studio-waveform-head p {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.waveform-preview {
+  width: 100%;
+  height: 110px;
+  margin-top: 12px;
+}
+
+.studio-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.studio-rule-item {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.studio-rule-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.studio-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.studio-rule-select {
+  display: grid;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.studio-rule-select select {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  padding: 10px 12px;
+}
+
 @media (max-width: 1120px) {
   .controls-shell,
-  .grid {
+  .grid,
+  .studio-layout {
     grid-template-columns: 1fr;
   }
 

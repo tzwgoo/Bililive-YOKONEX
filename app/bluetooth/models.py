@@ -9,8 +9,9 @@ from typing import Any
 @dataclass
 class BluetoothSettings:
     enabled: bool = False
-    scan_timeout_seconds: int = 8
-    auto_reconnect: bool = False
+    scan_timeout_seconds: int = 15
+    connect_timeout_seconds: int = 20
+    auto_reconnect: bool = True
     last_connected_device_id: str = ""
     last_connected_device_name: str = ""
     default_target_device_id: str = ""
@@ -30,7 +31,13 @@ class BluetoothDevice:
 class EmsWaveformStep:
     duration_ms: int = 200
     channel_a: int = 40
+    channel_a_mode: int = 1
+    channel_a_frequency: int = 10
+    channel_a_pulse_width: int = 5
     channel_b: int = 40
+    channel_b_mode: int = 1
+    channel_b_frequency: int = 10
+    channel_b_pulse_width: int = 5
 
 
 @dataclass
@@ -39,6 +46,8 @@ class EmsWaveform:
     name: str
     builtin: bool = False
     editable: bool = True
+    execution_mode: str = "fixed"
+    loop_count: int = 1
     steps: list[EmsWaveformStep] = field(default_factory=list)
 
 
@@ -63,45 +72,43 @@ class BluetoothConfigPayload:
 class BluetoothConnectionStatus:
     connected: bool = False
     device: BluetoothDevice | None = None
+    battery_level: int | None = None
     message: str = "未连接"
 
 
 def build_default_payload() -> BluetoothConfigPayload:
-    default_waveform = EmsWaveform(
-        id="ems-default-pulse",
-        name="EMS 默认脉冲",
-        builtin=True,
-        editable=False,
-        steps=[
-            EmsWaveformStep(duration_ms=180, channel_a=48, channel_b=48),
-            EmsWaveformStep(duration_ms=120, channel_a=0, channel_b=0),
-        ],
-    )
+    from app.bluetooth.gift_tiers import build_default_gift_rules
+    from app.bluetooth.ems_builtin_waveforms import create_defaults
+
+    default_waveforms = create_defaults()
     return BluetoothConfigPayload(
         bluetooth_settings=BluetoothSettings(),
-        ems_waveforms=[default_waveform],
+        ems_waveforms=default_waveforms,
         bluetooth_event_rules=[
-            BluetoothEventRule(
-                id="gift-default",
-                enabled=False,
-                event_type="gift",
-                waveform_id=default_waveform.id,
-                cooldown_seconds=0,
-                filters={},
-            ),
+            *[
+                BluetoothEventRule(
+                    id=str(item["id"]),
+                    enabled=bool(item["enabled"]),
+                    event_type=str(item["event_type"]),
+                    waveform_id=str(item["waveform_id"]),
+                    cooldown_seconds=int(item["cooldown_seconds"]),
+                    filters=dict(item["filters"]),
+                )
+                for item in build_default_gift_rules(enabled=True)
+            ],
             BluetoothEventRule(
                 id="like-default",
-                enabled=False,
+                enabled=True,
                 event_type="like",
-                waveform_id=default_waveform.id,
+                waveform_id="ems-preset-01",
                 cooldown_seconds=0,
                 filters={},
             ),
             BluetoothEventRule(
                 id="danmaku-default",
-                enabled=False,
+                enabled=True,
                 event_type="danmaku",
-                waveform_id=default_waveform.id,
+                waveform_id="ems-preset-03",
                 cooldown_seconds=3,
                 filters={"keywords": []},
             ),
@@ -111,4 +118,3 @@ def build_default_payload() -> BluetoothConfigPayload:
 
 def payload_to_dict(payload: BluetoothConfigPayload) -> dict[str, Any]:
     return asdict(payload)
-

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from collections.abc import Awaitable
 from collections.abc import Callable
 from collections.abc import Iterable
@@ -22,6 +24,8 @@ except ImportError:  # pragma: no cover - exercised through runtime fallback
 
 EMS_SERVICE_UUID = "0000ff30-0000-1000-8000-00805f9b34fb"
 EMS_WRITE_CHAR_UUID = "0000ff31-0000-1000-8000-00805f9b34fb"
+EMS_NOTIFY_CHAR_UUID = "0000ff32-0000-1000-8000-00805f9b34fb"
+LOGGER = logging.getLogger("bili_live.bluetooth.runtime")
 
 
 class BleakBluetoothRuntime:
@@ -31,6 +35,8 @@ class BleakBluetoothRuntime:
         self,
         *,
         scan_timeout_seconds: int,
+        connect_timeout_seconds: float = 20,
+        auto_reconnect: bool = False,
         scanner_discover: Callable[..., Awaitable[Any]] | None = None,
         client_factory: Callable[..., Any] | None = None,
         sleep_func: Callable[[float], Awaitable[None]] | None = None,
@@ -44,6 +50,8 @@ class BleakBluetoothRuntime:
                 raise RuntimeError("未安装 bleak，无法启用真实蓝牙运行时")
             client_factory = BleakClient
         self._scan_timeout_seconds = scan_timeout_seconds
+        self._connect_timeout_seconds = max(0.01, float(connect_timeout_seconds))
+        self._auto_reconnect = bool(auto_reconnect)
         self._scanner_discover = scanner_discover
         self._client_factory = client_factory
         self._sleep = sleep_func or asyncio.sleep
@@ -51,6 +59,23 @@ class BleakBluetoothRuntime:
         self._ble_devices: dict[str, Any] = {}
         self._client: Any | None = None
         self._connected_device_id = ""
+        self._manual_disconnect_requested = False
+        self._reconnect_task: asyncio.Task | None = None
+        self._battery_level: int | None = None
+        self._status_message = "未连接"
+        self._overlay_payload = {
+            "connected": False,
+            "device_name": "",
+            "waveform_name": "",
+            "battery_level": None,
+            "channel_a": 0,
+            "channel_b": 0,
+            "step_index": 0,
+            "step_count": 0,
+            "updated_at": 0.0,
+            "history": [],
+            "revision": 0,
+        }
 
     async def scan(self) -> list[BluetoothDevice]:
         discovered = await self._scanner_discover(
@@ -81,33 +106,69 @@ class BleakBluetoothRuntime:
             raise ValueError("未找到指定蓝牙设备")
         if self._client is not None and getattr(self._client, "is_connected", False):
             await self.disconnect()
+        if self._reconnect_task is not None and not self._reconnect_task.done():
+            self._reconnect_task.cancel()
+            self._reconnect_task = None
         client = self._client_factory(
             ble_device,
             disconnected_callback=self._handle_disconnect,
         )
-        await client.connect()
+        await asyncio.wait_for(client.connect(), timeout=self._connect_timeout_seconds)
         self._client = client
         self._connected_device_id = device_id if getattr(client, "is_connected", False) else ""
         self._sync_connected_flags()
         if not self._connected_device_id:
             raise RuntimeError("蓝牙设备连接失败")
+        await self._initialize_device_telemetry(device)
+        self._status_message = f"已连接 {device.name}"
+        self._set_overlay_payload(
+            connected=True,
+            device_name=device.name,
+            battery_level=self._battery_level,
+        )
         return BluetoothConnectionStatus(
             connected=True,
             device=device,
-            message=f"已连接 {device.name}",
+            battery_level=self._battery_level,
+            message=self._status_message,
         )
 
     async def disconnect(self) -> BluetoothConnectionStatus:
         client = self._client
+        self._manual_disconnect_requested = True
+        if self._reconnect_task is not None and not self._reconnect_task.done():
+            self._reconnect_task.cancel()
+            self._reconnect_task = None
         self._client = None
         self._connected_device_id = ""
+        self._battery_level = None
         if client is not None and getattr(client, "is_connected", False):
+            stop_notify = getattr(client, "stop_notify", None)
+            if callable(stop_notify):
+                try:
+                    await stop_notify(EMS_NOTIFY_CHAR_UUID)
+                except Exception:
+                    LOGGER.debug("停止蓝牙通知失败", exc_info=True)
             await client.disconnect()
+        self._manual_disconnect_requested = False
         self._sync_connected_flags()
+        self._status_message = "已断开蓝牙设备"
+        self._set_overlay_payload(
+            connected=False,
+            device_name="",
+            waveform_name="",
+            battery_level=None,
+            channel_a=0,
+            channel_b=0,
+            step_index=0,
+            step_count=0,
+            history=[],
+        )
         return BluetoothConnectionStatus(
             connected=False,
             device=None,
-            message="已断开蓝牙设备",
+            battery_level=None,
+            message=self._status_message,
         )
 
     def get_status(self) -> BluetoothConnectionStatus:
@@ -115,11 +176,18 @@ class BleakBluetoothRuntime:
         return BluetoothConnectionStatus(
             connected=device is not None,
             device=device,
-            message=f"已连接 {device.name}" if device is not None else "未连接",
+            battery_level=self._battery_level if device is not None else None,
+            message=self._status_message if self._status_message else (f"已连接 {device.name}" if device is not None else "未连接"),
         )
 
     def get_devices(self) -> list[BluetoothDevice]:
         return list(self._devices)
+
+    def get_overlay_payload(self) -> dict:
+        return {
+            **self._overlay_payload,
+            "history": list(self._overlay_payload["history"]),
+        }
 
     async def play_waveform(self, waveform: EmsWaveform) -> None:
         if self._client is None or not getattr(self._client, "is_connected", False):
@@ -128,22 +196,155 @@ class BleakBluetoothRuntime:
         if device is None:
             raise RuntimeError("未找到当前连接设备")
         packets = create_waveform_packets(waveform=waveform, protocol=device.protocol)
+        history = list(self._overlay_payload["history"])
         try:
-            for packet, duration_seconds in packets:
+            for index, ((packet, duration_seconds), step) in enumerate(zip(packets, waveform.steps, strict=False), start=1):
+                history.append(
+                    {
+                        "channel_a": step.channel_a,
+                        "channel_b": step.channel_b,
+                    }
+                )
+                history = history[-90:]
+                self._set_overlay_payload(
+                    connected=True,
+                    device_name=device.name,
+                    waveform_name=waveform.name,
+                    channel_a=step.channel_a,
+                    channel_b=step.channel_b,
+                    step_index=index,
+                    step_count=len(waveform.steps),
+                    history=history,
+                )
                 await self._client.write_gatt_char(EMS_WRITE_CHAR_UUID, packet, response=False)
                 await self._sleep(duration_seconds)
         finally:
             stop_packet = create_stop_packet(protocol=device.protocol)
             await self._client.write_gatt_char(EMS_WRITE_CHAR_UUID, stop_packet, response=False)
+            self._set_overlay_payload(
+                connected=True,
+                device_name=device.name,
+                waveform_name="",
+                channel_a=0,
+                channel_b=0,
+                step_index=0,
+                step_count=0,
+                history=[*history, {"channel_a": 0, "channel_b": 0}][-90:],
+            )
 
     def _handle_disconnect(self, _client: Any) -> None:
+        previous_device_id = self._connected_device_id
+        previous_device_name = next(
+            (item.name for item in self._devices if item.device_id == previous_device_id),
+            "",
+        )
         self._connected_device_id = ""
         self._client = None
+        self._battery_level = None
         self._sync_connected_flags()
+        if self._manual_disconnect_requested:
+            LOGGER.info("蓝牙设备已主动断开 device_id=%s name=%s", previous_device_id, previous_device_name)
+            return
+        self._status_message = f"蓝牙设备已断开: {previous_device_name or previous_device_id or '未知设备'}"
+        LOGGER.warning(
+            "蓝牙设备连接断开 device_id=%s name=%s auto_reconnect=%s",
+            previous_device_id,
+            previous_device_name,
+            self._auto_reconnect,
+        )
+        self._set_overlay_payload(
+            connected=False,
+            device_name="",
+            waveform_name="",
+            battery_level=None,
+            channel_a=0,
+            channel_b=0,
+            step_index=0,
+            step_count=0,
+            history=[],
+        )
+        if self._auto_reconnect and previous_device_id and (self._reconnect_task is None or self._reconnect_task.done()):
+            self._status_message = f"蓝牙设备已断开，正在尝试重连: {previous_device_name or previous_device_id}"
+            self._reconnect_task = asyncio.create_task(
+                self._attempt_reconnect(previous_device_id, previous_device_name)
+            )
 
     def _sync_connected_flags(self) -> None:
         for item in self._devices:
             item.connected = item.device_id == self._connected_device_id
+
+    async def _attempt_reconnect(self, device_id: str, device_name: str) -> None:
+        try:
+            await self._sleep(1.5)
+            ble_device = self._ble_devices.get(device_id)
+            device = next((item for item in self._devices if item.device_id == device_id), None)
+            if ble_device is None or device is None:
+                self._status_message = f"蓝牙设备已断开，且无法找到设备进行重连: {device_name or device_id}"
+                LOGGER.warning("蓝牙自动重连失败，设备已不存在 device_id=%s name=%s", device_id, device_name)
+                return
+            client = self._client_factory(
+                ble_device,
+                disconnected_callback=self._handle_disconnect,
+            )
+            await asyncio.wait_for(client.connect(), timeout=self._connect_timeout_seconds)
+            self._client = client
+            self._connected_device_id = device_id if getattr(client, "is_connected", False) else ""
+            self._sync_connected_flags()
+            if not self._connected_device_id:
+                raise RuntimeError("蓝牙自动重连后状态仍未连接")
+            await self._initialize_device_telemetry(device)
+            self._status_message = f"蓝牙已自动重连 {device.name}"
+            LOGGER.info("蓝牙自动重连成功 device_id=%s name=%s", device_id, device.name)
+            self._set_overlay_payload(
+                connected=True,
+                device_name=device.name,
+                battery_level=self._battery_level,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._status_message = f"蓝牙自动重连失败: {exc}"
+            LOGGER.warning("蓝牙自动重连失败 device_id=%s name=%s error=%s", device_id, device_name, exc)
+        finally:
+            self._reconnect_task = None
+
+    def _set_overlay_payload(self, **updates) -> None:
+        self._overlay_payload = {
+            **self._overlay_payload,
+            **updates,
+            "updated_at": time.time(),
+            "revision": int(self._overlay_payload.get("revision", 0)) + 1,
+        }
+
+    async def _initialize_device_telemetry(self, device: BluetoothDevice) -> None:
+        self._battery_level = None
+        client = self._client
+        if client is None or not getattr(client, "is_connected", False):
+            return
+        if device.protocol != "ems_v2":
+            return
+        start_notify = getattr(client, "start_notify", None)
+        if not callable(start_notify):
+            return
+        await start_notify(EMS_NOTIFY_CHAR_UUID, self._handle_notify)
+        await client.write_gatt_char(
+            EMS_WRITE_CHAR_UUID,
+            _build_ems_query_packet(0x04),
+            response=False,
+        )
+
+    async def _handle_notify(self, _sender: Any, data: bytearray) -> None:
+        battery_level = _try_parse_ems_battery_level(bytes(data))
+        if battery_level is None:
+            return
+        self._battery_level = battery_level
+        if self._connected_device_id:
+            device = next((item for item in self._devices if item.device_id == self._connected_device_id), None)
+            self._set_overlay_payload(
+                connected=True,
+                device_name="" if device is None else device.name,
+                battery_level=battery_level,
+            )
 
 
 def classify_ems_device(*, ble_device: Any, advertisement: Any) -> BluetoothDevice | None:
@@ -176,6 +377,8 @@ def create_waveform_packets(*, waveform: EmsWaveform, protocol: str) -> list[tup
     for step in waveform.steps:
         if protocol == "ems_v1":
             packet = _create_v1_packet(step)
+        elif str(waveform.execution_mode).lower() == "realtime":
+            packet = _create_v2_realtime_packet(step)
         else:
             packet = _create_v2_fixed_packet(step)
         packets.append((packet, max(step.duration_ms, 0) / 1000))
@@ -193,7 +396,11 @@ def create_stop_packet(*, protocol: str) -> bytes:
 def _create_v1_packet(step: EmsWaveformStep) -> bytes:
     channel = _resolve_v1_channel(step)
     enabled = 0x01 if channel != 0x00 else 0x00
-    strength = step.channel_b if channel == 0x02 or step.channel_b > step.channel_a else step.channel_a
+    use_channel_b = channel == 0x02 or step.channel_b > step.channel_a
+    strength = step.channel_b if use_channel_b else step.channel_a
+    mode = step.channel_b_mode if use_channel_b else step.channel_a_mode
+    frequency = step.channel_b_frequency if use_channel_b else step.channel_a_frequency
+    pulse_width = step.channel_b_pulse_width if use_channel_b else step.channel_a_pulse_width
     bytes_list = [
         0x35,
         0x11,
@@ -201,9 +408,9 @@ def _create_v1_packet(step: EmsWaveformStep) -> bytes:
         enabled,
         _high(strength),
         _low(strength),
-        0x01,
-        0x00,
-        0x00,
+        mode,
+        frequency if mode == 0x11 else 0x00,
+        pulse_width if mode == 0x11 else 0x00,
     ]
     bytes_list.append(_compute_checksum(bytes_list))
     return bytes(bytes_list)
@@ -216,10 +423,28 @@ def _create_v2_fixed_packet(step: EmsWaveformStep) -> bytes:
         0x01,
         _high(step.channel_a),
         _low(step.channel_a),
-        0x01,
+        step.channel_a_mode,
         _high(step.channel_b),
         _low(step.channel_b),
-        0x01,
+        step.channel_b_mode,
+    ]
+    bytes_list.append(_compute_checksum(bytes_list))
+    return bytes(bytes_list)
+
+
+def _create_v2_realtime_packet(step: EmsWaveformStep) -> bytes:
+    bytes_list = [
+        0x35,
+        0x11,
+        0x02,
+        _high(step.channel_a),
+        _low(step.channel_a),
+        step.channel_a_frequency,
+        step.channel_a_pulse_width,
+        _high(step.channel_b),
+        _low(step.channel_b),
+        step.channel_b_frequency,
+        step.channel_b_pulse_width,
     ]
     bytes_list.append(_compute_checksum(bytes_list))
     return bytes(bytes_list)
@@ -274,3 +499,15 @@ def _compute_checksum(values: Iterable[int]) -> int:
     for item in values:
         total = (total + item) & 0xFF
     return total
+
+
+def _build_ems_query_packet(query_type: int) -> bytes:
+    values = [0x35, 0x71, max(0, min(int(query_type), 0xFF))]
+    values.append(_compute_checksum(values))
+    return bytes(values)
+
+
+def _try_parse_ems_battery_level(packet: bytes) -> int | None:
+    if len(packet) < 4 or packet[0] != 0x35 or packet[1] != 0x71 or packet[2] != 0x04:
+        return None
+    return max(0, min(int(packet[3]), 100))
