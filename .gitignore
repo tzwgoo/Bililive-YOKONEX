@@ -20,6 +20,7 @@ htmlcov/
 .venv/
 venv/
 env/
+.worktrees/
 
 build/
 build_logs/
