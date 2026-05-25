@@ -88,3 +88,17 @@ def test_frontend_hides_removed_runtime_snapshot_fields() -> None:
     assert "const configLoaded =" not in app_js
     assert "const lastCommandMessage =" not in app_js
     assert "const lastHeartbeatAt =" not in app_js
+
+
+def test_frontend_contains_bluetooth_panel_skeleton() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
+    app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="bluetooth-status-pill"' in index_html
+    assert 'id="bluetooth-scan-btn"' in index_html
+    assert 'id="bluetooth-devices"' in index_html
+    assert 'id="bluetooth-waveforms"' in index_html
+    assert 'id="bluetooth-rules"' in index_html
+    assert 'fetch("/api/bluetooth/status")' in app_js
+    assert 'fetch("/api/bluetooth/scan"' in app_js

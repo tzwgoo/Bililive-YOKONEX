@@ -21,12 +21,14 @@ class ThirdPartyLiveSessionService:
         event_hub: EventHub,
         gift_dispatcher: Any | None = None,
         danmaku_dispatcher: Any | None = None,
+        bluetooth_dispatcher: Any | None = None,
         ws_client: Any | None = None,
         room_info_fetcher: Callable[[int], Awaitable[dict[str, Any]]] | None = None,
     ) -> None:
         self.event_hub = event_hub
         self.gift_dispatcher = gift_dispatcher
         self.danmaku_dispatcher = danmaku_dispatcher
+        self.bluetooth_dispatcher = bluetooth_dispatcher
         self.ws_client = ws_client or ThirdPartyWsClient()
         self.room_info_fetcher = room_info_fetcher or self._fetch_room_info
         self.status = SessionStatus.IDLE
@@ -177,6 +179,8 @@ class ThirdPartyLiveSessionService:
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
+        if self.bluetooth_dispatcher is not None:
+            event["bluetooth_dispatch"] = await self.bluetooth_dispatcher.dispatch(event)
         self.event_hub.publish(event)
 
     async def _hydrate_room_profile(self) -> None:

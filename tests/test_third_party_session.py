@@ -41,6 +41,20 @@ class FakeDanmakuDispatcher:
         return None
 
 
+class FakeBluetoothDispatcher:
+    def __init__(self) -> None:
+        self.called_with: dict | None = None
+
+    async def dispatch(self, event: dict) -> dict:
+        self.called_with = event
+        return {
+            "matched": True,
+            "waveform_id": "ems-default-pulse",
+            "success": True,
+            "message": "蓝牙波形触发成功",
+        }
+
+
 class FakeThirdPartyWsClient:
     def __init__(self, messages: list[dict] | None = None) -> None:
         self.messages = messages or []
@@ -332,3 +346,41 @@ async def test_third_party_session_can_restart_another_room_after_disconnect_err
     assert ws_client.connected_room_ids == [123456, 654321]
     assert events[-1]["uname"] == "房间B用户"
     assert service.room_id == 654321
+
+
+@pytest.mark.anyio
+async def test_third_party_session_dispatches_bluetooth_waveform() -> None:
+    event_hub = EventHub()
+    bluetooth_dispatcher = FakeBluetoothDispatcher()
+    ws_client = FakeThirdPartyWsClient(
+        messages=[
+            {
+                "cmd": "SEND_GIFT",
+                "data": {
+                    "giftId": 1001,
+                    "giftName": "小花花",
+                    "num": 1,
+                    "uname": "测试用户",
+                    "price": 1000,
+                    "timestamp": 1714113037,
+                },
+            }
+        ]
+    )
+    service = ThirdPartyLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=FakeGiftDispatcher(),
+        bluetooth_dispatcher=bluetooth_dispatcher,
+        ws_client=ws_client,
+        room_info_fetcher=fake_room_info_fetcher,
+    )
+
+    await service.start(value="123456")
+    await asyncio.sleep(0.05)
+
+    events = event_hub.snapshot()
+
+    assert bluetooth_dispatcher.called_with is not None
+    assert events[-1]["bluetooth_dispatch"]["waveform_id"] == "ems-default-pulse"
+
+    await service.stop()

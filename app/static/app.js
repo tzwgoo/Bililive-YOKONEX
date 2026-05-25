@@ -22,6 +22,13 @@ const commandDisconnectBtn = document.getElementById("command-disconnect-btn");
 const commandStatusUid = document.getElementById("command-status-uid");
 const commandUserId = document.getElementById("command-user-id");
 const commandLastLoginAt = document.getElementById("command-last-login-at");
+const bluetoothStatusPill = document.getElementById("bluetooth-status-pill");
+const bluetoothMessageText = document.getElementById("bluetooth-message-text");
+const bluetoothScanBtn = document.getElementById("bluetooth-scan-btn");
+const bluetoothDisconnectBtn = document.getElementById("bluetooth-disconnect-btn");
+const bluetoothDevices = document.getElementById("bluetooth-devices");
+const bluetoothWaveforms = document.getElementById("bluetooth-waveforms");
+const bluetoothRules = document.getElementById("bluetooth-rules");
 
 const giftEvents = document.getElementById("gift-events");
 const danmakuEvents = document.getElementById("danmaku-events");
@@ -188,6 +195,15 @@ function prependEvent(container, html) {
   updateEventCounts();
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function formatGiftValue(payload) {
   const giftNum = Number(payload.gift_num || 0) || 0;
   const unitPrice = Number(payload.price || 0) || 0;
@@ -316,6 +332,72 @@ async function refreshCommandStatus() {
   }
 }
 
+function renderBluetoothDevices(devices) {
+  if (!Array.isArray(devices) || devices.length === 0) {
+    bluetoothDevices.innerHTML = '<p class="mini-empty">暂无设备，点击“扫描设备”开始搜索。</p>';
+    return;
+  }
+  bluetoothDevices.innerHTML = devices
+    .map((device) => {
+      const action = device.connected
+        ? '<span class="mini-chip">当前设备</span>'
+        : `<button class="mini-action" data-device-id="${escapeHtml(device.device_id)}">连接</button>`;
+      return `<article class="mini-item"><div><strong>${escapeHtml(device.name)}</strong><small>${escapeHtml(device.protocol)} · RSSI ${escapeHtml(device.rssi)}</small></div>${action}</article>`;
+    })
+    .join("");
+}
+
+function renderBluetoothWaveforms(waveforms) {
+  if (!Array.isArray(waveforms) || waveforms.length === 0) {
+    bluetoothWaveforms.innerHTML = '<p class="mini-empty">暂无波形配置。</p>';
+    return;
+  }
+  bluetoothWaveforms.innerHTML = waveforms
+    .map((waveform) => {
+      const stepCount = Array.isArray(waveform.steps) ? waveform.steps.length : 0;
+      const tag = waveform.builtin ? "内置" : "自定义";
+      return `<article class="mini-item"><div><strong>${escapeHtml(waveform.name)}</strong><small>${escapeHtml(tag)} · ${stepCount} 步</small></div></article>`;
+    })
+    .join("");
+}
+
+function renderBluetoothRules(rules) {
+  if (!Array.isArray(rules) || rules.length === 0) {
+    bluetoothRules.innerHTML = '<p class="mini-empty">暂无事件规则。</p>';
+    return;
+  }
+  bluetoothRules.innerHTML = rules
+    .map((rule) => `<article class="mini-item"><div><strong>${escapeHtml(rule.event_type || "unknown")}</strong><small>${rule.enabled ? "已启用" : "未启用"} · 波形 ${escapeHtml(rule.waveform_id || "-")}</small></div></article>`)
+    .join("");
+}
+
+async function connectBluetoothDevice(deviceId) {
+  const response = await fetch("/api/bluetooth/connect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    bluetoothMessageText.textContent = payload.detail || "蓝牙连接失败";
+    await refreshBluetoothStatus();
+    return;
+  }
+  await refreshBluetoothStatus();
+}
+
+async function refreshBluetoothStatus() {
+  const response = await fetch("/api/bluetooth/status");
+  const data = await response.json();
+  bluetoothStatusPill.textContent = data.connected ? "connected" : "idle";
+  updateStatusTone(bluetoothStatusPill, data.connected ? "connected" : "idle");
+  bluetoothMessageText.textContent = data.message || "未连接";
+  bluetoothDisconnectBtn.disabled = !data.connected;
+  renderBluetoothDevices(data.devices || []);
+  renderBluetoothWaveforms(data.waveforms || []);
+  renderBluetoothRules(data.rules || []);
+}
+
 startBtn.addEventListener("click", async () => {
   startBtn.disabled = true;
   const mode = sessionModeSelect.value;
@@ -380,6 +462,36 @@ commandDisconnectBtn.addEventListener("click", async () => {
   await refreshCommandStatus();
 });
 
+bluetoothScanBtn.addEventListener("click", async () => {
+  bluetoothScanBtn.disabled = true;
+  const response = await fetch("/api/bluetooth/scan", { method: "POST" });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    bluetoothMessageText.textContent = payload.detail || "蓝牙扫描失败";
+  }
+  bluetoothScanBtn.disabled = false;
+  await refreshBluetoothStatus();
+});
+
+bluetoothDisconnectBtn.addEventListener("click", async () => {
+  bluetoothDisconnectBtn.disabled = true;
+  await fetch("/api/bluetooth/disconnect", { method: "POST" });
+  await refreshBluetoothStatus();
+});
+
+bluetoothDevices.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const deviceId = target.dataset.deviceId;
+  if (!deviceId) {
+    return;
+  }
+  target.setAttribute("disabled", "disabled");
+  await connectBluetoothDevice(deviceId);
+});
+
 sessionModeSelect.addEventListener("change", () => {
   persistSessionDraft();
   updateSessionModeForm();
@@ -423,7 +535,7 @@ source.onerror = () => {
 };
 
 async function refreshDashboard() {
-  await Promise.all([refreshStatus(), refreshCommandStatus()]);
+  await Promise.all([refreshStatus(), refreshCommandStatus(), refreshBluetoothStatus()]);
 }
 
 restoreCommandForm();

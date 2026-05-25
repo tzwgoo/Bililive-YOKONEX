@@ -43,6 +43,20 @@ class FakeDanmakuDispatcher:
         return None
 
 
+class FakeBluetoothDispatcher:
+    def __init__(self) -> None:
+        self.called_with: dict | None = None
+
+    async def dispatch(self, event: dict) -> dict:
+        self.called_with = event
+        return {
+            "matched": True,
+            "waveform_id": "ems-default-pulse",
+            "success": True,
+            "message": "蓝牙波形触发成功",
+        }
+
+
 @pytest.fixture
 def fake_dependencies() -> dict:
     return {
@@ -61,6 +75,7 @@ def fake_dependencies() -> dict:
         "ws_client": FakeWsClient(),
         "gift_dispatcher": FakeGiftDispatcher(),
         "danmaku_dispatcher": FakeDanmakuDispatcher(),
+        "bluetooth_dispatcher": FakeBluetoothDispatcher(),
     }
 
 
@@ -203,3 +218,29 @@ async def test_handle_danmaku_event_dispatches_command(fake_dependencies: dict) 
     assert service.danmaku_dispatcher.called_with == event
     assert service.last_command_id == "danmaku_trigger"
     assert service.last_command_message == "弹幕关键词触发成功"
+
+
+@pytest.mark.anyio
+async def test_handle_gift_event_dispatches_bluetooth_waveform(fake_dependencies: dict) -> None:
+    service = LiveSessionService(**fake_dependencies)
+
+    event = {
+        "event_type": "gift",
+        "cmd": "LIVE_OPEN_PLATFORM_SEND_GIFT",
+        "room_id": 1,
+        "open_id": "user-open-id",
+        "uname": "测试用户",
+        "timestamp": 1714113037,
+        "payload": {
+            "gift_id": 1001,
+            "gift_name": "小花花",
+            "gift_num": 1,
+            "price": 1000,
+            "r_price": 1000,
+        },
+    }
+
+    await service._handle_event(event)
+
+    assert service.bluetooth_dispatcher.called_with == event
+    assert event["bluetooth_dispatch"]["waveform_id"] == "ems-default-pulse"

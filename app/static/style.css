@@ -230,6 +230,76 @@ p {
   align-items: stretch;
 }
 
+.bluetooth-shell {
+  margin-bottom: 22px;
+}
+
+.bluetooth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bluetooth-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.bluetooth-card {
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 240, 233, 0.9));
+}
+
+.mini-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mini-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.mini-item strong,
+.mini-item small {
+  display: block;
+}
+
+.mini-item small,
+.mini-empty {
+  color: var(--muted);
+}
+
+.mini-chip,
+.mini-action {
+  align-self: center;
+}
+
+.mini-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(31, 157, 99, 0.12);
+  color: #18663e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-action {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
 .control-panel {
   display: flex;
   flex-direction: column;
@@ -648,7 +718,8 @@ button.secondary {
 
   .session-grid,
   .session-grid-primary,
-  .control-grid {
+  .control-grid,
+  .bluetooth-grid {
     grid-template-columns: 1fr;
   }
 

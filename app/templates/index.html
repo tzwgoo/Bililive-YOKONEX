@@ -163,6 +163,44 @@
         </aside>
       </section>
 
+      <section class="bluetooth-shell">
+        <article class="panel bluetooth-panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">EMS Bluetooth</p>
+              <h2>EMS 蓝牙连接</h2>
+              <p class="subtitle">先完成设备扫描和连接，再逐步把直播事件绑定到 EMS 波形上。</p>
+            </div>
+            <div class="status-pill" id="bluetooth-status-pill">idle</div>
+          </div>
+          <div class="buttons">
+            <button id="bluetooth-scan-btn">扫描设备</button>
+            <button id="bluetooth-disconnect-btn" class="secondary">断开设备</button>
+          </div>
+          <p class="hint" id="bluetooth-message-text">未连接</p>
+          <div class="bluetooth-grid">
+            <section class="bluetooth-card">
+              <div class="stream-head">
+                <h3>设备列表</h3>
+              </div>
+              <div id="bluetooth-devices" class="mini-list"></div>
+            </section>
+            <section class="bluetooth-card">
+              <div class="stream-head">
+                <h3>波形库</h3>
+              </div>
+              <div id="bluetooth-waveforms" class="mini-list"></div>
+            </section>
+            <section class="bluetooth-card">
+              <div class="stream-head">
+                <h3>事件规则</h3>
+              </div>
+              <div id="bluetooth-rules" class="mini-list"></div>
+            </section>
+          </div>
+        </article>
+      </section>
+
       <section class="grid">
         <article class="panel stream">
           <div class="stream-head">

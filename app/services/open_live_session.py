@@ -23,6 +23,7 @@ class OpenLiveSessionService:
         ws_client: Any,
         gift_dispatcher: Any | None = None,
         danmaku_dispatcher: Any | None = None,
+        bluetooth_dispatcher: Any | None = None,
         config_error: str = "",
     ) -> None:
         self.settings = settings
@@ -31,6 +32,7 @@ class OpenLiveSessionService:
         self.ws_client = ws_client
         self.gift_dispatcher = gift_dispatcher
         self.danmaku_dispatcher = danmaku_dispatcher
+        self.bluetooth_dispatcher = bluetooth_dispatcher
         self.config_error = config_error
         self.status = SessionStatus.IDLE
         self.game_id = ""
@@ -229,4 +231,6 @@ class OpenLiveSessionService:
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
+        if self.bluetooth_dispatcher is not None:
+            event["bluetooth_dispatch"] = await self.bluetooth_dispatcher.dispatch(event)
         self.event_hub.publish(event)
