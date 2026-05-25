@@ -4,6 +4,7 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
 
 python -m pip install pyinstaller
+python -m pip install -r requirements.txt
 
 $distRoot = Join-Path $projectRoot "dist"
 $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
@@ -34,6 +35,8 @@ $pyInstallerArgs = @(
     "--exclude-module", "jupyter_client",
     "--exclude-module", "jupyter_core",
     "--exclude-module", "tkinter",
+    "--hidden-import", "bleak.backends.winrt.client",
+    "--hidden-import", "bleak.backends.winrt.scanner",
     "--hidden-import", "bilibili_api.clients.HTTPXClient",
     "--hidden-import", "bilibili_api.clients.AioHTTPClient",
     "--hidden-import", "bilibili_api.clients.CurlCFFIClient",

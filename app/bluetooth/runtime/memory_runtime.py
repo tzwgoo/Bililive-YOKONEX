@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from app.bluetooth.models import BluetoothConnectionStatus
 from app.bluetooth.models import BluetoothDevice
+from app.bluetooth.models import EmsWaveform
 
 
 class MemoryBluetoothRuntime:
+    backend_name = "memory"
+
     def __init__(self) -> None:
         self._devices: list[BluetoothDevice] = []
         self._connected_device_id = ""
@@ -64,3 +67,5 @@ class MemoryBluetoothRuntime:
     def get_devices(self) -> list[BluetoothDevice]:
         return list(self._devices)
 
+    async def play_waveform(self, waveform: EmsWaveform) -> None:
+        return None

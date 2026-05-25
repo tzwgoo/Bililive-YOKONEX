@@ -4,9 +4,12 @@ from typing import Protocol
 
 from app.bluetooth.models import BluetoothConnectionStatus
 from app.bluetooth.models import BluetoothDevice
+from app.bluetooth.models import EmsWaveform
 
 
 class BluetoothRuntime(Protocol):
+    backend_name: str
+
     async def scan(self) -> list[BluetoothDevice]:
         ...
 
@@ -22,3 +25,5 @@ class BluetoothRuntime(Protocol):
     def get_devices(self) -> list[BluetoothDevice]:
         ...
 
+    async def play_waveform(self, waveform: EmsWaveform) -> None:
+        ...
