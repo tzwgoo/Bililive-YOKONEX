@@ -17,6 +17,7 @@ router = APIRouter()
 class StartSessionRequest(BaseModel):
     mode: str
     value: str
+    output_mode: str = "im"
     trigger_mode: str = "by_quantity"
     like_multiple: int = 100
     danmaku_enabled: bool = False
@@ -106,6 +107,7 @@ async def start_session(request: Request, payload: StartSessionRequest) -> dict:
         await request.app.state.session_service.start(
             mode=payload.mode,
             value=payload.value,
+            output_mode=payload.output_mode,
             trigger_mode=payload.trigger_mode,
             like_multiple=payload.like_multiple,
             danmaku_enabled=payload.danmaku_enabled,

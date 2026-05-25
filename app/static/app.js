@@ -3,6 +3,7 @@ const messageText = document.getElementById("message-text");
 const roomId = document.getElementById("room-id");
 const anchorName = document.getElementById("anchor-name");
 const sessionModeSelect = document.getElementById("session-mode");
+const outputModeSelect = document.getElementById("output-mode");
 const triggerModeSelect = document.getElementById("trigger-mode");
 const likeMultipleInput = document.getElementById("like-multiple");
 const danmakuEnabledSelect = document.getElementById("danmaku-enabled");
@@ -37,6 +38,7 @@ const giftCount = document.getElementById("gift-count");
 const danmakuCount = document.getElementById("danmaku-count");
 const likeCount = document.getElementById("like-count");
 const lastEventAt = document.getElementById("last-event-at");
+const outputModeLabel = document.getElementById("output-mode-label");
 const triggerModeLabel = document.getElementById("trigger-mode-label");
 const likeMultipleLabel = document.getElementById("like-multiple-label");
 const danmakuEnabledLabel = document.getElementById("danmaku-enabled-label");
@@ -47,6 +49,7 @@ const commandWsUrlStorageKey = "biliLive.commandWsUrl";
 const commandUidStorageKey = "biliLive.commandUid";
 const commandTokenStorageKey = "biliLive.commandToken";
 const sessionModeStorageKey = "biliLive.sessionMode";
+const outputModeStorageKey = "biliLive.outputMode";
 const triggerModeStorageKey = "biliLive.triggerMode";
 const likeMultipleStorageKey = "biliLive.likeMultiple";
 const danmakuEnabledStorageKey = "biliLive.danmakuEnabled";
@@ -55,6 +58,10 @@ const danmakuCooldownSecondsStorageKey = "biliLive.danmakuCooldownSeconds";
 const triggerModeOptions = {
   by_quantity: "按礼物数量触发",
   single: "单次触发",
+};
+const outputModeOptions = {
+  im: "IM 指令",
+  bluetooth: "蓝牙",
 };
 const sessionModeOptions = {
   open_live: {
@@ -92,6 +99,7 @@ function persistCommandForm() {
 
 function restoreSessionDraft() {
   const savedSessionMode = window.localStorage.getItem(sessionModeStorageKey);
+  const savedOutputMode = window.localStorage.getItem(outputModeStorageKey);
   const savedTriggerMode = window.localStorage.getItem(triggerModeStorageKey);
   const savedLikeMultiple = window.localStorage.getItem(likeMultipleStorageKey);
   const savedDanmakuEnabled = window.localStorage.getItem(danmakuEnabledStorageKey);
@@ -99,6 +107,9 @@ function restoreSessionDraft() {
   const savedDanmakuCooldownSeconds = window.localStorage.getItem(danmakuCooldownSecondsStorageKey);
   if (savedSessionMode && sessionModeOptions[savedSessionMode]) {
     sessionModeSelect.value = savedSessionMode;
+  }
+  if (savedOutputMode && outputModeOptions[savedOutputMode]) {
+    outputModeSelect.value = savedOutputMode;
   }
   if (savedTriggerMode && triggerModeOptions[savedTriggerMode]) {
     triggerModeSelect.value = savedTriggerMode;
@@ -123,6 +134,7 @@ function restoreSessionDraft() {
 
 function persistSessionDraft() {
   window.localStorage.setItem(sessionModeStorageKey, sessionModeSelect.value);
+  window.localStorage.setItem(outputModeStorageKey, outputModeSelect.value);
   window.localStorage.setItem(triggerModeStorageKey, triggerModeSelect.value);
   const normalizedLikeMultiple = String(Math.max(1, Number(likeMultipleInput.value || 100) || 100));
   likeMultipleInput.value = normalizedLikeMultiple;
@@ -137,6 +149,7 @@ function persistSessionDraft() {
 function updateStatusDraftLabels(
   isRunning,
   serverMode,
+  serverOutputMode,
   serverTriggerMode,
   serverLikeMultiple,
   serverDanmakuEnabled,
@@ -145,6 +158,7 @@ function updateStatusDraftLabels(
   serverDanmakuCooldownSeconds
 ) {
   if (isRunning) {
+    outputModeLabel.textContent = outputModeOptions[serverOutputMode] || outputModeOptions.im;
     triggerModeLabel.textContent = triggerModeOptions[serverTriggerMode] || triggerModeOptions.by_quantity;
     likeMultipleLabel.textContent = String(serverLikeMultiple || 100);
     danmakuEnabledLabel.textContent = serverDanmakuEnabled ? "开启" : "关闭";
@@ -153,6 +167,7 @@ function updateStatusDraftLabels(
     return;
   }
 
+  outputModeLabel.textContent = outputModeOptions[outputModeSelect.value] || outputModeOptions.im;
   triggerModeLabel.textContent = triggerModeOptions[triggerModeSelect.value] || triggerModeOptions.by_quantity;
   likeMultipleLabel.textContent = String(Math.max(1, Number(likeMultipleInput.value || 100) || 100));
   danmakuEnabledLabel.textContent = danmakuEnabledSelect.value === "true" ? "开启" : "关闭";
@@ -283,6 +298,9 @@ async function refreshStatus() {
     if (data.trigger_mode && triggerModeOptions[data.trigger_mode]) {
       triggerModeSelect.value = data.trigger_mode;
     }
+    if (data.output_mode && outputModeOptions[data.output_mode]) {
+      outputModeSelect.value = data.output_mode;
+    }
     if (data.like_multiple) {
       likeMultipleInput.value = String(data.like_multiple);
     }
@@ -303,6 +321,7 @@ async function refreshStatus() {
   updateStatusDraftLabels(
     data.can_stop,
     data.mode,
+    data.output_mode,
     data.trigger_mode,
     data.like_multiple,
     data.danmaku_enabled,
@@ -413,6 +432,7 @@ startBtn.addEventListener("click", async () => {
     body: JSON.stringify({
       mode: sessionModeSelect.value,
       value: sessionValueInput.value,
+      output_mode: outputModeSelect.value,
       trigger_mode: triggerModeSelect.value,
       like_multiple: Math.max(1, Number(likeMultipleInput.value || 100) || 100),
       danmaku_enabled: danmakuEnabledSelect.value === "true",
@@ -495,6 +515,12 @@ bluetoothDevices.addEventListener("click", async (event) => {
 sessionModeSelect.addEventListener("change", () => {
   persistSessionDraft();
   updateSessionModeForm();
+  updateStatusDraftLabels(false);
+});
+
+outputModeSelect.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
 });
 
 triggerModeSelect.addEventListener("change", () => {

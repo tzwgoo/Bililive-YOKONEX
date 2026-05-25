@@ -375,12 +375,13 @@ async def test_third_party_session_dispatches_bluetooth_waveform() -> None:
         room_info_fetcher=fake_room_info_fetcher,
     )
 
-    await service.start(value="123456")
+    await service.start(value="123456", output_mode="bluetooth")
     await asyncio.sleep(0.05)
 
     events = event_hub.snapshot()
 
     assert bluetooth_dispatcher.called_with is not None
     assert events[-1]["bluetooth_dispatch"]["waveform_id"] == "ems-default-pulse"
+    assert "command_dispatch" not in events[-1]
 
     await service.stop()

@@ -48,6 +48,13 @@
                     <option value="third_party">第三方房间消息流</option>
                   </select>
                 </div>
+                <div class="field">
+                  <label for="output-mode">输出方式</label>
+                  <select id="output-mode">
+                    <option value="im">IM 指令</option>
+                    <option value="bluetooth">蓝牙</option>
+                  </select>
+                </div>
                 <div class="field session-value-field">
                   <label for="session-value-input" id="session-value-label">主播身份码</label>
                   <input id="session-value-input" type="text" placeholder="请输入主播身份码 code" />
@@ -150,6 +157,7 @@
               </div>
             </div>
             <dl>
+              <div><dt>输出方式</dt><dd id="output-mode-label">IM 指令</dd></div>
               <div><dt>触发模式</dt><dd id="trigger-mode-label">按礼物数量触发</dd></div>
               <div><dt>点赞倍数</dt><dd id="like-multiple-label">100</dd></div>
               <div><dt>弹幕开关</dt><dd id="danmaku-enabled-label">关闭</dd></div>

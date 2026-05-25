@@ -39,6 +39,7 @@ class ThirdPartyLiveSessionService:
         self.last_heartbeat_at = 0
         self.last_command_id = ""
         self.last_command_message = ""
+        self.output_mode = "im"
         self.trigger_mode = "by_quantity"
         self._consume_task: asyncio.Task | None = None
         self._stop_requested = False
@@ -47,6 +48,7 @@ class ThirdPartyLiveSessionService:
         self,
         *,
         value: str,
+        output_mode: str = "im",
         trigger_mode: str = "by_quantity",
         like_multiple: int = 100,
         danmaku_enabled: bool = False,
@@ -65,6 +67,7 @@ class ThirdPartyLiveSessionService:
             raise ValueError("房间号必须是数字") from exc
 
         self.room_id = normalized_room_id
+        self.output_mode = str(output_mode or "im")
         self.trigger_mode = trigger_mode
         if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_trigger_mode"):
             self.gift_dispatcher.set_trigger_mode(trigger_mode)
@@ -164,22 +167,22 @@ class ThirdPartyLiveSessionService:
         event = map_third_party_message(message, room_id=self.room_id)
         if event is None:
             return
-        if event.get("event_type") == "gift" and self.gift_dispatcher is not None:
+        if self.output_mode == "im" and event.get("event_type") == "gift" and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_gift_event(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
-        elif event.get("event_type") == "like" and self.gift_dispatcher is not None:
+        elif self.output_mode == "im" and event.get("event_type") == "like" and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_like_event(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
-        elif event.get("event_type") == "danmaku" and self.danmaku_dispatcher is not None:
+        elif self.output_mode == "im" and event.get("event_type") == "danmaku" and self.danmaku_dispatcher is not None:
             dispatch_result = await self.danmaku_dispatcher.dispatch(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
-        if self.bluetooth_dispatcher is not None:
+        if self.output_mode == "bluetooth" and self.bluetooth_dispatcher is not None:
             event["bluetooth_dispatch"] = await self.bluetooth_dispatcher.dispatch(event)
         self.event_hub.publish(event)
 
