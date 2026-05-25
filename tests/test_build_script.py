@@ -8,8 +8,10 @@ def test_build_script_includes_bilibili_client_hidden_imports() -> None:
 
     assert "bilibili_api.clients.HTTPXClient" in script
     assert "bilibili_api.clients.AioHTTPClient" in script
+    assert ".build-venv" in script
+    assert '$env:PYTHONNOUSERSITE = "1"' in script
     assert 'Start-Process `' in script
-    assert '-FilePath "python"' in script
+    assert '-FilePath $buildPython' in script
     assert "-RedirectStandardOutput $stdoutLog" in script
     assert "-RedirectStandardError $stderrLog" in script
     assert "$pyInstallerExitCode = $pyInstallerProcess.ExitCode" in script
