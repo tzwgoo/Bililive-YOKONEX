@@ -22,6 +22,7 @@ class OpenLiveSessionService:
         api_client: Any,
         ws_client: Any,
         gift_dispatcher: Any | None = None,
+        danmaku_dispatcher: Any | None = None,
         config_error: str = "",
     ) -> None:
         self.settings = settings
@@ -29,6 +30,7 @@ class OpenLiveSessionService:
         self.api_client = api_client
         self.ws_client = ws_client
         self.gift_dispatcher = gift_dispatcher
+        self.danmaku_dispatcher = danmaku_dispatcher
         self.config_error = config_error
         self.status = SessionStatus.IDLE
         self.game_id = ""
@@ -44,7 +46,17 @@ class OpenLiveSessionService:
         self._consume_task: asyncio.Task | None = None
         self._interaction_ended = False
 
-    async def start(self, *, value: str, trigger_mode: str = "by_quantity") -> None:
+    async def start(
+        self,
+        *,
+        value: str,
+        trigger_mode: str = "by_quantity",
+        like_multiple: int = 100,
+        danmaku_enabled: bool = False,
+        danmaku_keywords: str = "",
+        danmaku_command_id: str = "",
+        danmaku_cooldown_seconds: int = 0,
+    ) -> None:
         code = value.strip()
         if self.config_error:
             raise ValueError(self.config_error)
@@ -58,11 +70,24 @@ class OpenLiveSessionService:
         self.trigger_mode = trigger_mode
         if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_trigger_mode"):
             self.gift_dispatcher.set_trigger_mode(trigger_mode)
+        if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_like_multiple"):
+            self.gift_dispatcher.set_like_multiple(like_multiple)
+        if self.danmaku_dispatcher is not None and hasattr(self.danmaku_dispatcher, "configure"):
+            self.danmaku_dispatcher.configure(
+                enabled=danmaku_enabled,
+                keywords=danmaku_keywords,
+                command_id=danmaku_command_id,
+                cooldown_seconds=danmaku_cooldown_seconds,
+            )
         self.status = SessionStatus.STARTING
         self.last_error = ""
         self.last_command_id = ""
         self.last_command_message = ""
         self._interaction_ended = False
+        if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "reset_runtime_state"):
+            self.gift_dispatcher.reset_runtime_state()
+        if self.danmaku_dispatcher is not None and hasattr(self.danmaku_dispatcher, "reset_runtime_state"):
+            self.danmaku_dispatcher.reset_runtime_state()
         start_payload = await self.api_client.start(app_id=self.settings.app_id, code=code)
         data = start_payload.get("data", {})
         game_info = data.get("game_info", {})
@@ -125,7 +150,8 @@ class OpenLiveSessionService:
             "last_command_message": self.last_command_message,
             "trigger_mode": self.trigger_mode,
             "command_dispatch_enabled": bool(
-                self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False)
+                (self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False))
+                or (self.danmaku_dispatcher is not None and getattr(self.danmaku_dispatcher, "is_enabled", False))
             ),
             "config_loaded": not bool(self.config_error),
             "can_start": self.status in {SessionStatus.IDLE, SessionStatus.ERROR},
@@ -190,6 +216,16 @@ class OpenLiveSessionService:
             return
         if event.get("event_type") == "gift" and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_gift_event(event)
+            self.last_command_id = dispatch_result.get("command_id", "")
+            self.last_command_message = dispatch_result.get("message", "")
+            event["command_dispatch"] = dispatch_result
+        elif event.get("event_type") == "like" and self.gift_dispatcher is not None:
+            dispatch_result = await self.gift_dispatcher.dispatch_like_event(event)
+            self.last_command_id = dispatch_result.get("command_id", "")
+            self.last_command_message = dispatch_result.get("message", "")
+            event["command_dispatch"] = dispatch_result
+        elif event.get("event_type") == "danmaku" and self.danmaku_dispatcher is not None:
+            dispatch_result = await self.danmaku_dispatcher.dispatch(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result

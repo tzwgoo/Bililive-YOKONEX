@@ -32,6 +32,17 @@ class FakeGiftDispatcher:
         }
 
 
+class FakeDanmakuDispatcher:
+    def __init__(self) -> None:
+        self.called_with: dict | None = None
+
+        def configure(self, **kwargs) -> None:
+            self.config = kwargs
+
+    def reset_runtime_state(self) -> None:
+        return None
+
+
 @pytest.fixture
 def fake_dependencies() -> dict:
     return {
@@ -49,6 +60,7 @@ def fake_dependencies() -> dict:
         "api_client": FakeApiClient(),
         "ws_client": FakeWsClient(),
         "gift_dispatcher": FakeGiftDispatcher(),
+        "danmaku_dispatcher": FakeDanmakuDispatcher(),
     }
 
 
@@ -111,3 +123,83 @@ async def test_handle_gift_event_dispatches_command(fake_dependencies: dict) -> 
     assert service.gift_dispatcher.called_with == event
     assert service.last_command_id == "player_hurt"
     assert service.last_command_message == "指令发送成功"
+
+
+@pytest.mark.anyio
+async def test_handle_like_event_dispatches_command(fake_dependencies: dict) -> None:
+    class FakeLikeDispatcher(FakeGiftDispatcher):
+        async def dispatch_like_event(self, event: dict) -> dict:
+            self.called_with = event
+            return {
+                "matched": True,
+                "command_id": "like_trigger",
+                "success": True,
+                "message": "点赞指令发送成功",
+                "trigger_count": 1,
+                "sent_count": 1,
+            }
+
+        def reset_runtime_state(self) -> None:
+            return None
+
+        def set_like_multiple(self, like_multiple: int) -> None:
+            self.like_multiple = like_multiple
+
+    fake_dependencies["gift_dispatcher"] = FakeLikeDispatcher()
+    service = LiveSessionService(**fake_dependencies)
+
+    event = {
+        "event_type": "like",
+        "cmd": "LIVE_OPEN_PLATFORM_LIKE",
+        "room_id": 1,
+        "open_id": "user-open-id",
+        "uname": "测试用户",
+        "timestamp": 1714113037,
+        "payload": {
+            "like_text": "点赞了直播间",
+            "like_count": 100,
+        },
+    }
+
+    await service._handle_event(event)
+
+    assert service.gift_dispatcher.called_with == event
+    assert service.last_command_id == "like_trigger"
+    assert service.last_command_message == "点赞指令发送成功"
+
+
+@pytest.mark.anyio
+async def test_handle_danmaku_event_dispatches_command(fake_dependencies: dict) -> None:
+    class FakeDanmakuDispatcher(FakeGiftDispatcher):
+        async def dispatch(self, event: dict) -> dict:
+            self.called_with = event
+            return {
+                "matched": True,
+                "command_id": "danmaku_trigger",
+                "success": True,
+                "message": "弹幕关键词触发成功",
+                "trigger_count": 1,
+                "sent_count": 1,
+                "matched_keywords": ["开火"],
+            }
+
+    fake_dependencies["danmaku_dispatcher"] = FakeDanmakuDispatcher()
+    service = LiveSessionService(**fake_dependencies)
+
+    event = {
+        "event_type": "danmaku",
+        "cmd": "LIVE_OPEN_PLATFORM_DM",
+        "room_id": 1,
+        "open_id": "user-open-id",
+        "uname": "测试用户",
+        "timestamp": 1714113037,
+        "payload": {
+            "msg": "大家准备开火",
+        },
+    }
+
+    await service._handle_event(event)
+
+    assert service.danmaku_dispatcher.called_with == event
+    assert service.last_command_id == "danmaku_trigger"
+    assert service.last_command_message == "弹幕关键词触发成功"

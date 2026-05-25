@@ -1,11 +1,13 @@
 const statusPill = document.getElementById("status-pill");
 const messageText = document.getElementById("message-text");
-const modeLabel = document.getElementById("mode-label");
 const roomId = document.getElementById("room-id");
 const anchorName = document.getElementById("anchor-name");
-const configLoaded = document.getElementById("config-loaded");
 const sessionModeSelect = document.getElementById("session-mode");
 const triggerModeSelect = document.getElementById("trigger-mode");
+const likeMultipleInput = document.getElementById("like-multiple");
+const danmakuEnabledSelect = document.getElementById("danmaku-enabled");
+const danmakuKeywordsInput = document.getElementById("danmaku-keywords");
+const danmakuCooldownSecondsInput = document.getElementById("danmaku-cooldown-seconds");
 const sessionValueLabel = document.getElementById("session-value-label");
 const sessionValueInput = document.getElementById("session-value-input");
 const startBtn = document.getElementById("start-btn");
@@ -28,21 +30,33 @@ const giftCount = document.getElementById("gift-count");
 const danmakuCount = document.getElementById("danmaku-count");
 const likeCount = document.getElementById("like-count");
 const lastEventAt = document.getElementById("last-event-at");
-const lastHeartbeatAt = document.getElementById("last-heartbeat-at");
-const lastCommandMessage = document.getElementById("last-command-message");
 const triggerModeLabel = document.getElementById("trigger-mode-label");
+const likeMultipleLabel = document.getElementById("like-multiple-label");
+const danmakuEnabledLabel = document.getElementById("danmaku-enabled-label");
+const danmakuKeywordsLabel = document.getElementById("danmaku-keywords-label");
+const danmakuCooldownSecondsLabel = document.getElementById("danmaku-cooldown-seconds-label");
+const fixedDanmakuCommandId = "danmaku_trigger";
 const commandWsUrlStorageKey = "biliLive.commandWsUrl";
 const commandUidStorageKey = "biliLive.commandUid";
+const commandTokenStorageKey = "biliLive.commandToken";
+const sessionModeStorageKey = "biliLive.sessionMode";
+const triggerModeStorageKey = "biliLive.triggerMode";
+const likeMultipleStorageKey = "biliLive.likeMultiple";
+const danmakuEnabledStorageKey = "biliLive.danmakuEnabled";
+const danmakuKeywordsStorageKey = "biliLive.danmakuKeywords";
+const danmakuCooldownSecondsStorageKey = "biliLive.danmakuCooldownSeconds";
 const triggerModeOptions = {
   by_quantity: "按礼物数量触发",
   single: "单次触发",
 };
 const sessionModeOptions = {
   open_live: {
+    modeLabel: "官方 open-live",
     label: "主播身份码",
     placeholder: "请输入主播身份码 code",
   },
   third_party: {
+    modeLabel: "第三方房间消息流",
     label: "房间长 ID",
     placeholder: "请输入直播间房间长 ID room_id",
   },
@@ -51,17 +65,92 @@ const sessionModeOptions = {
 function restoreCommandForm() {
   const savedWsUrl = window.localStorage.getItem(commandWsUrlStorageKey);
   const savedUid = window.localStorage.getItem(commandUidStorageKey);
+  const savedToken = window.localStorage.getItem(commandTokenStorageKey);
   if (savedWsUrl) {
     commandWsUrlInput.value = savedWsUrl;
   }
   if (savedUid) {
     commandUidInput.value = savedUid;
   }
+  if (savedToken) {
+    commandTokenInput.value = savedToken;
+  }
 }
 
 function persistCommandForm() {
   window.localStorage.setItem(commandWsUrlStorageKey, commandWsUrlInput.value.trim());
   window.localStorage.setItem(commandUidStorageKey, commandUidInput.value.trim());
+  window.localStorage.setItem(commandTokenStorageKey, commandTokenInput.value);
+}
+
+function restoreSessionDraft() {
+  const savedSessionMode = window.localStorage.getItem(sessionModeStorageKey);
+  const savedTriggerMode = window.localStorage.getItem(triggerModeStorageKey);
+  const savedLikeMultiple = window.localStorage.getItem(likeMultipleStorageKey);
+  const savedDanmakuEnabled = window.localStorage.getItem(danmakuEnabledStorageKey);
+  const savedDanmakuKeywords = window.localStorage.getItem(danmakuKeywordsStorageKey);
+  const savedDanmakuCooldownSeconds = window.localStorage.getItem(danmakuCooldownSecondsStorageKey);
+  if (savedSessionMode && sessionModeOptions[savedSessionMode]) {
+    sessionModeSelect.value = savedSessionMode;
+  }
+  if (savedTriggerMode && triggerModeOptions[savedTriggerMode]) {
+    triggerModeSelect.value = savedTriggerMode;
+  }
+  if (savedLikeMultiple && Number(savedLikeMultiple) > 0) {
+    likeMultipleInput.value = savedLikeMultiple;
+  } else if (!likeMultipleInput.value) {
+    likeMultipleInput.value = "100";
+  }
+  if (savedDanmakuEnabled === "true" || savedDanmakuEnabled === "false") {
+    danmakuEnabledSelect.value = savedDanmakuEnabled;
+  }
+  if (savedDanmakuKeywords) {
+    danmakuKeywordsInput.value = savedDanmakuKeywords;
+  }
+  if (savedDanmakuCooldownSeconds && Number(savedDanmakuCooldownSeconds) >= 0) {
+    danmakuCooldownSecondsInput.value = savedDanmakuCooldownSeconds;
+  } else if (!danmakuCooldownSecondsInput.value) {
+    danmakuCooldownSecondsInput.value = "0";
+  }
+}
+
+function persistSessionDraft() {
+  window.localStorage.setItem(sessionModeStorageKey, sessionModeSelect.value);
+  window.localStorage.setItem(triggerModeStorageKey, triggerModeSelect.value);
+  const normalizedLikeMultiple = String(Math.max(1, Number(likeMultipleInput.value || 100) || 100));
+  likeMultipleInput.value = normalizedLikeMultiple;
+  window.localStorage.setItem(likeMultipleStorageKey, normalizedLikeMultiple);
+  const normalizedDanmakuCooldownSeconds = String(Math.max(0, Number(danmakuCooldownSecondsInput.value || 0) || 0));
+  danmakuCooldownSecondsInput.value = normalizedDanmakuCooldownSeconds;
+  window.localStorage.setItem(danmakuEnabledStorageKey, danmakuEnabledSelect.value);
+  window.localStorage.setItem(danmakuKeywordsStorageKey, danmakuKeywordsInput.value.trim());
+  window.localStorage.setItem(danmakuCooldownSecondsStorageKey, normalizedDanmakuCooldownSeconds);
+}
+
+function updateStatusDraftLabels(
+  isRunning,
+  serverMode,
+  serverTriggerMode,
+  serverLikeMultiple,
+  serverDanmakuEnabled,
+  serverDanmakuKeywords,
+  serverDanmakuCommandId,
+  serverDanmakuCooldownSeconds
+) {
+  if (isRunning) {
+    triggerModeLabel.textContent = triggerModeOptions[serverTriggerMode] || triggerModeOptions.by_quantity;
+    likeMultipleLabel.textContent = String(serverLikeMultiple || 100);
+    danmakuEnabledLabel.textContent = serverDanmakuEnabled ? "开启" : "关闭";
+    danmakuKeywordsLabel.textContent = serverDanmakuKeywords || "-";
+    danmakuCooldownSecondsLabel.textContent = `${serverDanmakuCooldownSeconds || 0} 秒`;
+    return;
+  }
+
+  triggerModeLabel.textContent = triggerModeOptions[triggerModeSelect.value] || triggerModeOptions.by_quantity;
+  likeMultipleLabel.textContent = String(Math.max(1, Number(likeMultipleInput.value || 100) || 100));
+  danmakuEnabledLabel.textContent = danmakuEnabledSelect.value === "true" ? "开启" : "关闭";
+  danmakuKeywordsLabel.textContent = danmakuKeywordsInput.value.trim() || "-";
+  danmakuCooldownSecondsLabel.textContent = `${Math.max(0, Number(danmakuCooldownSecondsInput.value || 0) || 0)} 秒`;
 }
 
 function formatTimestamp(value) {
@@ -99,31 +188,59 @@ function prependEvent(container, html) {
   updateEventCounts();
 }
 
+function formatGiftValue(payload) {
+  const giftNum = Number(payload.gift_num || 0) || 0;
+  const unitPrice = Number(payload.price || 0) || 0;
+  const totalPrice = Number(payload.r_price || 0) || 0;
+
+  if (giftNum > 1 && unitPrice > 0 && totalPrice > 0) {
+    return `单价 ${unitPrice} · 总价值 ${totalPrice}`;
+  }
+  if (unitPrice > 0) {
+    return `价值 ${unitPrice}`;
+  }
+  if (totalPrice > 0) {
+    return `价值 ${totalPrice}`;
+  }
+  return "价值 0";
+}
+
 function renderEvent(event) {
   if (event.event_type === "gift") {
     const dispatch = event.command_dispatch || {};
     const dispatchClass = dispatch.ok === false ? " dispatch-failed" : dispatch.command_id ? " dispatch-success" : "";
     const dispatchTimes = dispatch.trigger_count > 1 ? ` · 触发 ${dispatch.trigger_count} 次` : "";
     const commandText = dispatch.command_id
-      ? `<small class="dispatch-chip${dispatchClass}">槽位 ${dispatch.command_id}${dispatchTimes} · ${dispatch.message || "已处理"}</small>`
+      ? `<small class="dispatch-chip${dispatchClass}">指令 ${dispatch.command_id}${dispatchTimes} · ${dispatch.message || "已处理"}</small>`
       : "";
     prependEvent(
       giftEvents,
-      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.gift_name} x ${event.payload.gift_num}</p><small>价值 ${event.payload.r_price}</small>${commandText}`
+      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.gift_name} x ${event.payload.gift_num}</p><small>${formatGiftValue(event.payload)}</small>${commandText}`
     );
     return;
   }
   if (event.event_type === "danmaku") {
+    const dispatch = event.command_dispatch || {};
+    const dispatchClass = dispatch.ok === false ? " dispatch-failed" : dispatch.command_id ? " dispatch-success" : "";
+    const commandText = dispatch.command_id
+      ? `<small class="dispatch-chip${dispatchClass}">指令 ${dispatch.command_id} · ${dispatch.message || "已处理"}</small>`
+      : "";
     prependEvent(
       danmakuEvents,
-      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.msg || ""}</p>`
+      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.msg || ""}</p>${commandText}`
     );
     return;
   }
   if (event.event_type === "like") {
+    const dispatch = event.command_dispatch || {};
+    const dispatchClass = dispatch.ok === false ? " dispatch-failed" : dispatch.command_id ? " dispatch-success" : "";
+    const dispatchTimes = dispatch.trigger_count > 1 ? ` · 触发 ${dispatch.trigger_count} 次` : "";
+    const commandText = dispatch.command_id
+      ? `<small class="dispatch-chip${dispatchClass}">指令 ${dispatch.command_id}${dispatchTimes} · ${dispatch.message || "已处理"}</small>`
+      : "";
     prependEvent(
       likeEvents,
-      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.like_text || "点赞"} (${event.payload.like_count || 0})</p>`
+      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.like_text || "点赞"} (${event.payload.like_count || 0})</p>${commandText}`
     );
     return;
   }
@@ -138,23 +255,45 @@ async function refreshStatus() {
   statusPill.textContent = data.status;
   updateStatusTone(statusPill, data.status);
   messageText.textContent = data.message || "运行正常";
-  modeLabel.textContent = data.mode_label || "官方 open-live";
-  triggerModeLabel.textContent = triggerModeOptions[data.trigger_mode] || triggerModeOptions.by_quantity;
   roomId.textContent = data.room_id || "-";
   anchorName.textContent = data.anchor_name || "-";
-  configLoaded.textContent = data.config_loaded ? "已加载" : "缺失";
   lastEventAt.textContent = formatTimestamp(data.last_event_at);
-  lastHeartbeatAt.textContent = formatTimestamp(data.last_heartbeat_at);
-  lastCommandMessage.textContent = data.last_command_message || "-";
   startBtn.disabled = !data.can_start;
   stopBtn.disabled = !data.can_stop;
-  if (data.mode && sessionModeOptions[data.mode]) {
-    sessionModeSelect.value = data.mode;
-    updateSessionModeForm();
+  if (data.can_stop) {
+    if (data.mode && sessionModeOptions[data.mode]) {
+      sessionModeSelect.value = data.mode;
+    }
+    if (data.trigger_mode && triggerModeOptions[data.trigger_mode]) {
+      triggerModeSelect.value = data.trigger_mode;
+    }
+    if (data.like_multiple) {
+      likeMultipleInput.value = String(data.like_multiple);
+    }
+    if (typeof data.danmaku_enabled === "boolean") {
+      danmakuEnabledSelect.value = data.danmaku_enabled ? "true" : "false";
+    }
+    if (typeof data.danmaku_keywords === "string") {
+      danmakuKeywordsInput.value = data.danmaku_keywords;
+    }
+    if (typeof data.danmaku_cooldown_seconds === "number") {
+      danmakuCooldownSecondsInput.value = String(data.danmaku_cooldown_seconds);
+    }
+    persistSessionDraft();
+  } else {
+    restoreSessionDraft();
   }
-  if (data.trigger_mode && triggerModeOptions[data.trigger_mode]) {
-    triggerModeSelect.value = data.trigger_mode;
-  }
+  updateSessionModeForm();
+  updateStatusDraftLabels(
+    data.can_stop,
+    data.mode,
+    data.trigger_mode,
+    data.like_multiple,
+    data.danmaku_enabled,
+    data.danmaku_keywords,
+    data.danmaku_command_id,
+    data.danmaku_cooldown_seconds
+  );
 }
 
 async function refreshCommandStatus() {
@@ -193,6 +332,10 @@ startBtn.addEventListener("click", async () => {
       mode: sessionModeSelect.value,
       value: sessionValueInput.value,
       trigger_mode: triggerModeSelect.value,
+      like_multiple: Math.max(1, Number(likeMultipleInput.value || 100) || 100),
+      danmaku_enabled: danmakuEnabledSelect.value === "true",
+      danmaku_keywords: danmakuKeywordsInput.value.trim(),
+      danmaku_cooldown_seconds: Math.max(0, Number(danmakuCooldownSecondsInput.value || 0) || 0),
     }),
   });
   const payload = await response.json().catch(() => ({}));
@@ -228,7 +371,6 @@ commandConnectBtn.addEventListener("click", async () => {
     await refreshCommandStatus();
     return;
   }
-  commandTokenInput.value = "";
   await refreshCommandStatus();
 });
 
@@ -239,8 +381,37 @@ commandDisconnectBtn.addEventListener("click", async () => {
 });
 
 sessionModeSelect.addEventListener("change", () => {
+  persistSessionDraft();
   updateSessionModeForm();
 });
+
+triggerModeSelect.addEventListener("change", () => {
+  persistSessionDraft();
+});
+
+likeMultipleInput.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuEnabledSelect.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuKeywordsInput.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuCooldownSecondsInput.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+commandWsUrlInput.addEventListener("change", persistCommandForm);
+commandUidInput.addEventListener("change", persistCommandForm);
+commandTokenInput.addEventListener("change", persistCommandForm);
 
 const source = new EventSource("/api/events/stream");
 source.onmessage = (event) => {
@@ -256,6 +427,7 @@ async function refreshDashboard() {
 }
 
 restoreCommandForm();
+restoreSessionDraft();
 updateSessionModeForm();
 updateEventCounts();
 refreshDashboard();

@@ -20,11 +20,13 @@ class ThirdPartyLiveSessionService:
         *,
         event_hub: EventHub,
         gift_dispatcher: Any | None = None,
+        danmaku_dispatcher: Any | None = None,
         ws_client: Any | None = None,
         room_info_fetcher: Callable[[int], Awaitable[dict[str, Any]]] | None = None,
     ) -> None:
         self.event_hub = event_hub
         self.gift_dispatcher = gift_dispatcher
+        self.danmaku_dispatcher = danmaku_dispatcher
         self.ws_client = ws_client or ThirdPartyWsClient()
         self.room_info_fetcher = room_info_fetcher or self._fetch_room_info
         self.status = SessionStatus.IDLE
@@ -39,7 +41,17 @@ class ThirdPartyLiveSessionService:
         self._consume_task: asyncio.Task | None = None
         self._stop_requested = False
 
-    async def start(self, *, value: str, trigger_mode: str = "by_quantity") -> None:
+    async def start(
+        self,
+        *,
+        value: str,
+        trigger_mode: str = "by_quantity",
+        like_multiple: int = 100,
+        danmaku_enabled: bool = False,
+        danmaku_keywords: str = "",
+        danmaku_command_id: str = "",
+        danmaku_cooldown_seconds: int = 0,
+    ) -> None:
         room_id = value.strip()
         if not room_id:
             raise ValueError("房间号不能为空")
@@ -54,12 +66,25 @@ class ThirdPartyLiveSessionService:
         self.trigger_mode = trigger_mode
         if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_trigger_mode"):
             self.gift_dispatcher.set_trigger_mode(trigger_mode)
+        if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_like_multiple"):
+            self.gift_dispatcher.set_like_multiple(like_multiple)
+        if self.danmaku_dispatcher is not None and hasattr(self.danmaku_dispatcher, "configure"):
+            self.danmaku_dispatcher.configure(
+                enabled=danmaku_enabled,
+                keywords=danmaku_keywords,
+                command_id=danmaku_command_id,
+                cooldown_seconds=danmaku_cooldown_seconds,
+            )
         self.anchor_name = ""
         self.last_error = ""
         self.last_command_id = ""
         self.last_command_message = ""
         self.last_event_at = 0
         self._stop_requested = False
+        if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "reset_runtime_state"):
+            self.gift_dispatcher.reset_runtime_state()
+        if self.danmaku_dispatcher is not None and hasattr(self.danmaku_dispatcher, "reset_runtime_state"):
+            self.danmaku_dispatcher.reset_runtime_state()
         await self._hydrate_room_profile()
         self.status = SessionStatus.STARTING
         self._consume_task = asyncio.create_task(self._consume_loop())
@@ -70,17 +95,22 @@ class ThirdPartyLiveSessionService:
 
         self.status = SessionStatus.STOPPING
         self._stop_requested = True
-        await self.ws_client.disconnect()
-        if self._consume_task is not None:
-            self._consume_task.cancel()
+        try:
             try:
-                await self._consume_task
-            except asyncio.CancelledError:
-                pass
-            self._consume_task = None
-        self.status = SessionStatus.IDLE
-        self.room_id = 0
-        self.anchor_name = ""
+                await self.ws_client.disconnect()
+            except Exception as exc:  # pragma: no cover - 真实联调容错路径
+                LOGGER.warning("第三方断开连接时发生异常 room_id=%s error=%s", self.room_id, exc)
+            if self._consume_task is not None:
+                self._consume_task.cancel()
+                try:
+                    await self._consume_task
+                except asyncio.CancelledError:
+                    pass
+                self._consume_task = None
+        finally:
+            self.status = SessionStatus.IDLE
+            self.room_id = 0
+            self.anchor_name = ""
 
     def get_status_payload(self) -> dict[str, Any]:
         return {
@@ -95,7 +125,8 @@ class ThirdPartyLiveSessionService:
             "last_command_message": self.last_command_message,
             "trigger_mode": self.trigger_mode,
             "command_dispatch_enabled": bool(
-                self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False)
+                (self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False))
+                or (self.danmaku_dispatcher is not None and getattr(self.danmaku_dispatcher, "is_enabled", False))
             ),
             "config_loaded": True,
             "can_start": self.status in {SessionStatus.IDLE, SessionStatus.ERROR},
@@ -133,6 +164,16 @@ class ThirdPartyLiveSessionService:
             return
         if event.get("event_type") == "gift" and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_gift_event(event)
+            self.last_command_id = dispatch_result.get("command_id", "")
+            self.last_command_message = dispatch_result.get("message", "")
+            event["command_dispatch"] = dispatch_result
+        elif event.get("event_type") == "like" and self.gift_dispatcher is not None:
+            dispatch_result = await self.gift_dispatcher.dispatch_like_event(event)
+            self.last_command_id = dispatch_result.get("command_id", "")
+            self.last_command_message = dispatch_result.get("message", "")
+            event["command_dispatch"] = dispatch_result
+        elif event.get("event_type") == "danmaku" and self.danmaku_dispatcher is not None:
+            dispatch_result = await self.danmaku_dispatcher.dispatch(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result

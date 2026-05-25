@@ -1,6 +1,6 @@
 # Bililive-YOKONEX
 
-一个基于 `Python + FastAPI` 的本地直播互动控制台，用来接入 Bilibili 直播事件，并把礼物事件映射成固定指令槽位 `command_one` 到 `command_ten` 发往下游 WebSocket 指令服务。
+一个基于 `Python + FastAPI` 的本地直播互动控制台，用来接入 Bilibili 直播事件，并把礼物事件、点赞事件、弹幕关键词事件映射成固定指令槽位 `command_one` 到 `command_ten` 发往下游 WebSocket 指令服务。
 
 当前支持两种监听模式：
 
@@ -20,6 +20,8 @@
 - 支持本地 Web 控制台，直接在浏览器中启动、停止、查看状态
 - 支持手动登录下游 WebSocket 指令通道
 - 支持礼物映射配置，按礼物单价区间命中固定指令槽位 `command_one` 到 `command_ten`
+- 支持点赞映射配置，点赞数每满指定倍数触发一次固定指令槽位
+- 支持页面输入弹幕关键词和命令槽位，命中任一关键词时触发一次指令
 - 支持页面切换礼物触发模式：`单次触发` 或 `按礼物数量触发`
 - 支持实时展示礼物、弹幕、点赞事件
 - 支持打包为 Windows `exe`
@@ -87,18 +89,26 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
 示例：
 
 ```json
-[
-  {
-    "min_price": 0,
-    "max_price": 99,
-    "command_slot": "command_one"
-  },
-  {
-    "min_price": 100,
-    "max_price": 999,
-    "command_slot": "command_two"
-  }
-]
+{
+  "rules": [
+    {
+      "min_price": 0,
+      "max_price": 99,
+      "command_slot": "command_one"
+    },
+    {
+      "min_price": 100,
+      "max_price": 999,
+      "command_slot": "command_two"
+    }
+  ],
+  "like_rules": [
+    {
+      "like_multiple": 100,
+      "command_slot": "command_three"
+    }
+  ]
+}
 ```
 
 规则说明：
@@ -120,6 +130,10 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
 - 页面支持两种触发模式：
   - `按礼物数量触发`：按 `gift_num` 连续触发多次
   - `单次触发`：每条礼物事件只触发一次
+- 页面支持单独输入“点赞倍数”，默认 `100`
+- 点赞事件命中 `like_rules` 后，只有当累计点赞数跨过新的倍数阈值时才会发送指令
+- 页面支持输入弹幕关键词列表和弹幕命令槽位，多个关键词使用逗号分隔
+- 只要弹幕内容包含任一关键词，就会触发一次对应槽位
 - 下游服务接收到的 `commandId` 就是命中的 `command_slot`
 
 ## 启动服务

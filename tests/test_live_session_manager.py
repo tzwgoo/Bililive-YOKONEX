@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
 from app.services.live_session_manager import LiveSessionManager
 
 
@@ -28,13 +29,28 @@ class FakeSession:
             "can_stop": False,
         }
 
-    async def start(self, *, value: str, trigger_mode: str = "by_quantity") -> None:
+    async def start(
+        self,
+        *,
+        value: str,
+        trigger_mode: str = "by_quantity",
+        like_multiple: int = 100,
+        danmaku_enabled: bool = False,
+        danmaku_keywords: str = "",
+        danmaku_command_id: str = "",
+        danmaku_cooldown_seconds: int = 0,
+    ) -> None:
         self.started_with = value
         self.trigger_mode = trigger_mode
         self.status_payload = {
             **self.status_payload,
             "status": "running",
             "trigger_mode": trigger_mode,
+            "like_multiple": like_multiple,
+            "danmaku_enabled": danmaku_enabled,
+            "danmaku_keywords": danmaku_keywords,
+            "danmaku_command_id": danmaku_command_id,
+            "danmaku_cooldown_seconds": danmaku_cooldown_seconds,
             "can_start": False,
             "can_stop": True,
         }
@@ -85,6 +101,27 @@ async def test_manager_routes_third_party_start() -> None:
 
 
 @pytest.mark.anyio
+async def test_manager_ignores_custom_danmaku_command_id_and_uses_fixed_slot() -> None:
+    open_live = FakeSession(mode="open_live")
+    third_party = FakeSession(mode="third_party")
+    manager = LiveSessionManager(
+        open_live_session=open_live,
+        third_party_session=third_party,
+    )
+
+    await manager.start(
+        mode="open_live",
+        value="code-demo",
+        danmaku_enabled=True,
+        danmaku_keywords="开火",
+        danmaku_command_id="boss_warning",
+    )
+
+    assert open_live.status_payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
+    assert manager.danmaku_command_id == FIXED_DANMAKU_COMMAND_ID
+
+
+@pytest.mark.anyio
 async def test_manager_stop_only_calls_active_mode() -> None:
     open_live = FakeSession(mode="open_live")
     third_party = FakeSession(mode="third_party")
@@ -113,3 +150,4 @@ def test_manager_status_includes_current_mode() -> None:
     assert payload["mode"] == "open_live"
     assert payload["mode_label"] == "官方 open-live"
     assert payload["trigger_mode"] == "by_quantity"
+    assert payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID

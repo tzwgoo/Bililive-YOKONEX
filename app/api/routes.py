@@ -8,8 +8,6 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from app.runtime import resolve_bundle_path
-
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(resolve_bundle_path("app/templates")))
 
@@ -20,6 +18,10 @@ class StartSessionRequest(BaseModel):
     mode: str
     value: str
     trigger_mode: str = "by_quantity"
+    like_multiple: int = 100
+    danmaku_enabled: bool = False
+    danmaku_keywords: str = ""
+    danmaku_cooldown_seconds: int = 0
 
 
 class ConnectCommandRequest(BaseModel):
@@ -54,6 +56,10 @@ async def start_session(request: Request, payload: StartSessionRequest) -> dict:
             mode=payload.mode,
             value=payload.value,
             trigger_mode=payload.trigger_mode,
+            like_multiple=payload.like_multiple,
+            danmaku_enabled=payload.danmaku_enabled,
+            danmaku_keywords=payload.danmaku_keywords,
+            danmaku_cooldown_seconds=payload.danmaku_cooldown_seconds,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

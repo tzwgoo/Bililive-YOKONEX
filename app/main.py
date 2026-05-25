@@ -13,6 +13,7 @@ from app.config import Settings, load_settings
 from app.logging_config import setup_logging
 from app.runtime import resolve_bundle_path, resolve_runtime_path
 from app.services.command_session import CommandSessionService
+from app.services.danmaku_dispatcher import DanmakuCommandDispatcher
 from app.services.event_hub import EventHub
 from app.services.gift_dispatcher import GiftCommandDispatcher
 from app.services.live_session_manager import LiveSessionManager
@@ -50,6 +51,9 @@ def create_app() -> FastAPI:
         mapper=mapper,
         command_session=command_session,
     )
+    danmaku_dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
     ws_client = BilibiliWsClient()
     open_live_session = OpenLiveSessionService(
         settings=settings,
@@ -57,6 +61,7 @@ def create_app() -> FastAPI:
         api_client=api_client,
         ws_client=ws_client,
         gift_dispatcher=gift_dispatcher,
+        danmaku_dispatcher=danmaku_dispatcher,
         config_error=config_error,
     )
     from app.services.third_party_session import ThirdPartyLiveSessionService
@@ -64,6 +69,7 @@ def create_app() -> FastAPI:
     third_party_session = ThirdPartyLiveSessionService(
         event_hub=event_hub,
         gift_dispatcher=gift_dispatcher,
+        danmaku_dispatcher=danmaku_dispatcher,
     )
     session_service = LiveSessionManager(
         open_live_session=open_live_session,
