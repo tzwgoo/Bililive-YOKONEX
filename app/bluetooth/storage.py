@@ -47,7 +47,7 @@ class BluetoothSettingsStore:
                 waveform for waveform in normalized_input_waveforms
                 if waveform.id.lower() != "ems-default-pulse" and not is_preset_waveform_id(waveform.id)
             ]
-            waveforms = [*defaults.ems_waveforms, *custom_waveforms]
+            waveforms = [*custom_waveforms, *defaults.ems_waveforms]
         else:
             waveforms = defaults.ems_waveforms
 
@@ -80,11 +80,11 @@ def _normalize_waveform(item: dict) -> EmsWaveform:
     normalized_steps = [
         EmsWaveformStep(
             duration_ms=max(1, int(step.get("duration_ms", 200))),
-            channel_a=max(0, int(step.get("channel_a", 40))),
+            channel_a=_normalize_channel_strength(step.get("channel_a", 40)),
             channel_a_mode=max(1, int(step.get("channel_a_mode", step.get("a_mode", 1)))),
             channel_a_frequency=max(1, int(step.get("channel_a_frequency", step.get("a_frequency", 10)))),
             channel_a_pulse_width=max(1, int(step.get("channel_a_pulse_width", step.get("a_pulse_width", 5)))),
-            channel_b=max(0, int(step.get("channel_b", 40))),
+            channel_b=_normalize_channel_strength(step.get("channel_b", 40)),
             channel_b_mode=max(1, int(step.get("channel_b_mode", step.get("b_mode", 1)))),
             channel_b_frequency=max(1, int(step.get("channel_b_frequency", step.get("b_frequency", 10)))),
             channel_b_pulse_width=max(1, int(step.get("channel_b_pulse_width", step.get("b_pulse_width", 5)))),
@@ -115,6 +115,10 @@ def _normalize_rule(item: dict) -> BluetoothEventRule:
         cooldown_seconds=max(0, int(item.get("cooldown_seconds", 0))),
         filters=filters if isinstance(filters, dict) else {},
     )
+
+
+def _normalize_channel_strength(value) -> int:
+    return max(0, min(int(value), 180))
 
 
 def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:

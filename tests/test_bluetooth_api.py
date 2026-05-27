@@ -22,6 +22,11 @@ class FakeBluetoothService:
         self.scan_called = False
         self.disconnect_called = False
         self.saved_rules: list[dict] = []
+        self.created_waveform_name = ""
+        self.duplicated_waveform_id = ""
+        self.updated_waveform_id = ""
+        self.updated_waveform_payload: dict | None = None
+        self.deleted_waveform_id = ""
         self.overlay_payload = {
             "connected": False,
             "device_name": "YYC-DJ-DEMO",
@@ -119,6 +124,63 @@ class FakeBluetoothService:
 
     def get_overlay_payload(self) -> dict:
         return dict(self.overlay_payload)
+
+    def create_waveform(self, *, name: str) -> dict:
+        self.created_waveform_name = name
+        return {
+            "success": True,
+            "waveform": {
+                "id": "custom-wave-created",
+                "name": name or "自定义波形",
+                "builtin": False,
+                "editable": True,
+                "execution_mode": "fixed",
+                "loop_count": 1,
+                "steps": [{"duration_ms": 200, "channel_a": 0, "channel_b": 0}],
+            },
+            "waveforms": [],
+        }
+
+    def duplicate_waveform(self, *, source_waveform_id: str, name: str) -> dict:
+        self.duplicated_waveform_id = source_waveform_id
+        return {
+            "success": True,
+            "waveform": {
+                "id": "custom-wave-duplicated",
+                "name": name or "复制波形",
+                "builtin": False,
+                "editable": True,
+                "execution_mode": "fixed",
+                "loop_count": 1,
+                "steps": [{"duration_ms": 120, "channel_a": 40, "channel_b": 40}],
+            },
+            "waveforms": [],
+        }
+
+    def update_waveform(self, *, waveform_id: str, name: str, steps: list[dict]) -> dict:
+        self.updated_waveform_id = waveform_id
+        self.updated_waveform_payload = {"name": name, "steps": steps}
+        return {
+            "success": True,
+            "waveform": {
+                "id": waveform_id,
+                "name": name,
+                "builtin": False,
+                "editable": True,
+                "execution_mode": "fixed",
+                "loop_count": 1,
+                "steps": steps,
+            },
+            "waveforms": [],
+        }
+
+    def delete_waveform(self, waveform_id: str) -> dict:
+        self.deleted_waveform_id = waveform_id
+        return {
+            "success": True,
+            "deleted_waveform_id": waveform_id,
+            "waveforms": [],
+        }
 
 
 def test_bluetooth_status_endpoint_returns_payload() -> None:
@@ -274,3 +336,104 @@ def test_bluetooth_rules_endpoint_saves_rule_selection() -> None:
             "waveform_id": "ems-preset-06",
         }
     ]
+
+
+def test_bluetooth_waveform_create_endpoint_returns_new_waveform() -> None:
+    app = create_app()
+    fake_service = FakeBluetoothService()
+    app.state.bluetooth_service = fake_service
+    client = TestClient(app)
+
+    response = client.post("/api/bluetooth/waveforms", json={"name": "我的波形"})
+
+    assert response.status_code == 200
+    assert response.json()["waveform"]["name"] == "我的波形"
+    assert fake_service.created_waveform_name == "我的波形"
+
+
+def test_bluetooth_waveform_duplicate_endpoint_returns_custom_copy() -> None:
+    app = create_app()
+    fake_service = FakeBluetoothService()
+    app.state.bluetooth_service = fake_service
+    client = TestClient(app)
+
+    response = client.post("/api/bluetooth/waveforms/ems-preset-01/duplicate", json={"name": "复制版"})
+
+    assert response.status_code == 200
+    assert response.json()["waveform"]["id"] == "custom-wave-duplicated"
+    assert fake_service.duplicated_waveform_id == "ems-preset-01"
+
+
+def test_bluetooth_waveform_update_endpoint_saves_steps() -> None:
+    app = create_app()
+    fake_service = FakeBluetoothService()
+    app.state.bluetooth_service = fake_service
+    client = TestClient(app)
+
+    response = client.put(
+        "/api/bluetooth/waveforms/custom-wave-01",
+        json={
+            "name": "编辑后的波形",
+            "steps": [
+                {"duration_ms": 180, "channel_a": 120, "channel_b": 80},
+                {"duration_ms": 220, "channel_a": 0, "channel_b": 0},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["waveform"]["name"] == "编辑后的波形"
+    assert fake_service.updated_waveform_id == "custom-wave-01"
+    assert fake_service.updated_waveform_payload == {
+        "name": "编辑后的波形",
+        "steps": [
+            {"duration_ms": 180, "channel_a": 120, "channel_b": 80},
+            {"duration_ms": 220, "channel_a": 0, "channel_b": 0},
+        ],
+    }
+
+
+def test_bluetooth_waveform_delete_endpoint_removes_custom_wave() -> None:
+    app = create_app()
+    fake_service = FakeBluetoothService()
+    app.state.bluetooth_service = fake_service
+    client = TestClient(app)
+
+    response = client.delete("/api/bluetooth/waveforms/custom-wave-01")
+
+    assert response.status_code == 200
+    assert response.json()["deleted_waveform_id"] == "custom-wave-01"
+    assert fake_service.deleted_waveform_id == "custom-wave-01"
+
+
+def test_bluetooth_waveform_delete_endpoint_returns_validation_errors() -> None:
+    class FailingBluetoothService(FakeBluetoothService):
+        def delete_waveform(self, waveform_id: str) -> dict:
+            raise ValueError("请先修改规则绑定后再删除该波形")
+
+    app = create_app()
+    app.state.bluetooth_service = FailingBluetoothService()
+    client = TestClient(app)
+
+    response = client.delete("/api/bluetooth/waveforms/custom-wave-01")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "请先修改规则绑定后再删除该波形"
+
+
+def test_bluetooth_waveform_update_endpoint_validates_required_steps() -> None:
+    app = create_app()
+    fake_service = FakeBluetoothService()
+    app.state.bluetooth_service = fake_service
+    client = TestClient(app)
+
+    response = client.put(
+        "/api/bluetooth/waveforms/custom-wave-01",
+        json={
+            "name": "非法波形",
+            "steps": [],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "波形至少需要一个分段"

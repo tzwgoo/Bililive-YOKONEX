@@ -87,7 +87,8 @@ def test_store_loads_existing_payload_and_normalizes_fields(tmp_path) -> None:
     assert payload.bluetooth_settings.scan_timeout_seconds == 12
     assert payload.bluetooth_settings.connect_timeout_seconds == 18
     assert payload.bluetooth_settings.last_connected_device_id == "demo-device"
-    assert payload.ems_waveforms[0].id == "ems-default-pulse"
+    assert payload.ems_waveforms[0].id == "custom-wave"
+    assert payload.ems_waveforms[1].id == "ems-default-pulse"
     custom_wave = next(item for item in payload.ems_waveforms if item.id == "custom-wave")
     assert custom_wave.execution_mode == "fixed"
     assert custom_wave.steps[0].channel_a_mode == 6
@@ -140,6 +141,73 @@ def test_store_migrates_legacy_default_rules_to_enabled(tmp_path) -> None:
     assert all(rule.enabled is True for rule in gift_rules)
     assert gift_rules[0].waveform_id == "ems-preset-01"
     assert gift_rules[-1].waveform_id == "ems-preset-10"
+
+
+def test_store_clamps_custom_wave_strength_to_180(tmp_path) -> None:
+    path = tmp_path / "bluetooth.json"
+    path.write_text(
+        json.dumps(
+            {
+                "ems_waveforms": [
+                    {
+                        "id": "custom-wave",
+                        "name": "超限波形",
+                        "builtin": False,
+                        "editable": True,
+                        "steps": [
+                            {
+                                "duration_ms": 180,
+                                "channel_a": 260,
+                                "channel_b": 999,
+                            }
+                        ],
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    store = BluetoothSettingsStore(path)
+
+    payload = store.load()
+
+    custom_wave = next(item for item in payload.ems_waveforms if item.id == "custom-wave")
+    assert custom_wave.steps[0].channel_a == 180
+    assert custom_wave.steps[0].channel_b == 180
+
+
+def test_store_loads_custom_waveforms_before_builtin_presets(tmp_path) -> None:
+    path = tmp_path / "bluetooth.json"
+    path.write_text(
+        json.dumps(
+            {
+                "ems_waveforms": [
+                    {
+                        "id": "custom-wave-latest",
+                        "name": "最新自定义波形",
+                        "builtin": False,
+                        "editable": True,
+                        "steps": [
+                            {
+                                "duration_ms": 180,
+                                "channel_a": 60,
+                                "channel_b": 50,
+                            }
+                        ],
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    store = BluetoothSettingsStore(path)
+
+    payload = store.load()
+
+    assert payload.ems_waveforms[0].id == "custom-wave-latest"
+    assert payload.ems_waveforms[1].id == "ems-default-pulse"
 
 
 def test_store_save_persists_round_trip_payload(tmp_path) -> None:

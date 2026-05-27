@@ -102,3 +102,79 @@ def test_create_default_falls_back_to_memory_runtime_when_real_runtime_unavailab
     service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
 
     assert isinstance(service.runtime, MemoryBluetoothRuntime)
+
+
+def test_service_can_create_blank_custom_waveform(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    result = service.create_waveform(name="我的波形")
+
+    assert result["success"] is True
+    assert result["waveform"]["name"] == "我的波形"
+    assert result["waveform"]["builtin"] is False
+    assert result["waveform"]["steps"][0]["duration_ms"] == 200
+    assert result["waveform"]["steps"][0]["channel_a"] == 0
+    assert result["waveform"]["steps"][0]["channel_b"] == 0
+    assert result["waveforms"][0]["id"] == result["waveform"]["id"]
+    assert service.payload.ems_waveforms[0].id == result["waveform"]["id"]
+
+
+def test_service_can_duplicate_builtin_waveform(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    result = service.duplicate_waveform(source_waveform_id="ems-preset-01", name="")
+    source_waveform = next(item for item in service.payload.ems_waveforms if item.id == "ems-preset-01")
+
+    assert result["success"] is True
+    assert result["waveform"]["id"].startswith("custom-wave-")
+    assert result["waveform"]["builtin"] is False
+    assert result["waveform"]["name"] == "EMS 预设 01 - 呼吸 - 副本"
+    assert len(result["waveform"]["steps"]) == len(source_waveform.steps)
+    assert result["waveforms"][0]["id"] == result["waveform"]["id"]
+    assert service.payload.ems_waveforms[0].id == result["waveform"]["id"]
+
+
+def test_service_can_update_custom_waveform_steps(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+    created = service.create_waveform(name="待编辑波形")
+
+    result = service.update_waveform(
+        waveform_id=created["waveform"]["id"],
+        name="已编辑波形",
+        steps=[
+            {"duration_ms": 180, "channel_a": 220, "channel_b": -10},
+            {"duration_ms": 220, "channel_a": 120, "channel_b": 90},
+        ],
+    )
+
+    assert result["success"] is True
+    assert result["waveform"]["name"] == "已编辑波形"
+    assert result["waveform"]["steps"][0]["channel_a"] == 180
+    assert result["waveform"]["steps"][0]["channel_b"] == 0
+    assert result["waveform"]["steps"][1]["channel_a"] == 120
+    assert result["waveform"]["steps"][1]["channel_b"] == 90
+
+
+def test_service_rejects_delete_when_waveform_is_still_referenced(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+    created = service.create_waveform(name="被引用波形")
+    service.payload.bluetooth_event_rules[0].waveform_id = created["waveform"]["id"]
+
+    with pytest.raises(ValueError, match="请先修改规则绑定后再删除该波形"):
+        service.delete_waveform(created["waveform"]["id"])

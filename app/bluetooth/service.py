@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import uuid
 
 from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
 from app.bluetooth.models import BluetoothConnectionStatus
 from app.bluetooth.models import BluetoothConfigPayload
 from app.bluetooth.models import BluetoothDevice
 from app.bluetooth.models import BluetoothEventRule
+from app.bluetooth.models import EmsWaveform
+from app.bluetooth.models import EmsWaveformStep
 from app.bluetooth.models import payload_to_dict
 from app.bluetooth.runtime.base import BluetoothRuntime
 from app.bluetooth.runtime.memory_runtime import MemoryBluetoothRuntime
@@ -225,6 +228,68 @@ class BluetoothService:
             "rule_groups": self.get_studio_payload()["rule_groups"],
         }
 
+    def create_waveform(self, *, name: str) -> dict:
+        waveform = EmsWaveform(
+            id=_generate_custom_waveform_id(self.payload),
+            name=str(name or "").strip() or "自定义波形",
+            builtin=False,
+            editable=True,
+            execution_mode="fixed",
+            loop_count=1,
+            steps=[EmsWaveformStep(duration_ms=200, channel_a=0, channel_b=0)],
+        )
+        self.payload.ems_waveforms.insert(0, waveform)
+        self.store.save(self.payload)
+        return _build_waveform_mutation_response(self.payload, waveform)
+
+    def duplicate_waveform(self, *, source_waveform_id: str, name: str) -> dict:
+        source = self._find_waveform(source_waveform_id)
+        duplicated = EmsWaveform(
+            id=_generate_custom_waveform_id(self.payload),
+            name=str(name or "").strip() or f"{source.name} - 副本",
+            builtin=False,
+            editable=True,
+            execution_mode=source.execution_mode,
+            loop_count=source.loop_count,
+            steps=[_clone_waveform_step(step) for step in source.steps],
+        )
+        self.payload.ems_waveforms.insert(0, duplicated)
+        self.store.save(self.payload)
+        return _build_waveform_mutation_response(self.payload, duplicated)
+
+    def update_waveform(self, *, waveform_id: str, name: str, steps: list[dict]) -> dict:
+        waveform = self._find_waveform(waveform_id)
+        if waveform.builtin:
+            raise ValueError("内置波形不支持直接编辑")
+        normalized_name = str(name or "").strip()
+        if not normalized_name:
+            raise ValueError("波形名称不能为空")
+        normalized_steps = _merge_editable_steps(existing_steps=waveform.steps, incoming_steps=steps)
+        waveform.name = normalized_name
+        waveform.steps = normalized_steps
+        self.store.save(self.payload)
+        return _build_waveform_mutation_response(self.payload, waveform)
+
+    def delete_waveform(self, waveform_id: str) -> dict:
+        waveform = self._find_waveform(waveform_id)
+        if waveform.builtin:
+            raise ValueError("内置波形不支持删除")
+        if any(rule.waveform_id == waveform_id for rule in self.payload.bluetooth_event_rules):
+            raise ValueError("请先修改规则绑定后再删除该波形")
+        self.payload.ems_waveforms = [item for item in self.payload.ems_waveforms if item.id != waveform_id]
+        self.store.save(self.payload)
+        return {
+            "success": True,
+            "deleted_waveform_id": waveform_id,
+            "waveforms": payload_to_dict(self.payload)["ems_waveforms"],
+        }
+
+    def _find_waveform(self, waveform_id: str) -> EmsWaveform:
+        waveform = next((item for item in self.payload.ems_waveforms if item.id == waveform_id), None)
+        if waveform is None:
+            raise ValueError(f"未找到波形: {waveform_id}")
+        return waveform
+
 
 def create_real_bluetooth_runtime(
     *,
@@ -259,3 +324,60 @@ def _normalize_battery_level(value) -> int | None:
         return max(0, min(int(value), 100))
     except (TypeError, ValueError):
         return None
+
+
+def _generate_custom_waveform_id(payload: BluetoothConfigPayload) -> str:
+    existing_ids = {item.id for item in payload.ems_waveforms}
+    while True:
+        waveform_id = f"custom-wave-{uuid.uuid4().hex[:8]}"
+        if waveform_id not in existing_ids:
+            return waveform_id
+
+
+def _clone_waveform_step(step: EmsWaveformStep) -> EmsWaveformStep:
+    return EmsWaveformStep(
+        duration_ms=step.duration_ms,
+        channel_a=step.channel_a,
+        channel_a_mode=step.channel_a_mode,
+        channel_a_frequency=step.channel_a_frequency,
+        channel_a_pulse_width=step.channel_a_pulse_width,
+        channel_b=step.channel_b,
+        channel_b_mode=step.channel_b_mode,
+        channel_b_frequency=step.channel_b_frequency,
+        channel_b_pulse_width=step.channel_b_pulse_width,
+    )
+
+
+def _merge_editable_steps(*, existing_steps: list[EmsWaveformStep], incoming_steps: list[dict]) -> list[EmsWaveformStep]:
+    if not incoming_steps:
+        raise ValueError("波形至少需要一个分段")
+    normalized_steps: list[EmsWaveformStep] = []
+    for index, step in enumerate(incoming_steps):
+        base_step = existing_steps[index] if index < len(existing_steps) else EmsWaveformStep(channel_a=0, channel_b=0)
+        normalized_steps.append(
+            EmsWaveformStep(
+                duration_ms=max(1, int(step.get("duration_ms", base_step.duration_ms) or base_step.duration_ms)),
+                channel_a=_normalize_waveform_strength(step.get("channel_a", base_step.channel_a)),
+                channel_a_mode=base_step.channel_a_mode,
+                channel_a_frequency=base_step.channel_a_frequency,
+                channel_a_pulse_width=base_step.channel_a_pulse_width,
+                channel_b=_normalize_waveform_strength(step.get("channel_b", base_step.channel_b)),
+                channel_b_mode=base_step.channel_b_mode,
+                channel_b_frequency=base_step.channel_b_frequency,
+                channel_b_pulse_width=base_step.channel_b_pulse_width,
+            )
+        )
+    return normalized_steps
+
+
+def _normalize_waveform_strength(value) -> int:
+    return max(0, min(int(value), 180))
+
+
+def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform: EmsWaveform) -> dict:
+    waveform_data = next(item for item in payload_to_dict(payload)["ems_waveforms"] if item["id"] == waveform.id)
+    return {
+        "success": True,
+        "waveform": waveform_data,
+        "waveforms": payload_to_dict(payload)["ems_waveforms"],
+    }

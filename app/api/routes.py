@@ -47,6 +47,25 @@ class UpdateBluetoothRulesRequest(BaseModel):
     rules: list[BluetoothRuleUpdateItem]
 
 
+class CreateBluetoothWaveformRequest(BaseModel):
+    name: str = ""
+
+
+class DuplicateBluetoothWaveformRequest(BaseModel):
+    name: str = ""
+
+
+class BluetoothWaveformStepPayload(BaseModel):
+    duration_ms: int
+    channel_a: int
+    channel_b: int
+
+
+class UpdateBluetoothWaveformRequest(BaseModel):
+    name: str
+    steps: list[BluetoothWaveformStepPayload]
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
@@ -147,6 +166,55 @@ async def update_bluetooth_rules(request: Request, payload: UpdateBluetoothRules
         return request.app.state.bluetooth_service.save_rules(
             [item.model_dump() for item in payload.rules]
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/bluetooth/waveforms")
+async def create_bluetooth_waveform(request: Request, payload: CreateBluetoothWaveformRequest) -> dict:
+    try:
+        return request.app.state.bluetooth_service.create_waveform(name=payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/bluetooth/waveforms/{waveform_id}/duplicate")
+async def duplicate_bluetooth_waveform(
+    request: Request,
+    waveform_id: str,
+    payload: DuplicateBluetoothWaveformRequest,
+) -> dict:
+    try:
+        return request.app.state.bluetooth_service.duplicate_waveform(
+            source_waveform_id=waveform_id,
+            name=payload.name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.put("/api/bluetooth/waveforms/{waveform_id}")
+async def update_bluetooth_waveform(
+    request: Request,
+    waveform_id: str,
+    payload: UpdateBluetoothWaveformRequest,
+) -> dict:
+    if not payload.steps:
+        raise HTTPException(status_code=400, detail="波形至少需要一个分段")
+    try:
+        return request.app.state.bluetooth_service.update_waveform(
+            waveform_id=waveform_id,
+            name=payload.name,
+            steps=[item.model_dump() for item in payload.steps],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/api/bluetooth/waveforms/{waveform_id}")
+async def delete_bluetooth_waveform(request: Request, waveform_id: str) -> dict:
+    try:
+        return request.app.state.bluetooth_service.delete_waveform(waveform_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
