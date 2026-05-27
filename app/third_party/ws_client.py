@@ -30,7 +30,17 @@ class ThirdPartyWsClient:
         live_danmaku = self._create_live_danmaku(room_id)
         self._live_danmaku = live_danmaku
 
-        for event_name in ("DANMU_MSG", "SEND_GIFT", "COMBO_SEND", "LIKE_INFO_V3_CLICK", "LIKE_INFO_V3_UPDATE"):
+        for event_name in (
+            "DANMU_MSG",
+            "SEND_GIFT",
+            "COMBO_SEND",
+            "GUARD_BUY",
+            "SUPER_CHAT_MESSAGE",
+            "SUPER_CHAT_MESSAGE_JPN",
+            "USER_TOAST_MSG",
+            "LIKE_INFO_V3_CLICK",
+            "LIKE_INFO_V3_UPDATE",
+        ):
             self._register_handler(
                 live_danmaku=live_danmaku,
                 event_name=event_name,

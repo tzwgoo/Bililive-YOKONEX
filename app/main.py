@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
+from app.bluetooth.dispatcher import BluetoothDispatcher
+from app.bluetooth.service import BluetoothService
 from app.bilibili.http_client import BilibiliOpenClient
 from app.bilibili.ws_client import BilibiliWsClient
 from app.command_gateway.mapping import GiftCommandMapper
@@ -13,6 +15,7 @@ from app.config import Settings, load_settings
 from app.logging_config import setup_logging
 from app.runtime import resolve_bundle_path, resolve_runtime_path
 from app.services.command_session import CommandSessionService
+from app.services.danmaku_dispatcher import DanmakuCommandDispatcher
 from app.services.event_hub import EventHub
 from app.services.gift_dispatcher import GiftCommandDispatcher
 from app.services.live_session_manager import LiveSessionManager
@@ -46,9 +49,18 @@ def create_app() -> FastAPI:
         mapping_path = resolve_runtime_path(str(mapping_path))
     mapper = GiftCommandMapper.from_file(mapping_path)
     command_session = CommandSessionService()
+    bluetooth_service = BluetoothService.create_default(
+        config_path=resolve_runtime_path("config/bluetooth_settings.json"),
+    )
     gift_dispatcher = GiftCommandDispatcher(
         mapper=mapper,
         command_session=command_session,
+    )
+    danmaku_dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
+    bluetooth_dispatcher = BluetoothDispatcher(
+        bluetooth_service=bluetooth_service,
     )
     ws_client = BilibiliWsClient()
     open_live_session = OpenLiveSessionService(
@@ -57,6 +69,8 @@ def create_app() -> FastAPI:
         api_client=api_client,
         ws_client=ws_client,
         gift_dispatcher=gift_dispatcher,
+        danmaku_dispatcher=danmaku_dispatcher,
+        bluetooth_dispatcher=bluetooth_dispatcher,
         config_error=config_error,
     )
     from app.services.third_party_session import ThirdPartyLiveSessionService
@@ -64,6 +78,8 @@ def create_app() -> FastAPI:
     third_party_session = ThirdPartyLiveSessionService(
         event_hub=event_hub,
         gift_dispatcher=gift_dispatcher,
+        danmaku_dispatcher=danmaku_dispatcher,
+        bluetooth_dispatcher=bluetooth_dispatcher,
     )
     session_service = LiveSessionManager(
         open_live_session=open_live_session,
@@ -71,6 +87,7 @@ def create_app() -> FastAPI:
     )
 
     app.state.event_hub = event_hub
+    app.state.bluetooth_service = bluetooth_service
     app.state.command_session = command_session
     app.state.session_service = session_service
     app.include_router(router)

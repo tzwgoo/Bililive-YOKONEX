@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
 
 
 class FakeCommandSessionService:
@@ -60,7 +61,15 @@ class FakeSessionManager:
             "message": "",
             "mode": "open_live",
             "mode_label": "官方 open-live",
+            "connection_mode": "im",
+            "connection_mode_label": "IM 指令",
+            "output_mode": "im",
             "trigger_mode": "by_quantity",
+            "like_multiple": 100,
+            "danmaku_enabled": False,
+            "danmaku_keywords": "",
+            "danmaku_command_id": FIXED_DANMAKU_COMMAND_ID,
+            "danmaku_cooldown_seconds": 0,
             "game_id": "",
             "room_id": 0,
             "anchor_name": "",
@@ -79,13 +88,38 @@ class FakeSessionManager:
     def get_status_payload(self) -> dict:
         return self.status
 
-    async def start(self, *, mode: str, value: str, trigger_mode: str) -> None:
-        self.start_called_with = {"mode": mode, "value": value, "trigger_mode": trigger_mode}
+    async def start(
+        self,
+        *,
+        mode: str,
+        value: str,
+        trigger_mode: str,
+        output_mode: str = "im",
+        like_multiple: int = 100,
+        danmaku_enabled: bool = False,
+        danmaku_keywords: str = "",
+        danmaku_cooldown_seconds: int = 0,
+    ) -> None:
+        self.start_called_with = {
+            "mode": mode,
+            "value": value,
+            "trigger_mode": trigger_mode,
+            "output_mode": output_mode,
+            "like_multiple": like_multiple,
+            "danmaku_enabled": danmaku_enabled,
+            "danmaku_keywords": danmaku_keywords,
+            "danmaku_cooldown_seconds": danmaku_cooldown_seconds,
+        }
         self.status = {
             **self.status,
             "status": "running",
             "mode": mode,
             "trigger_mode": trigger_mode,
+            "like_multiple": like_multiple,
+            "danmaku_enabled": danmaku_enabled,
+            "danmaku_keywords": danmaku_keywords,
+            "danmaku_command_id": FIXED_DANMAKU_COMMAND_ID,
+            "danmaku_cooldown_seconds": danmaku_cooldown_seconds,
             "can_start": False,
             "can_stop": True,
         }
@@ -110,7 +144,10 @@ def test_status_endpoint_returns_idle_state() -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "idle"
     assert response.json()["mode"] == "open_live"
+    assert response.json()["connection_mode"] == "im"
+    assert response.json()["output_mode"] == "im"
     assert response.json()["trigger_mode"] == "by_quantity"
+    assert response.json()["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
 
 
 def test_command_status_endpoint_returns_idle_state() -> None:
@@ -120,6 +157,16 @@ def test_command_status_endpoint_returns_idle_state() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "idle"
+
+
+def test_index_page_no_longer_renders_fixed_danmaku_slot() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "固定指令槽位" not in response.text
+    assert "danmaku-command-id-label" not in response.text
 
 
 def test_command_connect_endpoint_uses_frontend_payload() -> None:
@@ -157,6 +204,11 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
             "mode": "third_party",
             "value": "123456",
             "trigger_mode": "single",
+            "connection_mode": "bluetooth",
+            "like_multiple": 200,
+            "danmaku_enabled": True,
+            "danmaku_keywords": "开火,冲冲冲",
+            "danmaku_cooldown_seconds": 15,
         },
     )
 
@@ -165,6 +217,11 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
         "mode": "third_party",
         "value": "123456",
         "trigger_mode": "single",
+        "output_mode": "bluetooth",
+        "like_multiple": 200,
+        "danmaku_enabled": True,
+        "danmaku_keywords": "开火,冲冲冲",
+        "danmaku_cooldown_seconds": 15,
     }
 
 

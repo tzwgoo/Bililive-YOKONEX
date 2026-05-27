@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
 from app.services.live_session_manager import LiveSessionManager
 
 
@@ -11,6 +12,7 @@ class FakeSession:
         self.started_with: str | None = None
         self.stopped = False
         self.trigger_mode = "by_quantity"
+        self.output_mode = "im"
         self.status_payload = {
             "status": "idle",
             "message": "",
@@ -28,13 +30,31 @@ class FakeSession:
             "can_stop": False,
         }
 
-    async def start(self, *, value: str, trigger_mode: str = "by_quantity") -> None:
+    async def start(
+        self,
+        *,
+        value: str,
+        trigger_mode: str = "by_quantity",
+        output_mode: str = "im",
+        like_multiple: int = 100,
+        danmaku_enabled: bool = False,
+        danmaku_keywords: str = "",
+        danmaku_command_id: str = "",
+        danmaku_cooldown_seconds: int = 0,
+    ) -> None:
         self.started_with = value
         self.trigger_mode = trigger_mode
+        self.output_mode = output_mode
         self.status_payload = {
             **self.status_payload,
             "status": "running",
             "trigger_mode": trigger_mode,
+            "output_mode": output_mode,
+            "like_multiple": like_multiple,
+            "danmaku_enabled": danmaku_enabled,
+            "danmaku_keywords": danmaku_keywords,
+            "danmaku_command_id": danmaku_command_id,
+            "danmaku_cooldown_seconds": danmaku_cooldown_seconds,
             "can_start": False,
             "can_stop": True,
         }
@@ -61,10 +81,11 @@ async def test_manager_routes_open_live_start() -> None:
         third_party_session=third_party,
     )
 
-    await manager.start(mode="open_live", value="code-demo", trigger_mode="single")
+    await manager.start(mode="open_live", value="code-demo", trigger_mode="single", output_mode="bluetooth")
 
     assert open_live.started_with == "code-demo"
     assert open_live.trigger_mode == "single"
+    assert open_live.output_mode == "bluetooth"
     assert third_party.started_with is None
 
 
@@ -77,11 +98,48 @@ async def test_manager_routes_third_party_start() -> None:
         third_party_session=third_party,
     )
 
-    await manager.start(mode="third_party", value="123456", trigger_mode="by_quantity")
+    await manager.start(mode="third_party", value="123456", trigger_mode="by_quantity", output_mode="im")
 
     assert third_party.started_with == "123456"
     assert third_party.trigger_mode == "by_quantity"
+    assert third_party.output_mode == "im"
     assert open_live.started_with is None
+
+
+@pytest.mark.anyio
+async def test_manager_ignores_custom_danmaku_command_id_and_uses_fixed_slot() -> None:
+    open_live = FakeSession(mode="open_live")
+    third_party = FakeSession(mode="third_party")
+    manager = LiveSessionManager(
+        open_live_session=open_live,
+        third_party_session=third_party,
+    )
+
+    await manager.start(
+        mode="open_live",
+        value="code-demo",
+        danmaku_enabled=True,
+        danmaku_keywords="开火",
+        danmaku_command_id="boss_warning",
+    )
+
+    assert open_live.status_payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
+    assert manager.danmaku_command_id == FIXED_DANMAKU_COMMAND_ID
+
+
+@pytest.mark.anyio
+async def test_manager_defaults_output_mode_to_im() -> None:
+    open_live = FakeSession(mode="open_live")
+    third_party = FakeSession(mode="third_party")
+    manager = LiveSessionManager(
+        open_live_session=open_live,
+        third_party_session=third_party,
+    )
+
+    await manager.start(mode="open_live", value="code-demo")
+
+    assert manager.output_mode == "im"
+    assert open_live.output_mode == "im"
 
 
 @pytest.mark.anyio
@@ -112,4 +170,6 @@ def test_manager_status_includes_current_mode() -> None:
 
     assert payload["mode"] == "open_live"
     assert payload["mode_label"] == "官方 open-live"
+    assert payload["output_mode"] == "im"
     assert payload["trigger_mode"] == "by_quantity"
+    assert payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID

@@ -1,17 +1,25 @@
-[
-  {
-    "min_price": 0,
-    "max_price": 99,
-    "command_slot": "command_one"
-  },
-  {
-    "min_price": 100,
-    "max_price": 999,
-    "command_slot": "command_two"
-  },
-  {
-    "min_price": 1000,
-    "max_price": null,
-    "command_slot": "command_ten"
-  }
-]
+{
+  "rules": [
+    {
+      "min_price": 0,
+      "max_price": 99,
+      "command_slot": "command_one"
+    },
+    {
+      "min_price": 100,
+      "max_price": 999,
+      "command_slot": "command_two"
+    },
+    {
+      "min_price": 1000,
+      "max_price": null,
+      "command_slot": "command_ten"
+    }
+  ],
+  "like_rules": [
+    {
+      "like_multiple": 100,
+      "command_slot": "command_three"
+    }
+  ]
+}

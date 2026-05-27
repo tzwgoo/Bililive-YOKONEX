@@ -2,8 +2,18 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
+$env:PYTHONNOUSERSITE = "1"
 
-python -m pip install pyinstaller
+$buildEnvRoot = Join-Path $projectRoot ".build-venv"
+$buildPython = Join-Path $buildEnvRoot "Scripts\python.exe"
+
+if (-not (Test-Path $buildPython)) {
+    python -m venv $buildEnvRoot
+}
+
+& $buildPython -m pip install --upgrade pip setuptools wheel
+& $buildPython -m pip install pyinstaller
+& $buildPython -m pip install -r requirements.txt
 
 $distRoot = Join-Path $projectRoot "dist"
 $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
@@ -33,17 +43,25 @@ $pyInstallerArgs = @(
     "--exclude-module", "IPython",
     "--exclude-module", "jupyter_client",
     "--exclude-module", "jupyter_core",
+    "--exclude-module", "jupyter_server",
+    "--exclude-module", "gevent",
+    "--exclude-module", "sqlalchemy",
+    "--exclude-module", "zmq",
+    "--exclude-module", "numpy",
+    "--exclude-module", "scipy",
+    "--exclude-module", "pandas",
     "--exclude-module", "tkinter",
+    "--hidden-import", "bleak.backends.winrt.client",
+    "--hidden-import", "bleak.backends.winrt.scanner",
     "--hidden-import", "bilibili_api.clients.HTTPXClient",
     "--hidden-import", "bilibili_api.clients.AioHTTPClient",
-    "--hidden-import", "bilibili_api.clients.CurlCFFIClient",
     "--add-data", "app/templates;app/templates",
     "--add-data", "app/static;app/static",
     "run_app.py"
 )
 
 $pyInstallerProcess = Start-Process `
-    -FilePath "python" `
+    -FilePath $buildPython `
     -ArgumentList $pyInstallerArgs `
     -WorkingDirectory $projectRoot `
     -RedirectStandardOutput $stdoutLog `
