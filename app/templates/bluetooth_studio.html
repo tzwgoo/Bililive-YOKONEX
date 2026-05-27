@@ -21,7 +21,10 @@
         </div>
         <div class="hero-side">
           <a class="hero-link" href="/">返回监听控制台</a>
-          <button id="studio-save-btn">保存规则</button>
+          <div class="studio-hero-actions">
+            <button id="studio-new-waveform-btn" class="secondary">新建空白波形</button>
+            <button id="studio-save-btn">保存规则</button>
+          </div>
         </div>
       </section>
 
@@ -36,16 +39,50 @@
           <div id="studio-waveform-library" class="studio-waveform-library"></div>
         </article>
 
-        <article class="panel studio-panel">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">Event Rules</p>
-              <h2>事件规则</h2>
+        <div class="studio-main-stack">
+          <article class="panel studio-waveform-editor" id="studio-waveform-editor">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Waveform Editor</p>
+                <h2>波形编辑器</h2>
+              </div>
+              <div class="studio-editor-actions">
+                <button id="studio-duplicate-waveform-btn" class="secondary">复制为自定义</button>
+                <button id="studio-delete-waveform-btn" class="secondary">删除当前波形</button>
+                <button id="studio-save-waveform-btn">保存波形</button>
+              </div>
             </div>
-          </div>
-          <p class="hint" id="studio-message-text">修改完成后点击“保存规则”。</p>
-          <div id="studio-rule-groups" class="studio-rule-groups"></div>
-        </article>
+            <div class="studio-editor-meta">
+              <label class="studio-editor-field">
+                <span>波形名称</span>
+                <input id="studio-waveform-name-input" type="text" placeholder="输入波形名称" />
+              </label>
+              <div class="studio-editor-stats">
+                <div><span>分段数</span><strong id="studio-waveform-step-count">0</strong></div>
+                <div><span>总时长</span><strong id="studio-waveform-duration-total">0 ms</strong></div>
+                <div><span>最大强度</span><strong id="studio-waveform-max-strength">0</strong></div>
+              </div>
+            </div>
+            <p class="hint" id="studio-waveform-message-text">选择一个波形，或新建后开始编辑。</p>
+            <div class="studio-editor-canvas" id="studio-waveform-canvas" aria-label="波形编辑画布"></div>
+            <div class="studio-editor-toolbar">
+              <button id="studio-add-step-btn" class="secondary">新增分段</button>
+              <span class="studio-dirty-indicator" id="studio-dirty-indicator">未保存更改</span>
+            </div>
+            <div id="studio-waveform-steps" class="studio-waveform-steps"></div>
+          </article>
+
+          <article class="panel studio-panel">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Event Rules</p>
+                <h2>事件规则</h2>
+              </div>
+            </div>
+            <p class="hint" id="studio-message-text">修改完成后点击“保存规则”。</p>
+            <div id="studio-rule-groups" class="studio-rule-groups"></div>
+          </article>
+        </div>
       </section>
     </main>
 

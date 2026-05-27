@@ -153,14 +153,38 @@ def test_frontend_contains_bluetooth_studio_entry_and_template() -> None:
 
     assert 'href="/bluetooth/studio"' in index_html
     assert 'id="studio-waveform-library"' in studio_html
+    assert 'id="studio-waveform-editor"' in studio_html
+    assert 'id="studio-new-waveform-btn"' in studio_html
     assert 'id="studio-rule-groups"' in studio_html
     assert 'id="studio-save-btn"' in studio_html
+    assert 'id="studio-waveform-name-input"' in studio_html
+    assert 'id="studio-waveform-canvas"' in studio_html
+    assert 'id="studio-waveform-steps"' in studio_html
     assert 'fetch("/api/bluetooth/studio")' in studio_js
     assert 'fetch("/api/bluetooth/rules"' in studio_js
+    assert 'fetch("/api/bluetooth/waveforms"' in studio_js
     assert "function buildWaveformPreviewSvg(" in studio_js
     assert "function resolveWaveformMaxStrength(" in studio_js
+    assert "function renderWaveformEditorCanvas(" in studio_js
+    assert "pointerdown" in studio_js
+    assert "draftDirty" in studio_js
+    assert "activeDragHandle" in studio_js
     assert "最大强度 ${maxStrength}" in studio_js
     assert "rule.rule_label || rule.event_type" in studio_js
+
+
+def test_frontend_contains_bluetooth_studio_editor_styles() -> None:
+    style_css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert ".studio-waveform-card.is-selected" in style_css
+    assert ".studio-waveform-actions" in style_css
+    assert ".studio-waveform-editor" in style_css
+    assert ".studio-editor-canvas" in style_css
+    assert ".studio-editor-handle" in style_css
+    assert ".studio-editor-grid" in style_css
+    assert ".studio-waveform-steps" in style_css
+    assert "overflow-x: auto" in style_css
+    assert "min-width: 0" in style_css
 
 
 def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
