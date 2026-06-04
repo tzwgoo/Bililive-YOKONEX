@@ -213,7 +213,10 @@ async def get_bluetooth_overlay_status(request: Request) -> dict:
 
 @router.post("/api/bluetooth/scan")
 async def scan_bluetooth_devices(request: Request) -> dict:
-    devices = await request.app.state.bluetooth_service.scan()
+    try:
+        devices = await request.app.state.bluetooth_service.scan()
+    except (ValueError, RuntimeError, TimeoutError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "success": True,
         "devices": [

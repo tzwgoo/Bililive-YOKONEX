@@ -42,7 +42,7 @@
         <WaveformListPanel
           :waveforms="draftWaveforms"
           :selected-waveform-id="selectedWaveformId"
-          @select="selectedWaveformId = $event"
+          @select="handleSelectWaveform"
         />
       </ACol>
 
@@ -80,6 +80,7 @@ const message = ref("修改完成后点击“保存波形”。");
 const savingWaveform = ref(false);
 const selectedWaveformId = ref("");
 const draftWaveforms = ref<BluetoothWaveform[]>([]);
+const savedWaveformSnapshots = ref<Record<string, string>>({});
 
 const selectedWaveform = computed(() =>
   draftWaveforms.value.find((waveform) => waveform.id === selectedWaveformId.value) || null,
@@ -92,12 +93,16 @@ watch(
     if (!studio) {
       draftWaveforms.value = [];
       selectedWaveformId.value = "";
+      savedWaveformSnapshots.value = {};
       return;
     }
     draftWaveforms.value = studio.waveforms.map((waveform) => ({
       ...waveform,
       steps: waveform.steps.map((step) => ({ ...step })),
     }));
+    savedWaveformSnapshots.value = Object.fromEntries(
+      studio.waveforms.map((waveform) => [waveform.id, serializeWaveform(waveform)]),
+    );
     if (!selectedWaveformId.value || !draftWaveforms.value.some((item) => item.id === selectedWaveformId.value)) {
       selectedWaveformId.value = draftWaveforms.value[0]?.id || "";
     }
@@ -111,6 +116,49 @@ function normalizeDuration(value: number) {
 
 function normalizeStrength(value: number) {
   return Math.max(0, Math.min(180, Math.round(Number(value || 0))));
+}
+
+function cloneWaveform(waveform: BluetoothWaveform): BluetoothWaveform {
+  return {
+    ...waveform,
+    steps: waveform.steps.map((step) => ({ ...step })),
+  };
+}
+
+function serializeWaveform(waveform: BluetoothWaveform) {
+  return JSON.stringify({
+    id: waveform.id,
+    name: waveform.name,
+    builtin: Boolean(waveform.builtin),
+    editable: Boolean(waveform.editable),
+    execution_mode: waveform.execution_mode || "fixed",
+    loop_count: Number(waveform.loop_count || 1),
+    steps: waveform.steps.map((step) => ({
+      duration_ms: normalizeDuration(step.duration_ms),
+      channel_a: normalizeStrength(step.channel_a),
+      channel_b: normalizeStrength(step.channel_b),
+    })),
+  });
+}
+
+function restoreWaveformDraft(waveformId: string) {
+  const savedWaveform = bluetoothStore.studio?.waveforms.find((waveform) => waveform.id === waveformId);
+  if (!savedWaveform) {
+    return;
+  }
+  const draftIndex = draftWaveforms.value.findIndex((waveform) => waveform.id === waveformId);
+  if (draftIndex === -1) {
+    return;
+  }
+  draftWaveforms.value.splice(draftIndex, 1, cloneWaveform(savedWaveform));
+}
+
+function isWaveformDirty(waveformId: string) {
+  const draftWaveform = draftWaveforms.value.find((waveform) => waveform.id === waveformId);
+  if (!draftWaveform || draftWaveform.builtin) {
+    return false;
+  }
+  return serializeWaveform(draftWaveform) !== savedWaveformSnapshots.value[waveformId];
 }
 
 function updateWaveformName(name: string) {
@@ -158,6 +206,21 @@ function removeStep(index: number) {
     return;
   }
   selectedWaveform.value.steps.splice(index, 1);
+}
+
+function handleSelectWaveform(nextWaveformId: string) {
+  if (!nextWaveformId || nextWaveformId === selectedWaveformId.value) {
+    return;
+  }
+  if (selectedWaveformId.value && isWaveformDirty(selectedWaveformId.value)) {
+    const shouldDiscard = window.confirm("当前波形还有未保存更改，是否放弃修改并切换？");
+    if (!shouldDiscard) {
+      return;
+    }
+    restoreWaveformDraft(selectedWaveformId.value);
+    message.value = "已放弃当前波形的未保存修改";
+  }
+  selectedWaveformId.value = nextWaveformId;
 }
 
 async function handleCreateWaveform() {

@@ -49,6 +49,78 @@
       "min_price": 1000000,
       "max_price": null,
       "command_slot": "command_ten"
+    },
+    {
+      "event_type": "super_chat",
+      "min_price": 30,
+      "max_price": 49,
+      "command_slot": "command_one"
+    },
+    {
+      "event_type": "super_chat",
+      "min_price": 50,
+      "max_price": 99,
+      "command_slot": "command_two"
+    },
+    {
+      "event_type": "super_chat",
+      "min_price": 100,
+      "max_price": 499,
+      "command_slot": "command_three"
+    },
+    {
+      "event_type": "super_chat",
+      "min_price": 500,
+      "max_price": 999,
+      "command_slot": "command_four"
+    },
+    {
+      "event_type": "super_chat",
+      "min_price": 1000,
+      "max_price": 1999,
+      "command_slot": "command_five"
+    },
+    {
+      "event_type": "super_chat",
+      "min_price": 2000,
+      "max_price": null,
+      "command_slot": "command_six"
+    },
+    {
+      "event_type": "guard_buy",
+      "min_price": 100000,
+      "max_price": 999999,
+      "command_slot": "command_eight"
+    },
+    {
+      "event_type": "guard_buy",
+      "min_price": 1000000,
+      "max_price": 9999999,
+      "command_slot": "command_nine"
+    },
+    {
+      "event_type": "guard_buy",
+      "min_price": 10000000,
+      "max_price": null,
+      "command_slot": "command_ten"
+    },
+    {
+      "event_type": "guard_renew",
+      "min_price": 50000,
+      "max_price": 999999,
+      "command_slot": "command_seven"
+    },
+    {
+      "event_type": "guard_renew",
+      "min_price": 1000000,
+      "max_price": 9999999,
+      "command_slot": "command_eight"
+    },
+    {
+      "event_type": "guard_renew",
+      "min_price": 10000000,
+      "max_price": null,
+      "command_slot": "command_nine"
     }
   ],
   "like_rules": [

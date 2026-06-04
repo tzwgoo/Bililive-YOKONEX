@@ -117,4 +117,57 @@ describe("DashboardPage", () => {
       token: "token-001",
     });
   });
+
+  it("opens bluetooth overlay window before connecting a device", async () => {
+    vi.spyOn(sessionService, "fetchSessionStatus").mockResolvedValue({
+      status: "idle",
+      can_start: true,
+      can_stop: false,
+    });
+    vi.spyOn(commandService, "fetchCommandStatus").mockResolvedValue({
+      status: "idle",
+      can_connect: true,
+      can_disconnect: false,
+    });
+    vi.spyOn(bluetoothService, "fetchBluetoothStatus").mockResolvedValue({
+      connected: false,
+      devices: [
+        {
+          device_id: "device-01",
+          name: "Pulse Device",
+          protocol: "BLE",
+          rssi: -55,
+          connected: false,
+        },
+      ],
+      rules: [],
+    });
+    const connectBluetoothSpy = vi.spyOn(bluetoothService, "connectBluetoothDevice").mockResolvedValue({ success: true });
+    const overlayWindow = {
+      closed: false,
+      focus: vi.fn(),
+      close: vi.fn(),
+      location: {
+        replace: vi.fn(),
+      },
+    };
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(overlayWindow as unknown as Window);
+
+    const wrapper = mount(DashboardPage);
+    await flushPromises();
+
+    await wrapper.get(".bluetooth-collapse .ant-collapse-header").trigger("click");
+    await flushPromises();
+    await wrapper.get(".bluetooth-collapse .ant-list-item button").trigger("click");
+    await flushPromises();
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "/bluetooth/overlay",
+      "biliLiveBluetoothOverlay",
+      "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no",
+    );
+    expect(connectBluetoothSpy).toHaveBeenCalledWith("device-01");
+    expect(overlayWindow.location.replace).toHaveBeenCalledWith("/bluetooth/overlay");
+    expect(overlayWindow.focus).toHaveBeenCalled();
+  });
 });

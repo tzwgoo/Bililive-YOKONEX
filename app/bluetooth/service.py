@@ -14,6 +14,8 @@ from app.bluetooth.models import BluetoothEventRule
 from app.bluetooth.models import EmsWaveform
 from app.bluetooth.models import EmsWaveformStep
 from app.bluetooth.models import payload_to_dict
+from app.bluetooth.price_tiers import PRICE_FILTER_EVENT_TYPES
+from app.bluetooth.price_tiers import SPECIAL_PRICE_TIER_BY_RULE_ID
 from app.bluetooth.runtime.base import BluetoothRuntime
 from app.bluetooth.runtime.memory_runtime import MemoryBluetoothRuntime
 from app.bluetooth.storage import BluetoothSettingsStore
@@ -75,7 +77,12 @@ class BluetoothService:
         )
 
     async def scan(self) -> list[BluetoothDevice]:
-        devices = await self.runtime.scan()
+        try:
+            devices = await self.runtime.scan()
+        except TimeoutError:
+            raise RuntimeError("蓝牙扫描超时，请重试") from None
+        except Exception as exc:
+            raise RuntimeError(_resolve_scan_error_message(exc)) from exc
         return devices
 
     async def connect(self, device_id: str) -> BluetoothConnectionStatus:
@@ -254,7 +261,7 @@ class BluetoothService:
             next_filters_by_rule_id[rule_id] = _resolve_updated_filters(current=current, incoming=item)
             updated_count += 1
 
-        _validate_gift_rule_overlaps(
+        _validate_price_rule_overlaps(
             self.payload.bluetooth_event_rules,
             next_filters_by_rule_id,
             next_enabled_by_rule_id,
@@ -366,8 +373,8 @@ def create_real_bluetooth_runtime(
 
 def _build_rule_label(rule: dict) -> str:
     rule_id = str(rule.get("id", "") or "")
-    if rule_id in GIFT_TIER_BY_RULE_ID:
-        tier = GIFT_TIER_BY_RULE_ID[rule_id]
+    tier = _resolve_price_tier_definition(rule_id)
+    if tier is not None:
         filters = rule.get("filters", {}) if isinstance(rule.get("filters", {}), dict) else {}
         min_price = _coerce_non_negative_int(filters.get("min_price"), fallback=tier.min_price)
         max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
@@ -516,7 +523,7 @@ def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform:
 
 def _resolve_updated_filters(*, current: BluetoothEventRule, incoming: dict[str, Any]) -> dict[str, Any]:
     next_filters = dict(current.filters)
-    if current.event_type != "gift":
+    if current.event_type not in PRICE_FILTER_EVENT_TYPES:
         return next_filters
 
     min_price = _coerce_non_negative_int(incoming.get("min_price"), fallback=_coerce_non_negative_int(next_filters.get("min_price")))
@@ -530,47 +537,49 @@ def _resolve_updated_filters(*, current: BluetoothEventRule, incoming: dict[str,
     }
 
 
-def _validate_gift_rule_overlaps(
+def _validate_price_rule_overlaps(
     rules: list[BluetoothEventRule],
     next_filters_by_rule_id: dict[str, dict[str, Any]],
     next_enabled_by_rule_id: dict[str, bool],
 ) -> None:
-    enabled_gift_rules: list[tuple[str, int, int | None]] = []
-    for rule in rules:
-        if rule.event_type != "gift":
-            continue
-        is_enabled = next_enabled_by_rule_id.get(rule.id, rule.enabled)
-        if not is_enabled:
-            continue
-        filters = next_filters_by_rule_id.get(rule.id, dict(rule.filters))
-        min_price = _coerce_non_negative_int(filters.get("min_price"))
-        max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
-        enabled_gift_rules.append((rule.id, min_price, max_price))
+    for event_type in PRICE_FILTER_EVENT_TYPES:
+        enabled_price_rules: list[tuple[str, int, int | None]] = []
+        for rule in rules:
+            if rule.event_type != event_type:
+                continue
+            is_enabled = next_enabled_by_rule_id.get(rule.id, rule.enabled)
+            if not is_enabled:
+                continue
+            filters = next_filters_by_rule_id.get(rule.id, dict(rule.filters))
+            min_price = _coerce_non_negative_int(filters.get("min_price"))
+            max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
+            enabled_price_rules.append((rule.id, min_price, max_price))
 
-    enabled_gift_rules.sort(
-        key=lambda item: (
-            item[1],
-            float("inf") if item[2] is None else item[2],
-            item[0],
+        enabled_price_rules.sort(
+            key=lambda item: (
+                item[1],
+                float("inf") if item[2] is None else item[2],
+                item[0],
+            )
         )
-    )
 
-    previous_rule_id = ""
-    previous_max_price: int | None = None
-    for rule_id, min_price, max_price in enabled_gift_rules:
-        if previous_max_price is not None and min_price <= previous_max_price:
-            raise ValueError(f"礼物事件的价格区间重叠: {previous_rule_id} 与 {rule_id}")
-        previous_rule_id = rule_id
-        previous_max_price = max_price
-        if previous_max_price is None:
-            break
+        previous_rule_id = ""
+        previous_max_price: int | None = None
+        for rule_id, min_price, max_price in enabled_price_rules:
+            if previous_max_price is not None and min_price <= previous_max_price:
+                event_label = RULE_GROUP_LABELS.get(event_type, event_type or "事件")
+                raise ValueError(f"{event_label}的价格区间重叠: {previous_rule_id} 与 {rule_id}")
+            previous_rule_id = rule_id
+            previous_max_price = max_price
+            if previous_max_price is None:
+                break
 
 
 def _sort_event_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
     grouped_rules: list[BluetoothEventRule] = []
     for event_type in RULE_GROUP_LABELS:
         event_rules = [item for item in rules if item.event_type == event_type]
-        if event_type == "gift":
+        if event_type in PRICE_FILTER_EVENT_TYPES:
             event_rules = sorted(
                 event_rules,
                 key=lambda item: (
@@ -596,3 +605,20 @@ def _coerce_optional_non_negative_int(value: Any) -> int | None:
     if value in (None, ""):
         return None
     return _coerce_non_negative_int(value)
+
+
+def _resolve_price_tier_definition(rule_id: str):
+    if rule_id in GIFT_TIER_BY_RULE_ID:
+        return GIFT_TIER_BY_RULE_ID[rule_id]
+    return SPECIAL_PRICE_TIER_BY_RULE_ID.get(rule_id)
+
+
+def _resolve_scan_error_message(error: Exception) -> str:
+    raw_message = str(error or "").strip()
+    error_name = error.__class__.__name__
+    normalized_message = raw_message.lower()
+    if error_name == "BleakBluetoothNotAvailableError" or "no bluetooth adapter found" in normalized_message:
+        return "当前主机未检测到蓝牙适配器"
+    if raw_message:
+        return f"蓝牙扫描失败: {raw_message}"
+    return "蓝牙扫描失败，请检查蓝牙权限或适配器状态"

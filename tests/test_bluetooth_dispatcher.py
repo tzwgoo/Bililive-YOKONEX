@@ -79,6 +79,36 @@ async def test_dispatcher_triggers_waveform_for_interact_event() -> None:
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("event_type", "price", "expected_waveform_id"),
+    [
+        ("super_chat", 35, "ems-preset-07"),
+        ("guard_buy", 1000000, "ems-preset-08"),
+        ("guard_renew", 10000000, "ems-preset-08"),
+    ],
+)
+async def test_dispatcher_matches_special_price_event_tiers(
+    event_type: str,
+    price: int,
+    expected_waveform_id: str,
+) -> None:
+    service = FakeBluetoothService()
+    dispatcher = BluetoothDispatcher(bluetooth_service=service)
+
+    result = await dispatcher.dispatch(
+        {
+            "event_type": event_type,
+            "payload": {
+                "price": price,
+            },
+        }
+    )
+
+    assert result["success"] is True
+    assert service.triggered == [(event_type, expected_waveform_id)]
+
+
+@pytest.mark.anyio
 async def test_dispatcher_matches_keywords_for_danmaku_event() -> None:
     service = FakeBluetoothService()
     for rule in service.payload.bluetooth_event_rules:

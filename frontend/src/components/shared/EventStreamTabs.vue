@@ -1,5 +1,5 @@
 <template>
-  <ATabs v-model:activeKey="activeKey" class="event-stream-tabs">
+  <ATabs v-model:activeKey="activeKey" class="event-stream-tabs" @change="handleTabChange">
     <ATabPane v-for="tab in tabs" :key="tab.key">
       <template #tab>
         {{ tab.label }}<span class="event-tab-count">{{ tab.events.length }}</span>
@@ -22,10 +22,34 @@ interface EventTabItem {
 
 const props = defineProps<{
   tabs: EventTabItem[];
+  storageKey?: string;
 }>();
 
-const activeKey = ref(props.tabs[0]?.key || "");
+function loadInitialActiveKey() {
+  if (!props.storageKey) {
+    return props.tabs[0]?.key || "";
+  }
+  const rawValue = window.localStorage.getItem(props.storageKey);
+  if (!rawValue) {
+    return props.tabs[0]?.key || "";
+  }
+  try {
+    const nextKey = JSON.parse(rawValue) as string;
+    return props.tabs.some((tab) => tab.key === nextKey) ? nextKey : (props.tabs[0]?.key || "");
+  } catch {
+    return props.tabs[0]?.key || "";
+  }
+}
+
+const activeKey = ref(loadInitialActiveKey());
 const ATabPane = ATabs.TabPane;
+
+function persistActiveKey(value: string) {
+  if (!props.storageKey || !value) {
+    return;
+  }
+  window.localStorage.setItem(props.storageKey, JSON.stringify(value));
+}
 
 watch(
   () => props.tabs,
@@ -36,6 +60,15 @@ watch(
   },
   { deep: true },
 );
+
+watch(activeKey, (value) => {
+  persistActiveKey(value);
+});
+
+function handleTabChange(value: string) {
+  activeKey.value = value;
+  persistActiveKey(value);
+}
 </script>
 
 <style scoped>

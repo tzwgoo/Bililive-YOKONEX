@@ -53,7 +53,7 @@
         type="warning"
         show-icon
       />
-      <EventStreamTabs :tabs="eventTabs" />
+      <EventStreamTabs :tabs="eventTabs" storage-key="biliLive.dashboardTab" />
     </ACard>
   </main>
 </template>
@@ -189,6 +189,14 @@ async function refreshDashboard() {
 
 const polling = usePolling(refreshDashboard, 5000);
 
+function openBluetoothOverlayWindow() {
+  return window.open(
+    "/bluetooth/overlay",
+    "biliLiveBluetoothOverlay",
+    "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no",
+  );
+}
+
 async function handleStartSession() {
   startingSession.value = true;
   try {
@@ -263,10 +271,18 @@ async function handleScanBluetooth() {
 
 async function handleConnectBluetooth(deviceId: string) {
   scanningBluetooth.value = true;
+  const overlayWindow = openBluetoothOverlayWindow();
   try {
     await bluetoothStore.connectDevice(deviceId);
+    if (overlayWindow && !overlayWindow.closed) {
+      overlayWindow.location.replace("/bluetooth/overlay");
+      overlayWindow.focus();
+    }
     bluetoothMessage.value = "蓝牙连接成功";
   } catch (error) {
+    if (overlayWindow && !overlayWindow.closed) {
+      overlayWindow.close();
+    }
     bluetoothMessage.value = error instanceof Error ? error.message : "蓝牙连接失败";
   } finally {
     scanningBluetooth.value = false;

@@ -85,9 +85,6 @@ BLUETOOTH_DANMAKU_RULE_DEFINITIONS = [
 
 
 BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS = [
-    {"id": "super-chat-default", "event_type": "super_chat", "waveform_id": "ems-preset-07", "label": "醒目留言", "filters": {}},
-    {"id": "guard-buy-default", "event_type": "guard_buy", "waveform_id": "ems-preset-08", "label": "上舰", "filters": {}},
-    {"id": "guard-renew-default", "event_type": "guard_renew", "waveform_id": "ems-preset-08", "label": "续费", "filters": {}},
     {"id": "interact-default", "event_type": "interact", "waveform_id": "ems-preset-02", "label": "互动事件", "filters": {"interact_types": []}},
 ]
 
@@ -109,7 +106,21 @@ def build_default_danmaku_rules(*, enabled: bool = True) -> list[BluetoothEventR
 
 def build_default_special_event_rules(*, enabled: bool = True) -> list[BluetoothEventRule]:
     """构建默认 SC、舰队和互动蓝牙规则。"""
+    from app.bluetooth.price_tiers import build_default_special_price_rules
+
     return [
+        *(
+            BluetoothEventRule(
+                id=str(item["id"]),
+                enabled=bool(item["enabled"]),
+                event_type=str(item["event_type"]),
+                waveform_id=str(item["waveform_id"]),
+                cooldown_seconds=int(item["cooldown_seconds"]),
+                filters=dict(item["filters"]),
+            )
+            for item in build_default_special_price_rules(enabled=enabled)
+        ),
+        *(
         BluetoothEventRule(
             id=str(item["id"]),
             enabled=bool(enabled),
@@ -119,6 +130,7 @@ def build_default_special_event_rules(*, enabled: bool = True) -> list[Bluetooth
             filters=dict(item["filters"]),
         )
         for item in BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS
+        ),
     ]
 
 

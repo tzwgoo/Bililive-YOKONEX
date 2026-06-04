@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from app.bluetooth.gift_tiers import match_gift_tier_rule
+from app.bluetooth.price_tiers import PRICE_FILTER_EVENT_TYPES
 from app.models import is_danmaku_event_type
 
 
@@ -62,7 +63,11 @@ class BluetoothDispatcher:
         for rule in payload.bluetooth_event_rules:
             if not rule.enabled or not self._rule_matches_event_type(rule.event_type, original_event_type):
                 continue
-            if original_event_type == "gift" and not self._match_gift_rule(rule.filters, payload_data):
+            if original_event_type in PRICE_FILTER_EVENT_TYPES and not self._match_price_rule(
+                event_type=original_event_type,
+                filters=rule.filters,
+                payload=payload_data,
+            ):
                 continue
             if is_danmaku_event_type(original_event_type):
                 danmaku_rule_result = self._match_danmaku_rule(rule.filters, payload_data)
@@ -149,15 +154,17 @@ class BluetoothDispatcher:
 
         return None
 
-    def _match_gift_rule(self, filters: dict[str, Any], payload: dict[str, Any]) -> bool:
+    def _match_price_rule(self, *, event_type: str, filters: dict[str, Any], payload: dict[str, Any]) -> bool:
         price = self._coerce_int(payload.get("price", payload.get("r_price")))
         if price is None:
             return False
         min_price = self._coerce_int(filters.get("min_price"))
         max_price = self._coerce_int(filters.get("max_price"), allow_none=True)
         if min_price is None and max_price is None:
-            tier = match_gift_tier_rule(price)
-            return tier is not None
+            if event_type == "gift":
+                tier = match_gift_tier_rule(price)
+                return tier is not None
+            return True
         if min_price is not None and price < min_price:
             return False
         if max_price is not None and price > max_price:

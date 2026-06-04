@@ -16,6 +16,8 @@ from app.bluetooth.models import build_default_special_event_rules
 from app.bluetooth.models import build_default_payload
 from app.bluetooth.models import build_default_danmaku_rules
 from app.bluetooth.models import payload_to_dict
+from app.bluetooth.price_tiers import SPECIAL_PRICE_TIER_RULE_IDS_BY_EVENT_TYPE
+from app.bluetooth.price_tiers import build_default_special_price_rules
 
 
 class BluetoothSettingsStore:
@@ -127,6 +129,7 @@ def _normalize_channel_strength(value) -> int:
 def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
     rules = _migrate_legacy_gift_default_rule(rules)
     rules = _migrate_legacy_danmaku_default_rules(rules)
+    rules = _migrate_legacy_special_price_rules(rules)
     rules = _append_missing_special_event_rules(rules)
     rule_map = {rule.id: rule for rule in rules}
     for rule_id in ("like-default",):
@@ -208,4 +211,69 @@ def _migrate_legacy_danmaku_default_rules(rules: list[BluetoothEventRule]) -> li
         migrated_rules.append(default_rule)
 
     remaining_rules = [rule for rule in rules if rule.id != "danmaku-default"]
+    return [*remaining_rules, *migrated_rules]
+
+
+def _migrate_legacy_special_price_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
+    migrated_rules = list(rules)
+    migrated_rules = _migrate_single_special_price_rule(
+        rules=migrated_rules,
+        event_type="super_chat",
+        legacy_rule_id="super-chat-default",
+        default_waveform_id="ems-preset-07",
+    )
+    migrated_rules = _migrate_single_special_price_rule(
+        rules=migrated_rules,
+        event_type="guard_buy",
+        legacy_rule_id="guard-buy-default",
+        default_waveform_id="ems-preset-08",
+    )
+    migrated_rules = _migrate_single_special_price_rule(
+        rules=migrated_rules,
+        event_type="guard_renew",
+        legacy_rule_id="guard-renew-default",
+        default_waveform_id="ems-preset-08",
+    )
+    return migrated_rules
+
+
+def _migrate_single_special_price_rule(
+    *,
+    rules: list[BluetoothEventRule],
+    event_type: str,
+    legacy_rule_id: str,
+    default_waveform_id: str,
+) -> list[BluetoothEventRule]:
+    existing_rule_ids = SPECIAL_PRICE_TIER_RULE_IDS_BY_EVENT_TYPE[event_type]
+    if any(rule.id in existing_rule_ids for rule in rules):
+        return rules
+
+    legacy_rule = next(
+        (
+            rule
+            for rule in rules
+            if rule.id == legacy_rule_id and rule.event_type == event_type
+        ),
+        None,
+    )
+    if legacy_rule is None:
+        return rules
+
+    default_rules = build_default_special_price_rules(enabled=legacy_rule.enabled)
+    migrated_rules = []
+    for item in default_rules:
+        if item["event_type"] != event_type:
+            continue
+        migrated_rules.append(
+            BluetoothEventRule(
+                id=str(item["id"]),
+                enabled=bool(legacy_rule.enabled),
+                event_type=str(item["event_type"]),
+                waveform_id=legacy_rule.waveform_id or str(item["waveform_id"]) or default_waveform_id,
+                cooldown_seconds=max(0, int(legacy_rule.cooldown_seconds)),
+                filters=dict(item["filters"]),
+            )
+        )
+
+    remaining_rules = [rule for rule in rules if rule.id != legacy_rule_id]
     return [*remaining_rules, *migrated_rules]

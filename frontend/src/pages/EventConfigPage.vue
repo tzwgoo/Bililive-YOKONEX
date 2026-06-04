@@ -75,8 +75,8 @@
       v-else
       :rule-groups="draftRuleGroups"
       :waveform-options="waveformOptions"
-      @update-gift-filter="updateGiftFilter"
-      @update-gift-max-price="updateGiftMaxPrice"
+      @update-min-price="updateMinPrice"
+      @update-max-price="updateMaxPriceFilter"
     />
   </main>
 </template>
@@ -88,6 +88,7 @@ import PageHeaderBar from "@/components/layout/PageHeaderBar.vue";
 import BluetoothEventRulePanel from "@/components/events/BluetoothEventRulePanel.vue";
 import EventConfigTabs from "@/components/events/EventConfigTabs.vue";
 import ImRuleGroupsPanel from "@/components/events/ImRuleGroupsPanel.vue";
+import { useLocalDraft } from "@/composables/useLocalDraft";
 import { useBluetoothStore } from "@/stores/bluetooth";
 import { useCommandStore } from "@/stores/command";
 import type { BluetoothRuleGroup, BluetoothStudioRule, CommandStudioRule } from "@/types";
@@ -103,8 +104,9 @@ const props = withDefaults(
 
 const commandStore = useCommandStore();
 const bluetoothStore = useBluetoothStore();
+const activeTabStorage = useLocalDraft<"im" | "bluetooth">("biliLive.eventConfigTab", props.initialTab);
 
-const activeTab = ref<"im" | "bluetooth">(props.initialTab);
+const activeTab = ref<"im" | "bluetooth">(activeTabStorage.load());
 const message = ref("规则修改后可分别保存到 IM 和蓝牙配置。");
 const savingCommandRules = ref(false);
 const savingBluetoothRules = ref(false);
@@ -134,6 +136,11 @@ const bluetoothRuleCount = computed(() =>
   draftRuleGroups.value.reduce((sum, group) => sum + group.rules.length, 0),
 );
 const waveformCount = computed(() => bluetoothStore.studio?.waveforms.length || 0);
+const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_renew"]);
+
+watch(activeTab, (value) => {
+  activeTabStorage.save(value);
+});
 
 watch(
   () => commandStore.studio,
@@ -204,7 +211,7 @@ function removeRule(ruleId: string) {
   draftRules.value = draftRules.value.filter((rule) => rule.id !== ruleId);
 }
 
-function updateGiftFilter(ruleId: string, value: number) {
+function updateMinPrice(ruleId: string, value: number) {
   for (const group of draftRuleGroups.value) {
     const rule = group.rules.find((item) => item.id === ruleId);
     if (!rule) {
@@ -217,7 +224,7 @@ function updateGiftFilter(ruleId: string, value: number) {
   }
 }
 
-function updateGiftMaxPrice(ruleId: string, value: number | null) {
+function updateMaxPriceFilter(ruleId: string, value: number | null) {
   for (const group of draftRuleGroups.value) {
     const rule = group.rules.find((item) => item.id === ruleId);
     if (!rule) {
@@ -258,8 +265,10 @@ async function handleSaveBluetoothRules() {
         id: rule.id,
         enabled: rule.enabled,
         waveform_id: rule.waveform_id,
-        min_price: group.group_id === "gift" ? Math.max(0, Math.round(Number(rule.filters?.min_price || 0))) : null,
-        max_price: group.group_id === "gift"
+        min_price: priceFilterGroupIds.has(group.group_id)
+          ? Math.max(0, Math.round(Number(rule.filters?.min_price || 0)))
+          : null,
+        max_price: priceFilterGroupIds.has(group.group_id)
           ? (rule.filters?.max_price == null ? null : Math.max(0, Math.round(Number(rule.filters.max_price))))
           : null,
       })),

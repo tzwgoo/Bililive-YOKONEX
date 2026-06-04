@@ -25,7 +25,7 @@
                   :options="waveformOptions"
                 />
               </label>
-              <template v-if="group.group_id === 'gift'">
+              <template v-if="priceFilterGroupIds.has(group.group_id)">
                 <label class="field">
                   <span>最低价格</span>
                   <InputNumber
@@ -33,7 +33,7 @@
                     :min="0"
                     :step="1"
                     class="field-number"
-                    @update:value="emit('update-gift-filter', rule.id, Number($event ?? 0))"
+                    @update:value="emit('update-min-price', rule.id, Number($event ?? 0))"
                   />
                 </label>
                 <label class="field">
@@ -44,7 +44,7 @@
                     :step="1"
                     class="field-number"
                     placeholder="留空表示无上限"
-                    @update:value="emit('update-gift-max-price', rule.id, $event as number | null)"
+                    @update:value="emit('update-max-price', rule.id, $event as number | null)"
                   />
                 </label>
               </template>
@@ -76,11 +76,12 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "update-gift-filter": [ruleId: string, value: number];
-  "update-gift-max-price": [ruleId: string, value: number | null];
+  "update-min-price": [ruleId: string, value: number];
+  "update-max-price": [ruleId: string, value: number | null];
 }>();
 
 const ACollapsePanel = ACollapse.Panel;
+const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_renew"]);
 </script>
 
 <style scoped>
