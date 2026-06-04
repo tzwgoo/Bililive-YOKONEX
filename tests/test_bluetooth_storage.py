@@ -30,6 +30,9 @@ def test_store_returns_default_payload_when_file_missing(tmp_path) -> None:
     assert payload.bluetooth_event_rules[13].enabled is True
     assert payload.bluetooth_event_rules[14].enabled is True
     assert payload.bluetooth_event_rules[15].enabled is True
+    assert payload.bluetooth_event_rules[20].enabled is True
+    assert payload.bluetooth_event_rules[23].enabled is True
+    assert payload.bluetooth_event_rules[26].enabled is True
     assert payload.bluetooth_event_rules[27].enabled is True
     assert payload.bluetooth_event_rules[0].id == "gift-tier-01"
     assert payload.bluetooth_event_rules[0].waveform_id == "ems-preset-01"
@@ -50,12 +53,16 @@ def test_store_returns_default_payload_when_file_missing(tmp_path) -> None:
     assert payload.bluetooth_event_rules[20].id == "super-chat-tier-06"
     assert payload.bluetooth_event_rules[20].filters == {"min_price": 2000, "max_price": None}
     assert payload.bluetooth_event_rules[21].id == "guard-buy-tier-01"
+    assert payload.bluetooth_event_rules[21].waveform_id == "ems-preset-13"
     assert payload.bluetooth_event_rules[21].filters == {"min_price": 100000, "max_price": 999999}
     assert payload.bluetooth_event_rules[23].id == "guard-buy-tier-03"
+    assert payload.bluetooth_event_rules[23].waveform_id == "ems-preset-15"
     assert payload.bluetooth_event_rules[23].filters == {"min_price": 10000000, "max_price": None}
     assert payload.bluetooth_event_rules[24].id == "guard-renew-tier-01"
+    assert payload.bluetooth_event_rules[24].waveform_id == "ems-preset-10"
     assert payload.bluetooth_event_rules[24].filters == {"min_price": 50000, "max_price": 999999}
     assert payload.bluetooth_event_rules[26].id == "guard-renew-tier-03"
+    assert payload.bluetooth_event_rules[26].waveform_id == "ems-preset-12"
     assert payload.bluetooth_event_rules[26].filters == {"min_price": 10000000, "max_price": None}
     assert payload.bluetooth_event_rules[27].id == "interact-default"
     assert payload.bluetooth_event_rules[27].event_type == "interact"
@@ -167,6 +174,9 @@ def test_store_migrates_legacy_default_rules_to_enabled(tmp_path) -> None:
     assert all(rule.enabled is True for rule in gift_rules)
     assert gift_rules[0].waveform_id == "ems-preset-01"
     assert gift_rules[-1].waveform_id == "ems-preset-10"
+    assert len([rule for rule in payload.bluetooth_event_rules if rule.event_type == "super_chat"]) == 6
+    assert len([rule for rule in payload.bluetooth_event_rules if rule.event_type == "guard_buy"]) == 3
+    assert len([rule for rule in payload.bluetooth_event_rules if rule.event_type == "guard_renew"]) == 3
 
 
 def test_store_migrates_legacy_special_event_rules_to_price_tiers(tmp_path) -> None:
@@ -295,3 +305,47 @@ def test_store_save_persists_round_trip_payload(tmp_path) -> None:
 
     assert reloaded.bluetooth_settings.enabled is True
     assert reloaded.bluetooth_settings.default_target_device_id == "demo-device"
+
+
+def test_store_migrates_legacy_single_special_rules_to_price_tiers(tmp_path) -> None:
+    path = tmp_path / "bluetooth.json"
+    path.write_text(
+        json.dumps(
+            {
+                "bluetooth_event_rules": [
+                    {
+                        "id": "super-chat-default",
+                        "enabled": True,
+                        "event_type": "super_chat",
+                        "waveform_id": "custom-wave-sc",
+                        "cooldown_seconds": 1,
+                        "filters": {},
+                    },
+                    {
+                        "id": "guard-buy-default",
+                        "enabled": False,
+                        "event_type": "guard_buy",
+                        "waveform_id": "custom-wave-guard",
+                        "cooldown_seconds": 2,
+                        "filters": {},
+                    },
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    store = BluetoothSettingsStore(path)
+
+    payload = store.load()
+
+    super_chat_rules = [rule for rule in payload.bluetooth_event_rules if rule.event_type == "super_chat"]
+    guard_buy_rules = [rule for rule in payload.bluetooth_event_rules if rule.event_type == "guard_buy"]
+
+    assert len(super_chat_rules) == 6
+    assert all(rule.waveform_id == "custom-wave-sc" for rule in super_chat_rules)
+    assert all(rule.cooldown_seconds == 1 for rule in super_chat_rules)
+    assert super_chat_rules[0].filters == {"min_price": 30, "max_price": 49}
+    assert len(guard_buy_rules) == 3
+    assert all(rule.enabled is False for rule in guard_buy_rules)
+    assert all(rule.waveform_id == "custom-wave-guard" for rule in guard_buy_rules)

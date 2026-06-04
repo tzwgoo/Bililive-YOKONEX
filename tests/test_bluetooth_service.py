@@ -44,29 +44,36 @@ async def test_service_status_payload_includes_runtime_details(
     assert isinstance(status["devices"], list)
     assert isinstance(status["waveforms"], list)
     assert isinstance(status["rules"], list)
-    assert status["rules"][0]["enabled"] is True
-    assert status["rules"][0]["event_label"] == "礼物事件"
-    assert status["rules"][0]["rule_label"] == "礼物档位 01 · 0-99"
-    assert status["rules"][0]["waveform_name"] == "EMS 预设 01 - 呼吸"
-    assert status["rules"][9]["rule_label"] == "礼物档位 10 · 1000000+"
-    assert status["rules"][9]["waveform_name"] == "EMS 预设 10 - 渐变弹跳"
-    assert status["rules"][10]["event_label"] == "点赞事件"
-    assert status["rules"][10]["waveform_name"] == "EMS 预设 01 - 呼吸"
-    assert status["rules"][11]["event_label"] == "普通弹幕"
-    assert status["rules"][11]["waveform_name"] == "EMS 预设 03 - 连击"
-    assert status["rules"][12]["event_label"] == "舰长弹幕"
-    assert status["rules"][12]["waveform_name"] == "EMS 预设 04 - 快速按捏"
-    assert status["rules"][13]["event_label"] == "提督弹幕"
-    assert status["rules"][13]["waveform_name"] == "EMS 预设 05 - 按捏渐强"
-    assert status["rules"][14]["event_label"] == "总督弹幕"
-    assert status["rules"][14]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
-    assert status["rules"][15]["event_label"] == "醒目留言"
-    assert status["rules"][15]["rule_label"] == "醒目留言档位 · 30-49"
-    assert status["rules"][21]["event_label"] == "上舰"
-    assert status["rules"][21]["rule_label"] == "上舰档位 · 100000-999999"
-    assert status["rules"][24]["event_label"] == "续费"
-    assert status["rules"][24]["rule_label"] == "续费档位 · 50000-999999"
-    assert status["rules"][27]["event_label"] == "互动事件"
+    rule_map = {
+        item["id"]: item
+        for item in status["rules"]
+    }
+    assert rule_map["gift-tier-01"]["enabled"] is True
+    assert rule_map["gift-tier-01"]["event_label"] == "礼物事件"
+    assert rule_map["gift-tier-01"]["rule_label"] == "礼物档位 01 · 0-99"
+    assert rule_map["gift-tier-01"]["waveform_name"] == "EMS 预设 01 - 呼吸"
+    assert rule_map["gift-tier-10"]["rule_label"] == "礼物档位 10 · 1000000+"
+    assert rule_map["gift-tier-10"]["waveform_name"] == "EMS 预设 10 - 渐变弹跳"
+    assert rule_map["like-default"]["event_label"] == "点赞事件"
+    assert rule_map["like-default"]["waveform_name"] == "EMS 预设 01 - 呼吸"
+    assert rule_map["danmaku-normal"]["event_label"] == "普通弹幕"
+    assert rule_map["danmaku-normal"]["waveform_name"] == "EMS 预设 03 - 连击"
+    assert rule_map["danmaku-captain"]["event_label"] == "舰长弹幕"
+    assert rule_map["danmaku-captain"]["waveform_name"] == "EMS 预设 04 - 快速按捏"
+    assert rule_map["danmaku-commander"]["event_label"] == "提督弹幕"
+    assert rule_map["danmaku-commander"]["waveform_name"] == "EMS 预设 05 - 按捏渐强"
+    assert rule_map["danmaku-governor"]["event_label"] == "总督弹幕"
+    assert rule_map["danmaku-governor"]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
+    assert rule_map["super-chat-tier-01"]["event_label"] == "醒目留言"
+    assert rule_map["super-chat-tier-01"]["rule_label"] == "醒目留言档位 01 · 30-49"
+    assert rule_map["super-chat-tier-06"]["rule_label"] == "醒目留言档位 06 · 2000+"
+    assert rule_map["guard-buy-tier-01"]["event_label"] == "上舰"
+    assert rule_map["guard-buy-tier-01"]["rule_label"] == "上舰档位 01 · 100000-999999"
+    assert rule_map["guard-buy-tier-03"]["event_label"] == "上舰"
+    assert rule_map["guard-renew-tier-01"]["event_label"] == "续费"
+    assert rule_map["guard-renew-tier-01"]["rule_label"] == "续费档位 01 · 50000-999999"
+    assert rule_map["guard-renew-tier-03"]["event_label"] == "续费"
+    assert rule_map["interact-default"]["event_label"] == "互动事件"
     assert status["battery_level"] is None
 
 
@@ -271,6 +278,41 @@ def test_service_rejects_delete_when_waveform_is_still_referenced(tmp_path, monk
         service.delete_waveform(created["waveform"]["id"])
 
 
+def test_service_default_payload_includes_im_aligned_special_price_tiers(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    rule_groups = {
+        group["group_id"]: group["rules"]
+        for group in service.get_studio_payload()["rule_groups"]
+    }
+
+    assert [rule["rule_label"] for rule in rule_groups["super_chat"]] == [
+        "醒目留言档位 01 · 30-49",
+        "醒目留言档位 02 · 50-99",
+        "醒目留言档位 03 · 100-499",
+        "醒目留言档位 04 · 500-999",
+        "醒目留言档位 05 · 1000-1999",
+        "醒目留言档位 06 · 2000+",
+    ]
+    assert [rule["filters"] for rule in rule_groups["guard_buy"]] == [
+        {"min_price": 100000, "max_price": 999999},
+        {"min_price": 1000000, "max_price": 9999999},
+        {"min_price": 10000000, "max_price": None},
+    ]
+    assert [rule["filters"] for rule in rule_groups["guard_renew"]] == [
+        {"min_price": 50000, "max_price": 999999},
+        {"min_price": 1000000, "max_price": 9999999},
+        {"min_price": 10000000, "max_price": None},
+    ]
+
+
 def test_service_save_rules_allows_editing_gift_price_ranges_and_sorts_by_price(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -309,6 +351,51 @@ def test_service_save_rules_allows_editing_gift_price_ranges_and_sorts_by_price(
     assert gift_rules[1]["rule_label"] == "礼物档位 02 · 200-499"
 
 
+def test_service_save_rules_allows_editing_super_chat_price_ranges_and_sorts_by_price(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    payload = service.save_rules(
+        [
+            {
+                "id": "super-chat-tier-02",
+                "enabled": True,
+                "waveform_id": "ems-preset-07",
+                "min_price": 60,
+                "max_price": 99,
+            },
+            {
+                "id": "super-chat-tier-01",
+                "enabled": True,
+                "waveform_id": "ems-preset-07",
+                "min_price": 30,
+                "max_price": 59,
+            },
+        ]
+    )
+
+    super_chat_rules = next(
+        group["rules"]
+        for group in payload["rule_groups"]
+        if group["group_id"] == "super_chat"
+    )
+
+    assert [rule["id"] for rule in super_chat_rules[:2]] == [
+        "super-chat-tier-01",
+        "super-chat-tier-02",
+    ]
+    assert super_chat_rules[0]["filters"] == {"min_price": 30, "max_price": 59}
+    assert super_chat_rules[0]["rule_label"] == "醒目留言档位 01 · 30-59"
+    assert super_chat_rules[1]["filters"] == {"min_price": 60, "max_price": 99}
+    assert super_chat_rules[1]["rule_label"] == "醒目留言档位 02 · 60-99"
+
+
 def test_service_save_rules_rejects_overlapping_enabled_gift_price_ranges(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -340,6 +427,37 @@ def test_service_save_rules_rejects_overlapping_enabled_gift_price_ranges(
         )
 
 
+def test_service_save_rules_rejects_overlapping_enabled_guard_buy_price_ranges(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    with pytest.raises(ValueError, match="上舰.*价格区间重叠"):
+        service.save_rules(
+            [
+                {
+                    "id": "guard-buy-tier-01",
+                    "enabled": True,
+                    "waveform_id": "ems-preset-08",
+                    "min_price": 100000,
+                    "max_price": 999999,
+                },
+                {
+                    "id": "guard-buy-tier-02",
+                    "enabled": True,
+                    "waveform_id": "ems-preset-14",
+                    "min_price": 999999,
+                    "max_price": 9999999,
+                },
+            ]
+        )
+
+
 def test_service_save_rules_allows_editing_super_chat_price_ranges(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -366,7 +484,7 @@ def test_service_save_rules_allows_editing_super_chat_price_ranges(
     sc_rule = next(rule for rule in sc_group["rules"] if rule["id"] == "super-chat-tier-02")
 
     assert sc_rule["filters"] == {"min_price": 60, "max_price": 99}
-    assert sc_rule["rule_label"] == "醒目留言档位 · 60-99"
+    assert sc_rule["rule_label"] == "醒目留言档位 02 · 60-99"
 
 
 def test_service_save_rules_rejects_overlapping_enabled_super_chat_price_ranges(
@@ -379,7 +497,7 @@ def test_service_save_rules_rejects_overlapping_enabled_super_chat_price_ranges(
     )
     service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
 
-    with pytest.raises(ValueError, match="醒目留言的价格区间重叠"):
+    with pytest.raises(ValueError, match="醒目留言.*价格区间重叠"):
         service.save_rules(
             [
                 {

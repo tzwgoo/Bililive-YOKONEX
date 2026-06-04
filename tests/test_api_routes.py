@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from fastapi.responses import HTMLResponse
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+import app.api.routes as api_routes
 from app.services.event_hub import EventHub
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_IDS
@@ -225,6 +227,51 @@ def test_index_page_no_longer_renders_fixed_danmaku_slot() -> None:
     assert response.status_code == 200
     assert "固定指令槽位" not in response.text
     assert "danmaku-command-id-label" not in response.text
+
+
+def test_index_page_prefers_spa_response_when_available(monkeypatch) -> None:
+    client = TestClient(create_app())
+
+    monkeypatch.setattr(
+        api_routes,
+        "_spa_index_response",
+        lambda: HTMLResponse("<html><body>spa-index</body></html>"),
+    )
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "spa-index" in response.text
+
+
+def test_events_page_prefers_spa_response_when_available(monkeypatch) -> None:
+    client = TestClient(create_app())
+
+    monkeypatch.setattr(
+        api_routes,
+        "_spa_index_response",
+        lambda: HTMLResponse("<html><body>spa-index-events</body></html>"),
+    )
+
+    response = client.get("/events")
+
+    assert response.status_code == 200
+    assert "spa-index-events" in response.text
+
+
+def test_waveforms_page_prefers_spa_response_when_available(monkeypatch) -> None:
+    client = TestClient(create_app())
+
+    monkeypatch.setattr(
+        api_routes,
+        "_spa_index_response",
+        lambda: HTMLResponse("<html><body>spa-index-waveforms</body></html>"),
+    )
+
+    response = client.get("/waveforms")
+
+    assert response.status_code == 200
+    assert "spa-index-waveforms" in response.text
 
 
 def test_command_connect_endpoint_uses_frontend_payload() -> None:

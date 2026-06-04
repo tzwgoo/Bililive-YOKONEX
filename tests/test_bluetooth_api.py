@@ -226,6 +226,21 @@ def test_bluetooth_scan_endpoint_returns_devices() -> None:
     assert fake_service.scan_called is True
 
 
+def test_bluetooth_scan_endpoint_returns_runtime_errors() -> None:
+    class FailingBluetoothService(FakeBluetoothService):
+        async def scan(self) -> list:
+            raise RuntimeError("当前主机未检测到蓝牙适配器")
+
+    app = create_app()
+    app.state.bluetooth_service = FailingBluetoothService()
+    client = TestClient(app)
+
+    response = client.post("/api/bluetooth/scan")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "当前主机未检测到蓝牙适配器"
+
+
 def test_bluetooth_connect_endpoint_validates_device_id() -> None:
     app = create_app()
     fake_service = FakeBluetoothService()

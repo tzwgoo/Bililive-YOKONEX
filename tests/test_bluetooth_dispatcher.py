@@ -79,25 +79,33 @@ async def test_dispatcher_triggers_waveform_for_interact_event() -> None:
 
 
 @pytest.mark.anyio
-async def test_dispatcher_matches_super_chat_price_tier() -> None:
+@pytest.mark.parametrize(
+    ("event_type", "price", "expected_waveform_id"),
+    [
+        ("super_chat", 1200, "ems-preset-11"),
+        ("guard_buy", 1000000, "ems-preset-14"),
+        ("guard_renew", 500000, "ems-preset-10"),
+    ],
+)
+async def test_dispatcher_matches_special_price_event_tiers(
+    event_type: str,
+    price: int,
+    expected_waveform_id: str,
+) -> None:
     service = FakeBluetoothService()
     dispatcher = BluetoothDispatcher(bluetooth_service=service)
 
-    result = await dispatcher.dispatch({"event_type": "super_chat", "payload": {"price": 1200}})
+    result = await dispatcher.dispatch(
+        {
+            "event_type": event_type,
+            "payload": {
+                "price": price,
+            },
+        }
+    )
 
     assert result["success"] is True
-    assert service.triggered == [("super_chat", "ems-preset-11")]
-
-
-@pytest.mark.anyio
-async def test_dispatcher_matches_guard_renew_price_tier() -> None:
-    service = FakeBluetoothService()
-    dispatcher = BluetoothDispatcher(bluetooth_service=service)
-
-    result = await dispatcher.dispatch({"event_type": "guard_renew", "payload": {"price": 500000}})
-
-    assert result["success"] is True
-    assert service.triggered == [("guard_renew", "ems-preset-10")]
+    assert service.triggered == [(event_type, expected_waveform_id)]
 
 
 @pytest.mark.anyio

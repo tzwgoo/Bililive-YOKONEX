@@ -85,90 +85,6 @@ BLUETOOTH_DANMAKU_RULE_DEFINITIONS = [
 
 
 BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS = [
-    {
-        "id": "super-chat-tier-01",
-        "event_type": "super_chat",
-        "waveform_id": "ems-preset-07",
-        "label": "醒目留言档位 01",
-        "filters": {"min_price": 30, "max_price": 49},
-    },
-    {
-        "id": "super-chat-tier-02",
-        "event_type": "super_chat",
-        "waveform_id": "ems-preset-08",
-        "label": "醒目留言档位 02",
-        "filters": {"min_price": 50, "max_price": 99},
-    },
-    {
-        "id": "super-chat-tier-03",
-        "event_type": "super_chat",
-        "waveform_id": "ems-preset-09",
-        "label": "醒目留言档位 03",
-        "filters": {"min_price": 100, "max_price": 499},
-    },
-    {
-        "id": "super-chat-tier-04",
-        "event_type": "super_chat",
-        "waveform_id": "ems-preset-10",
-        "label": "醒目留言档位 04",
-        "filters": {"min_price": 500, "max_price": 999},
-    },
-    {
-        "id": "super-chat-tier-05",
-        "event_type": "super_chat",
-        "waveform_id": "ems-preset-11",
-        "label": "醒目留言档位 05",
-        "filters": {"min_price": 1000, "max_price": 1999},
-    },
-    {
-        "id": "super-chat-tier-06",
-        "event_type": "super_chat",
-        "waveform_id": "ems-preset-12",
-        "label": "醒目留言档位 06",
-        "filters": {"min_price": 2000, "max_price": None},
-    },
-    {
-        "id": "guard-buy-tier-01",
-        "event_type": "guard_buy",
-        "waveform_id": "ems-preset-13",
-        "label": "上舰档位 01",
-        "filters": {"min_price": 100000, "max_price": 999999},
-    },
-    {
-        "id": "guard-buy-tier-02",
-        "event_type": "guard_buy",
-        "waveform_id": "ems-preset-14",
-        "label": "上舰档位 02",
-        "filters": {"min_price": 1000000, "max_price": 9999999},
-    },
-    {
-        "id": "guard-buy-tier-03",
-        "event_type": "guard_buy",
-        "waveform_id": "ems-preset-15",
-        "label": "上舰档位 03",
-        "filters": {"min_price": 10000000, "max_price": None},
-    },
-    {
-        "id": "guard-renew-tier-01",
-        "event_type": "guard_renew",
-        "waveform_id": "ems-preset-10",
-        "label": "续费档位 01",
-        "filters": {"min_price": 50000, "max_price": 999999},
-    },
-    {
-        "id": "guard-renew-tier-02",
-        "event_type": "guard_renew",
-        "waveform_id": "ems-preset-11",
-        "label": "续费档位 02",
-        "filters": {"min_price": 1000000, "max_price": 9999999},
-    },
-    {
-        "id": "guard-renew-tier-03",
-        "event_type": "guard_renew",
-        "waveform_id": "ems-preset-12",
-        "label": "续费档位 03",
-        "filters": {"min_price": 10000000, "max_price": None},
-    },
     {"id": "interact-default", "event_type": "interact", "waveform_id": "ems-preset-02", "label": "互动事件", "filters": {"interact_types": []}},
 ]
 
@@ -190,7 +106,21 @@ def build_default_danmaku_rules(*, enabled: bool = True) -> list[BluetoothEventR
 
 def build_default_special_event_rules(*, enabled: bool = True) -> list[BluetoothEventRule]:
     """构建默认 SC、舰队和互动蓝牙规则。"""
+    from app.bluetooth.price_tiers import build_default_special_price_rules
+
     return [
+        *(
+            BluetoothEventRule(
+                id=str(item["id"]),
+                enabled=bool(item["enabled"]),
+                event_type=str(item["event_type"]),
+                waveform_id=str(item["waveform_id"]),
+                cooldown_seconds=int(item["cooldown_seconds"]),
+                filters=dict(item["filters"]),
+            )
+            for item in build_default_special_price_rules(enabled=enabled)
+        ),
+        *(
         BluetoothEventRule(
             id=str(item["id"]),
             enabled=bool(enabled),
@@ -200,6 +130,7 @@ def build_default_special_event_rules(*, enabled: bool = True) -> list[Bluetooth
             filters=dict(item["filters"]),
         )
         for item in BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS
+        ),
     ]
 
 
