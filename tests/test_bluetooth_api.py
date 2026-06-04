@@ -315,6 +315,24 @@ def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:
     assert response.json()["channel_b"] == 45
 
 
+def test_bluetooth_overlay_status_endpoint_includes_recent_events() -> None:
+    app = create_app()
+    app.state.event_hub.publish(
+        {
+            "event_type": "danmaku",
+            "uname": "弹幕用户",
+            "timestamp": 1714113037,
+            "payload": {"msg": "开火"},
+        }
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/bluetooth/overlay/status")
+
+    assert response.status_code == 200
+    assert response.json()["recent_events"][0]["msg"] == "开火"
+
+
 def test_bluetooth_overlay_stream_endpoint_uses_sse_content_type() -> None:
     app = create_app()
     app.state.bluetooth_service = FakeBluetoothService()

@@ -17,6 +17,7 @@ from app.bluetooth.models import payload_to_dict
 from app.bluetooth.runtime.base import BluetoothRuntime
 from app.bluetooth.runtime.memory_runtime import MemoryBluetoothRuntime
 from app.bluetooth.storage import BluetoothSettingsStore
+from app.models import is_danmaku_event_type
 
 
 logger = logging.getLogger(__name__)
@@ -189,6 +190,7 @@ class BluetoothService:
                 for item in payload.get("history", [])
                 if isinstance(item, dict)
             ][-90:],
+            "recent_events": _build_overlay_recent_events(self.event_hub),
             "revision": max(0, int(payload.get("revision", 0) or 0)),
         }
 
@@ -438,6 +440,69 @@ def _resolve_waveform_max_strength(waveform: EmsWaveform) -> int:
     if not waveform.steps:
         return 0
     return max(max(step.channel_a, step.channel_b) for step in waveform.steps)
+
+
+def _build_overlay_recent_events(event_hub: Any | None) -> list[dict[str, Any]]:
+    """汇总 OBS 小窗需要展示的最近直播事件。"""
+    if event_hub is None or not hasattr(event_hub, "snapshot"):
+        return []
+    events = [
+        event
+        for event in event_hub.snapshot()
+        if _is_overlay_recent_event(event)
+    ]
+    return [_summarize_overlay_event(event) for event in reversed(events[-6:])]
+
+
+def _is_overlay_recent_event(event: dict[str, Any]) -> bool:
+    """判断直播事件是否需要进入 OBS 小窗列表。"""
+    event_type = str(event.get("event_type", "") or "")
+    return event_type in {"gift", "super_chat", "guard_buy", "guard_renew", "interact"} or is_danmaku_event_type(event_type)
+
+
+def _summarize_overlay_event(event: dict[str, Any]) -> dict[str, Any]:
+    """把完整直播事件压缩成小窗展示摘要。"""
+    event_type = str(event.get("event_type", "") or "")
+    payload = event.get("payload", {}) if isinstance(event.get("payload", {}), dict) else {}
+    bluetooth_dispatch = event.get("bluetooth_dispatch", {}) if isinstance(event.get("bluetooth_dispatch", {}), dict) else {}
+    return {
+        "event_type": event_type,
+        "event_label": _resolve_overlay_event_label(event_type),
+        "uname": str(event.get("uname", "") or ""),
+        "timestamp": _coerce_non_negative_int(event.get("timestamp")),
+        "msg": _resolve_overlay_event_message(event_type, payload),
+        "guard_label": str(payload.get("guard_label", "") or ""),
+        "waveform_id": str(bluetooth_dispatch.get("waveform_id", "") or ""),
+        "success": bool(bluetooth_dispatch.get("success", False)),
+    }
+
+
+def _resolve_overlay_event_label(event_type: str) -> str:
+    """把事件类型转成 OBS 小窗展示标签。"""
+    if is_danmaku_event_type(event_type):
+        return "弹幕"
+    return {
+        "gift": "礼物",
+        "super_chat": "醒目留言",
+        "guard_buy": "上舰",
+        "guard_renew": "续费",
+        "interact": "互动",
+    }.get(event_type, event_type or "事件")
+
+
+def _resolve_overlay_event_message(event_type: str, payload: dict[str, Any]) -> str:
+    """从不同事件负载中提取 OBS 小窗主文本。"""
+    if is_danmaku_event_type(event_type):
+        return str(payload.get("msg", "") or "")
+    if event_type == "super_chat":
+        return str(payload.get("message", "") or payload.get("gift_name", "") or "")
+    if event_type in {"gift", "guard_buy", "guard_renew"}:
+        gift_name = str(payload.get("gift_name", "") or "")
+        gift_num = _coerce_non_negative_int(payload.get("gift_num"))
+        return f"{gift_name} x {gift_num}" if gift_num > 1 else gift_name
+    if event_type == "interact":
+        return str(payload.get("interact_label", "") or "")
+    return ""
 
 
 def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform: EmsWaveform) -> dict:

@@ -103,6 +103,35 @@ async def test_service_waveform_trigger_publishes_control_log(
     assert event_hub.control_snapshot()[-1]["payload"]["max_strength"] > 0
 
 
+def test_service_overlay_payload_includes_recent_live_events(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    event_hub.publish(
+        {
+            "event_type": "danmaku",
+            "uname": "弹幕用户",
+            "timestamp": 1714113037,
+            "payload": {
+                "msg": "开火",
+                "guard_label": "舰长",
+            },
+        }
+    )
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    overlay = service.get_overlay_payload()
+
+    assert overlay["recent_events"][0]["msg"] == "开火"
+    assert overlay["recent_events"][0]["event_label"] == "弹幕"
+    assert overlay["recent_events"][0]["guard_label"] == "舰长"
+
+
 def test_create_default_prefers_real_runtime_when_available(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_runtime = MemoryBluetoothRuntime()
 

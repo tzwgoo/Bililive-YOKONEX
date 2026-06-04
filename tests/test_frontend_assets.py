@@ -267,9 +267,12 @@ def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
     assert 'id="overlay-channel-a-bar"' in overlay_html
     assert 'id="overlay-channel-b-bar"' in overlay_html
     assert 'id="overlay-waveform-canvas"' in overlay_html
+    assert 'id="overlay-danmaku-list"' in overlay_html
     assert 'fetch("/api/bluetooth/overlay/status")' in overlay_js
     assert 'new EventSource("/api/bluetooth/overlay/stream")' in overlay_js
     assert 'overlayState.battery_level' in overlay_js
+    assert "recent_events" in overlay_js
+    assert "function renderOverlayDanmaku" in overlay_js
 
 
 def test_frontend_contains_control_log_panel_and_stream() -> None:
