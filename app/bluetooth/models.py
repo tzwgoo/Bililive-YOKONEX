@@ -84,7 +84,16 @@ BLUETOOTH_DANMAKU_RULE_DEFINITIONS = [
 ]
 
 
+BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS = [
+    {"id": "super-chat-default", "event_type": "super_chat", "waveform_id": "ems-preset-07", "label": "醒目留言", "filters": {}},
+    {"id": "guard-buy-default", "event_type": "guard_buy", "waveform_id": "ems-preset-08", "label": "上舰", "filters": {}},
+    {"id": "guard-renew-default", "event_type": "guard_renew", "waveform_id": "ems-preset-08", "label": "续费", "filters": {}},
+    {"id": "interact-default", "event_type": "interact", "waveform_id": "ems-preset-02", "label": "互动事件", "filters": {"interact_types": []}},
+]
+
+
 def build_default_danmaku_rules(*, enabled: bool = True) -> list[BluetoothEventRule]:
+    """构建默认弹幕蓝牙规则。"""
     return [
         BluetoothEventRule(
             id=str(item["id"]),
@@ -95,6 +104,21 @@ def build_default_danmaku_rules(*, enabled: bool = True) -> list[BluetoothEventR
             filters={"keywords": []},
         )
         for item in BLUETOOTH_DANMAKU_RULE_DEFINITIONS
+    ]
+
+
+def build_default_special_event_rules(*, enabled: bool = True) -> list[BluetoothEventRule]:
+    """构建默认 SC、舰队和互动蓝牙规则。"""
+    return [
+        BluetoothEventRule(
+            id=str(item["id"]),
+            enabled=bool(enabled),
+            event_type=str(item["event_type"]),
+            waveform_id=str(item["waveform_id"]),
+            cooldown_seconds=0,
+            filters=dict(item["filters"]),
+        )
+        for item in BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS
     ]
 
 
@@ -127,9 +151,11 @@ def build_default_payload() -> BluetoothConfigPayload:
                 filters={},
             ),
             *build_default_danmaku_rules(enabled=True),
+            *build_default_special_event_rules(enabled=True),
         ],
     )
 
 
 def payload_to_dict(payload: BluetoothConfigPayload) -> dict[str, Any]:
+    """把蓝牙配置对象转换成可 JSON 序列化字典。"""
     return asdict(payload)

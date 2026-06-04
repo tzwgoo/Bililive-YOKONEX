@@ -11,8 +11,12 @@ class CommandSessionService:
         self,
         *,
         client_factory: Callable[..., Any] = CommandWebSocketClient,
+        event_hub: Any | None = None,
     ) -> None:
+        # 指令客户端工厂，用于创建实际 WebSocket 指令连接。
         self.client_factory = client_factory
+        # 控制日志事件中心，用于记录登录、断开和指令发送结果。
+        self.event_hub = event_hub
         self.status = "idle"
         self.message = ""
         self.ws_url = ""
@@ -73,6 +77,15 @@ class CommandSessionService:
         self.message = result.get("message", "IM 登录成功")
         self.user_id = result.get("user_id", "") or getattr(client, "user_id", "")
         self.last_login_at = int(time.time())
+        self._publish_control(
+            "command_connect",
+            {
+                "success": True,
+                "message": self.message,
+                "uid": self.uid,
+                "user_id": self.user_id,
+            },
+        )
         return self.get_status_payload()
 
     async def disconnect(self) -> None:
@@ -86,17 +99,56 @@ class CommandSessionService:
             self.status = "idle"
             self.message = ""
             self.user_id = ""
+            self._publish_control(
+                "command_disconnect",
+                {
+                    "success": True,
+                    "message": "IM 指令通道已断开",
+                    "uid": self.uid,
+                },
+            )
 
     async def send_command(self, *, command_id: str) -> dict[str, Any]:
         if not self.is_connected or self._client is None:
             raise RuntimeError("指令通道未登录")
 
-        result = await self._client.send_command(command_id=command_id)
+        try:
+            result = await self._client.send_command(command_id=command_id)
+        except Exception as exc:
+            self._publish_control(
+                "command_send",
+                {
+                    "success": False,
+                    "command_id": command_id,
+                    "message": str(exc),
+                },
+            )
+            raise
         self.last_command_id = command_id
         self.last_command_message = result.get("message", "")
+        self._publish_control(
+            "command_send",
+            {
+                "success": bool(result.get("success", True)),
+                "command_id": command_id,
+                "message": self.last_command_message,
+            },
+        )
         return result
 
     async def _reset_client(self) -> None:
         if self._client is not None and hasattr(self._client, "disconnect"):
             await self._client.disconnect()
         self._client = None
+
+    def _publish_control(self, event_type: str, payload: dict[str, Any]) -> None:
+        """写入控制日志事件。"""
+        if self.event_hub is None or not hasattr(self.event_hub, "publish_control"):
+            return
+        self.event_hub.publish_control(
+            {
+                "type": event_type,
+                "timestamp": int(time.time()),
+                "payload": payload,
+            }
+        )

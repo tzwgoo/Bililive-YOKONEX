@@ -12,6 +12,7 @@ from app.bluetooth.models import BluetoothEventRule
 from app.bluetooth.models import BluetoothSettings
 from app.bluetooth.models import EmsWaveform
 from app.bluetooth.models import EmsWaveformStep
+from app.bluetooth.models import build_default_special_event_rules
 from app.bluetooth.models import build_default_payload
 from app.bluetooth.models import build_default_danmaku_rules
 from app.bluetooth.models import payload_to_dict
@@ -126,6 +127,7 @@ def _normalize_channel_strength(value) -> int:
 def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
     rules = _migrate_legacy_gift_default_rule(rules)
     rules = _migrate_legacy_danmaku_default_rules(rules)
+    rules = _append_missing_special_event_rules(rules)
     rule_map = {rule.id: rule for rule in rules}
     for rule_id in ("like-default",):
         rule = rule_map.get(rule_id)
@@ -134,6 +136,17 @@ def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[Bluet
         if rule_id == "like-default" and rule.event_type == "like" and rule.waveform_id == "ems-preset-01" and rule.enabled is False:
             rule.enabled = True
     return rules
+
+
+def _append_missing_special_event_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
+    """为旧配置补齐新增的 SC、舰队和互动事件规则。"""
+    existing_rule_ids = {rule.id for rule in rules}
+    missing_rules = [
+        rule
+        for rule in build_default_special_event_rules(enabled=True)
+        if rule.id not in existing_rule_ids
+    ]
+    return [*rules, *missing_rules]
 
 
 def _migrate_legacy_gift_default_rule(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:

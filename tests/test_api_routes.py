@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.services.event_hub import EventHub
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_IDS
 from app.services.danmaku_settings import FIXED_LIKE_COMMAND_ID
@@ -353,3 +354,18 @@ def test_command_studio_save_endpoint_uses_frontend_payload() -> None:
         "like_rules": [],
         "danmaku_slot_rules": [],
     }
+
+
+def test_control_stream_endpoint_returns_control_snapshot() -> None:
+    app = create_app()
+    event_hub = EventHub()
+    event_hub.publish_control({"type": "bluetooth_trigger", "payload": {"waveform_id": "ems-preset-01"}})
+    app.state.event_hub = event_hub
+    client = TestClient(app)
+
+    with client.stream("GET", "/api/control/stream?once=true") as response:
+        body = "".join(response.iter_text())
+
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]
+    assert '"type": "bluetooth_trigger"' in body

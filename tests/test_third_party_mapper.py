@@ -279,3 +279,26 @@ def test_map_like_update_to_standard_event_uses_click_count() -> None:
     assert event["source"] == "third_party_ws"
     assert event["payload"]["like_count"] == 3227
     assert event["payload"]["like_delta"] == 0
+
+
+def test_map_interact_word_to_standard_interact_event() -> None:
+    event = map_third_party_message(
+        {
+            "cmd": "INTERACT_WORD",
+            "data": {
+                "uid": 10086,
+                "uname": "分享用户",
+                "msg_type": 3,
+                "timestamp": 1714113037,
+            },
+        },
+        room_id=789,
+    )
+
+    assert event is not None
+    assert event["event_type"] == "interact"
+    assert event["source"] == "third_party_ws"
+    assert event["uname"] == "分享用户"
+    assert event["payload"]["uid"] == 10086
+    assert event["payload"]["interact_type"] == "share"
+    assert event["payload"]["interact_label"] == "分享"

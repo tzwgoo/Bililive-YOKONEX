@@ -4,6 +4,7 @@ import pytest
 
 from app.bluetooth.runtime.memory_runtime import MemoryBluetoothRuntime
 from app.bluetooth.service import BluetoothService
+from app.services.event_hub import EventHub
 
 
 @pytest.mark.anyio
@@ -59,6 +60,8 @@ async def test_service_status_payload_includes_runtime_details(
     assert status["rules"][13]["waveform_name"] == "EMS 预设 05 - 按捏渐强"
     assert status["rules"][14]["event_label"] == "总督弹幕"
     assert status["rules"][14]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
+    assert status["rules"][15]["event_label"] == "醒目留言"
+    assert status["rules"][18]["event_label"] == "互动事件"
     assert status["battery_level"] is None
 
 
@@ -78,6 +81,55 @@ async def test_service_overlay_payload_includes_battery_level(
     overlay = service.get_overlay_payload()
 
     assert overlay["battery_level"] == 100
+
+
+@pytest.mark.anyio
+async def test_service_waveform_trigger_publishes_control_log(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    result = await service.trigger_waveform(event_type="gift", waveform_id="ems-preset-01")
+
+    assert result["success"] is True
+    assert event_hub.control_snapshot()[-1]["type"] == "bluetooth_trigger"
+    assert event_hub.control_snapshot()[-1]["payload"]["waveform_id"] == "ems-preset-01"
+    assert event_hub.control_snapshot()[-1]["payload"]["max_strength"] > 0
+
+
+def test_service_overlay_payload_includes_recent_live_events(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    event_hub.publish(
+        {
+            "event_type": "danmaku",
+            "uname": "弹幕用户",
+            "timestamp": 1714113037,
+            "payload": {
+                "msg": "开火",
+                "guard_label": "舰长",
+            },
+        }
+    )
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    overlay = service.get_overlay_payload()
+
+    assert overlay["recent_events"][0]["msg"] == "开火"
+    assert overlay["recent_events"][0]["event_label"] == "弹幕"
+    assert overlay["recent_events"][0]["guard_label"] == "舰长"
 
 
 def test_create_default_prefers_real_runtime_when_available(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

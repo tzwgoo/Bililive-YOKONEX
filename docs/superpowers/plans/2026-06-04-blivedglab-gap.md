@@ -179,7 +179,7 @@ pytest tests/test_gift_dispatcher.py tests/test_bluetooth_dispatcher.py -v
 - Modify: `tests/test_third_party_mapper.py`
 - Modify: `app/third_party/event_mapper.py`
 
-- [ ] **Step 1: 为第三方弹幕补舰队等级标准化失败测试**
+- [x] **Step 1: 为第三方弹幕补舰队等级标准化失败测试**
 
 ```python
 def test_map_danmaku_msg_with_guard_level() -> None:
@@ -188,31 +188,31 @@ def test_map_danmaku_msg_with_guard_level() -> None:
     assert event["payload"]["guard_label"] == "舰长"
 ```
 
-- [ ] **Step 2: 为第三方弹幕补用户身份字段失败测试**
+- [x] **Step 2: 为第三方弹幕补用户身份字段失败测试**
 
 ```python
 assert event["open_id"] == ""
 assert event["payload"]["uid"] == 123456
 ```
 
-- [ ] **Step 3: 运行映射测试确认失败**
+- [x] **Step 3: 运行映射测试确认失败**
 
 Run: `pytest tests/test_third_party_mapper.py -v`
 Expected: FAIL，提示缺少 `guard_label`、`uid` 或第三方弹幕未解析舰队等级
 
-- [ ] **Step 4: 在第三方弹幕标准化中加入舰队等级与用户字段**
+- [x] **Step 4: 在第三方弹幕标准化中加入舰队等级与用户字段**
 
 ```python
 payload["guard_level"] = normalized_guard_level
 payload["guard_label"] = guard_level_to_label(normalized_guard_level)
 ```
 
-- [ ] **Step 5: 运行测试确认通过**
+- [x] **Step 5: 运行测试确认通过**
 
 Run: `pytest tests/test_third_party_mapper.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/test_third_party_mapper.py app/third_party/event_mapper.py
@@ -227,44 +227,44 @@ git commit -m "feat(third-party-events): 统一舰队等级字段并支持舰长
 - Modify: `app/third_party/event_mapper.py`
 - Modify: `app/services/third_party_session.py`
 
-- [ ] **Step 1: 为 `SUPER_CHAT_MESSAGE` 写独立事件类型失败测试**
+- [x] **Step 1: 为 `SUPER_CHAT_MESSAGE` 写独立事件类型失败测试**
 
 ```python
 assert event["event_type"] == "super_chat"
 assert event["payload"]["price"] == 30
 ```
 
-- [ ] **Step 2: 为 `GUARD_BUY` 和 `USER_TOAST_MSG` 写失败测试**
+- [x] **Step 2: 为 `GUARD_BUY` 和 `USER_TOAST_MSG` 写失败测试**
 
 ```python
 assert event["event_type"] == "guard_buy"
 assert event["payload"]["guard_level"] == 1
 ```
 
-- [ ] **Step 3: 运行映射与会话测试确认失败**
+- [x] **Step 3: 运行映射与会话测试确认失败**
 
 Run: `pytest tests/test_third_party_mapper.py tests/test_third_party_session.py -v`
 Expected: FAIL，说明第三方会话层仍只识别 `gift / like / danmaku`
 
-- [ ] **Step 4: 在 mapper 中拆分事件类型**
+- [x] **Step 4: 在 mapper 中拆分事件类型**
 
 ```python
 return {"event_type": "super_chat", ...}
 ```
 
-- [ ] **Step 5: 在第三方会话层把新事件交给 IM/蓝牙规则通道**
+- [x] **Step 5: 在第三方会话层把新事件交给 IM/蓝牙规则通道**
 
 ```python
 elif event.get("event_type") == "super_chat":
     ...
 ```
 
-- [ ] **Step 6: 运行测试确认通过**
+- [x] **Step 6: 运行测试确认通过**
 
 Run: `pytest tests/test_third_party_mapper.py tests/test_third_party_session.py -v`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add tests/test_third_party_mapper.py tests/test_third_party_session.py app/third_party/event_mapper.py app/services/third_party_session.py
@@ -280,7 +280,7 @@ git commit -m "feat(third-party-events): 拆分醒目留言与上舰续费独立
 - Modify: `app/bluetooth/dispatcher.py`
 - Modify: `app/services/live_session_manager.py`
 
-- [ ] **Step 1: 为“同一用户 N 分钟最多触发 X 次”写失败测试**
+- [x] **Step 1: 为“同一用户 N 分钟最多触发 X 次”写失败测试**
 
 ```python
 def test_danmaku_dispatcher_limits_same_user_within_window() -> None:
@@ -288,48 +288,48 @@ def test_danmaku_dispatcher_limits_same_user_within_window() -> None:
     assert third_result["trigger_count"] == 0
 ```
 
-- [ ] **Step 2: 为“仅舰长以上可触发”写失败测试**
+- [x] **Step 2: 为“仅舰长以上可触发”写失败测试**
 
 ```python
 assert result["message"] == "当前用户舰队等级不足"
 ```
 
-- [ ] **Step 3: 为“总督获得额外强度/次数加成”写失败测试**
+- [x] **Step 3: 为“总督获得额外强度/次数加成”写失败测试**
 
 ```python
 assert result["trigger_count"] == 2
 ```
 
-- [ ] **Step 4: 运行调度测试确认失败**
+- [x] **Step 4: 运行调度测试确认失败**
 
 Run: `pytest tests/test_gift_dispatcher.py tests/test_bluetooth_dispatcher.py -v`
 Expected: FAIL，说明当前仍是房间级冷却，不区分用户和舰队等级
 
-- [ ] **Step 5: 在弹幕调度器中增加用户维度限流键**
+- [x] **Step 5: 在弹幕调度器中增加用户维度限流键**
 
 ```python
 cooldown_key = (source, room_id, uid_or_open_id, command_id)
 ```
 
-- [ ] **Step 6: 在蓝牙调度器中增加最低舰队等级与倍率/偏移处理**
+- [x] **Step 6: 在蓝牙调度器中增加最低舰队等级与倍率/偏移处理**
 
 ```python
 if guard_level < min_guard_level:
     return blocked_result
 ```
 
-- [ ] **Step 7: 在 manager 中暴露新运行参数的默认值**
+- [x] **Step 7: 在 manager 中暴露新运行参数的默认值**
 
 ```python
 payload["danmaku_user_limit_window_seconds"] = ...
 ```
 
-- [ ] **Step 8: 运行测试确认通过**
+- [x] **Step 8: 运行测试确认通过**
 
 Run: `pytest tests/test_gift_dispatcher.py tests/test_bluetooth_dispatcher.py -v`
 Expected: PASS
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add tests/test_gift_dispatcher.py tests/test_bluetooth_dispatcher.py app/services/danmaku_dispatcher.py app/bluetooth/dispatcher.py app/services/live_session_manager.py
@@ -345,48 +345,48 @@ git commit -m "feat(danmaku-rules): 支持按用户限流与舰队等级过滤�
 - Modify: `app/bluetooth/storage.py`
 - Modify: `app/bluetooth/dispatcher.py`
 
-- [ ] **Step 1: 为默认规则结构写失败测试**
+- [x] **Step 1: 为默认规则结构写失败测试**
 
 ```python
 assert any(rule.event_type == "super_chat" for rule in payload.bluetooth_event_rules)
 ```
 
-- [ ] **Step 2: 为规则过滤字段持久化写失败测试**
+- [x] **Step 2: 为规则过滤字段持久化写失败测试**
 
 ```python
 assert rule.filters["min_guard_level"] == 2
 ```
 
-- [ ] **Step 3: 运行蓝牙存储与调度测试确认失败**
+- [x] **Step 3: 运行蓝牙存储与调度测试确认失败**
 
 Run: `pytest tests/test_bluetooth_storage.py tests/test_bluetooth_dispatcher.py -v`
 Expected: FAIL，说明默认规则尚未覆盖新事件或过滤字段未保存
 
-- [ ] **Step 4: 在模型默认值中加入 `super_chat / guard_buy` 规则**
+- [x] **Step 4: 在模型默认值中加入 `super_chat / guard_buy` 规则**
 
 ```python
 BluetoothEventRule(id="super-chat-default", event_type="super_chat", ...)
 ```
 
-- [ ] **Step 5: 在 storage 中确保新过滤字段原样保存和恢复**
+- [x] **Step 5: 在 storage 中确保新过滤字段原样保存和恢复**
 
 ```python
 filters=dict(item["filters"])
 ```
 
-- [ ] **Step 6: 在 dispatcher 中识别新事件与最小舰队等级**
+- [x] **Step 6: 在 dispatcher 中识别新事件与最小舰队等级**
 
 ```python
 if rule.event_type == "super_chat":
     ...
 ```
 
-- [ ] **Step 7: 运行测试确认通过**
+- [x] **Step 7: 运行测试确认通过**
 
 Run: `pytest tests/test_bluetooth_storage.py tests/test_bluetooth_dispatcher.py -v`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add tests/test_bluetooth_storage.py tests/test_bluetooth_dispatcher.py app/bluetooth/models.py app/bluetooth/storage.py app/bluetooth/dispatcher.py
@@ -406,7 +406,7 @@ git commit -m "feat(bluetooth-rules): 扩展蓝牙规则支持新事件类型与
 - Modify: `app/templates/index.html`
 - Modify: `app/static/app.js`
 
-- [ ] **Step 1: 为控制日志通道写失败测试**
+- [x] **Step 1: 为控制日志通道写失败测试**
 
 ```python
 def test_event_hub_supports_control_log_stream() -> None:
@@ -414,7 +414,7 @@ def test_event_hub_supports_control_log_stream() -> None:
     assert hub.control_snapshot()[0]["type"] == "bluetooth_trigger"
 ```
 
-- [ ] **Step 2: 为 API 和前端钩子写失败测试**
+- [x] **Step 2: 为 API 和前端钩子写失败测试**
 
 ```python
 assert 'id="control-events"' in html
@@ -422,25 +422,25 @@ assert 'new EventSource("/api/events/stream")' in js
 assert '"/api/control/stream"' in js
 ```
 
-- [ ] **Step 3: 运行测试确认失败**
+- [x] **Step 3: 运行测试确认失败**
 
 Run: `pytest tests/test_event_hub.py tests/test_api_routes.py tests/test_frontend_assets.py -v`
 Expected: FAIL，说明当前没有独立控制日志流
 
-- [ ] **Step 4: 在 `EventHub` 中增加控制日志缓冲和订阅**
+- [x] **Step 4: 在 `EventHub` 中增加控制日志缓冲和订阅**
 
 ```python
 def publish_control(self, event: dict[str, Any]) -> None:
     ...
 ```
 
-- [ ] **Step 5: 在命令发送和蓝牙触发成功/失败后写入控制日志**
+- [x] **Step 5: 在命令发送和蓝牙触发成功/失败后写入控制日志**
 
 ```python
 self.event_hub.publish_control({...})
 ```
 
-- [ ] **Step 6: 在 `routes.py` 中暴露控制日志 SSE**
+- [x] **Step 6: 在 `routes.py` 中暴露控制日志 SSE**
 
 ```python
 @router.get("/api/control/stream")
@@ -448,18 +448,18 @@ async def control_stream(...):
     ...
 ```
 
-- [ ] **Step 7: 在首页模板和脚本中增加控制日志区域**
+- [x] **Step 7: 在首页模板和脚本中增加控制日志区域**
 
 ```javascript
 const controlSource = new EventSource("/api/control/stream");
 ```
 
-- [ ] **Step 8: 运行测试确认通过**
+- [x] **Step 8: 运行测试确认通过**
 
 Run: `pytest tests/test_event_hub.py tests/test_api_routes.py tests/test_frontend_assets.py -v`
 Expected: PASS
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add tests/test_event_hub.py tests/test_api_routes.py tests/test_frontend_assets.py app/services/event_hub.py app/services/command_session.py app/bluetooth/service.py app/api/routes.py app/templates/index.html app/static/app.js
@@ -477,49 +477,49 @@ git commit -m "feat(control-log): 拆分控制日志流并接入首页监控"
 - Modify: `app/static/bluetooth_studio.js`
 - Modify: `app/static/style.css`
 
-- [ ] **Step 1: 为互动事件注册写失败测试**
+- [x] **Step 1: 为互动事件注册写失败测试**
 
 ```python
 assert "INTERACT_WORD" in registered_events
 ```
 
-- [ ] **Step 2: 为互动事件标准化写失败测试**
+- [x] **Step 2: 为互动事件标准化写失败测试**
 
 ```python
 assert event["event_type"] == "interact"
 assert event["payload"]["interact_type"] == "follow"
 ```
 
-- [ ] **Step 3: 运行第三方事件测试确认失败**
+- [x] **Step 3: 运行第三方事件测试确认失败**
 
 Run: `pytest tests/test_third_party_ws_client.py tests/test_third_party_mapper.py -v`
 Expected: FAIL，说明还未监听和标准化互动事件
 
-- [ ] **Step 4: 在 `ws_client.py` 注册第三方互动类事件**
+- [x] **Step 4: 在 `ws_client.py` 注册第三方互动类事件**
 
 ```python
 for event_name in (..., "INTERACT_WORD"):
     ...
 ```
 
-- [ ] **Step 5: 在 mapper 中输出 `进房 / 关注 / 分享 / 特别关注` 子类型**
+- [x] **Step 5: 在 mapper 中输出 `进房 / 关注 / 分享 / 特别关注` 子类型**
 
 ```python
 payload["interact_type"] = "share"
 ```
 
-- [ ] **Step 6: 在规则页中加入互动事件分组显示**
+- [x] **Step 6: 在规则页中加入互动事件分组显示**
 
 ```javascript
 group_label: "互动事件"
 ```
 
-- [ ] **Step 7: 运行测试确认通过**
+- [x] **Step 7: 运行测试确认通过**
 
 Run: `pytest tests/test_third_party_ws_client.py tests/test_third_party_mapper.py tests/test_frontend_assets.py -v`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add tests/test_third_party_ws_client.py tests/test_third_party_mapper.py tests/test_frontend_assets.py app/third_party/ws_client.py app/third_party/event_mapper.py app/static/bluetooth_studio.js app/static/style.css
@@ -536,31 +536,31 @@ git commit -m "feat(interact-events): 支持进房关注分享等互动事件接
 - Modify: `app/static/bluetooth_overlay.js`
 - Modify: `app/services/event_hub.py`
 
-- [ ] **Step 1: 为 overlay 数据结构写失败测试**
+- [x] **Step 1: 为 overlay 数据结构写失败测试**
 
 ```python
 assert response.json()["history"][0]["msg"] == "开火"
 ```
 
-- [ ] **Step 2: 为前端资源钩子写失败测试**
+- [x] **Step 2: 为前端资源钩子写失败测试**
 
 ```python
 assert "overlay-danmaku-list" in overlay_html
 assert "renderOverlayDanmaku" in overlay_js
 ```
 
-- [ ] **Step 3: 运行 API 和前端测试确认失败**
+- [x] **Step 3: 运行 API 和前端测试确认失败**
 
 Run: `pytest tests/test_api_routes.py tests/test_frontend_assets.py -v`
 Expected: FAIL，说明 overlay 仍只显示设备状态
 
-- [ ] **Step 4: 在 overlay payload 中附带最近触发事件摘要**
+- [x] **Step 4: 在 overlay payload 中附带最近触发事件摘要**
 
 ```python
 payload["recent_events"] = [...]
 ```
 
-- [ ] **Step 5: 在 overlay 页面中增加弹幕/SC/上舰展示区**
+- [x] **Step 5: 在 overlay 页面中增加弹幕/SC/上舰展示区**
 
 ```javascript
 function renderOverlayDanmaku(events) {
@@ -568,12 +568,12 @@ function renderOverlayDanmaku(events) {
 }
 ```
 
-- [ ] **Step 6: 运行测试确认通过**
+- [x] **Step 6: 运行测试确认通过**
 
 Run: `pytest tests/test_api_routes.py tests/test_frontend_assets.py -v`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add tests/test_api_routes.py tests/test_frontend_assets.py app/api/routes.py app/templates/bluetooth_overlay.html app/static/bluetooth_overlay.js app/services/event_hub.py
@@ -597,28 +597,28 @@ git commit -m "feat(obs-overlay): 增强小窗展示弹幕与触发演出信息"
 - Verify: `tests/test_api_routes.py`
 - Verify: `tests/test_frontend_assets.py`
 
-- [ ] **Step 1: 运行 `P0` 相关后端测试**
+- [x] **Step 1: 运行 `P0` 相关后端测试**
 
 Run: `pytest tests/test_third_party_mapper.py tests/test_third_party_session.py tests/test_gift_dispatcher.py tests/test_bluetooth_dispatcher.py -v`
 Expected: PASS
 
-- [ ] **Step 2: 运行事件流与前端测试**
+- [x] **Step 2: 运行事件流与前端测试**
 
 Run: `pytest tests/test_event_hub.py tests/test_api_routes.py tests/test_frontend_assets.py -v`
 Expected: PASS
 
-- [ ] **Step 3: 运行全量测试**
+- [x] **Step 3: 运行全量测试**
 
 Run: `pytest -v`
 Expected: PASS
 
-- [ ] **Step 4: 如实现中对第三方弹幕舰队字段索引做了兼容性折中，在本计划末尾补充实际偏差**
+- [x] **Step 4: 如实现中对第三方弹幕舰队字段索引做了兼容性折中，在本计划末尾补充实际偏差**
 
 ```markdown
 - 第三方 `DANMU_MSG` 的舰队等级字段按当前库版本的索引解析，如后续上游升级需复核。
 ```
 
-- [ ] **Step 5: 最终 Commit**
+- [x] **Step 5: 最终 Commit**
 
 ```bash
 git add app tests docs/superpowers/plans/2026-06-04-blivedglab-gap.md
@@ -630,3 +630,10 @@ git commit -m "feat(blivedglab-gap): 补齐直播联动核心玩法与观测能�
 - 区分 `舰长 / 提督 / 总督` 弹幕已经并入 `P0`，优先落在统一事件模型和规则过滤上。
 - 本计划默认第三方链路为主，官方 `open-live` 仅要求不受本轮改动破坏，不要求同步补齐所有玩法。
 - `P2` 的外部 DG-Lab Hub 兼容层不影响 `P0 / P1` 上线，可单独排期。
+
+## 实现记录
+
+- 2026-06-04：已补齐独立控制日志流、第三方互动事件、SC/上舰/续费/互动蓝牙规则、OBS 强度小窗最近事件展示和使用说明。
+- 2026-06-04：全量回归 `python -m pytest -v`，结果 `182 passed`。
+- 第三方 `INTERACT_WORD` 按 `msg_type=1/2/3` 映射为进房/关注/分享，并兼容 `msg_type=4` 为特别关注。
+

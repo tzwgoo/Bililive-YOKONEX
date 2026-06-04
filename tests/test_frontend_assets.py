@@ -201,6 +201,8 @@ def test_frontend_contains_bluetooth_studio_entry_and_template() -> None:
     assert "舰长弹幕" in studio_js
     assert "提督弹幕" in studio_js
     assert "总督弹幕" in studio_js
+    assert "醒目留言" in studio_js
+    assert "互动事件" in studio_js
 
 
 def test_frontend_contains_command_studio_entry_and_template() -> None:
@@ -265,9 +267,35 @@ def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
     assert 'id="overlay-channel-a-bar"' in overlay_html
     assert 'id="overlay-channel-b-bar"' in overlay_html
     assert 'id="overlay-waveform-canvas"' in overlay_html
+    assert 'id="overlay-danmaku-list"' in overlay_html
     assert 'fetch("/api/bluetooth/overlay/status")' in overlay_js
     assert 'new EventSource("/api/bluetooth/overlay/stream")' in overlay_js
     assert 'overlayState.battery_level' in overlay_js
+    assert "recent_events" in overlay_js
+    assert "function renderOverlayDanmaku" in overlay_js
+
+
+def test_frontend_contains_control_log_panel_and_stream() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
+    app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="control-events"' in index_html
+    assert 'id="control-count"' in index_html
+    assert 'new EventSource("/api/events/stream")' in app_js
+    assert 'new EventSource("/api/control/stream")' in app_js
+    assert "function renderControlEvent(event)" in app_js
+
+
+def test_frontend_renders_interact_events() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
+    app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="interact-events"' in index_html
+    assert 'id="interact-count"' in index_html
+    assert 'event.event_type === "interact"' in app_js
+    assert "interact_label" in app_js
 
 
 def test_bluetooth_panel_uses_vertical_stack_layout() -> None:

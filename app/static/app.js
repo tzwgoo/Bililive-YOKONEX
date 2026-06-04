@@ -38,9 +38,13 @@ const bluetoothConnectionSection = document.getElementById("bluetooth-connection
 const giftEvents = document.getElementById("gift-events");
 const danmakuEvents = document.getElementById("danmaku-events");
 const likeEvents = document.getElementById("like-events");
+const interactEvents = document.getElementById("interact-events");
+const controlEvents = document.getElementById("control-events");
 const giftCount = document.getElementById("gift-count");
 const danmakuCount = document.getElementById("danmaku-count");
 const likeCount = document.getElementById("like-count");
+const interactCount = document.getElementById("interact-count");
+const controlCount = document.getElementById("control-count");
 const lastEventAt = document.getElementById("last-event-at");
 const connectionModeLabel = document.getElementById("connection-mode-label");
 const triggerModeLabel = document.getElementById("trigger-mode-label");
@@ -273,6 +277,8 @@ function updateEventCounts() {
   giftCount.textContent = String(giftEvents.children.length);
   danmakuCount.textContent = String(danmakuEvents.children.length);
   likeCount.textContent = String(likeEvents.children.length);
+  interactCount.textContent = String(interactEvents.children.length);
+  controlCount.textContent = String(controlEvents.children.length);
 }
 
 function prependEvent(container, html) {
@@ -368,9 +374,41 @@ function renderEvent(event) {
     );
     return;
   }
+  if (event.event_type === "interact") {
+    const dispatch = event.bluetooth_dispatch || {};
+    const dispatchClass = dispatch.success === false ? " dispatch-failed" : dispatch.success ? " dispatch-success" : "";
+    const commandText = dispatch.waveform_id
+      ? `<small class="dispatch-chip${dispatchClass}">波形 ${dispatch.waveform_id} · ${dispatch.message || "已处理"}</small>`
+      : "";
+    prependEvent(
+      interactEvents,
+      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.interact_label || "互动"}</p>${commandText}`
+    );
+    return;
+  }
   if (event.event_type === "system") {
     messageText.textContent = event.payload.message || "互动状态已变更";
   }
+}
+
+function renderControlEvent(event) {
+  const payload = event.payload || {};
+  const isFailed = payload.success === false;
+  const controlClass = isFailed ? " dispatch-failed" : " dispatch-success";
+  const typeLabels = {
+    command_send: "IM 指令",
+    command_connect: "IM 登录",
+    command_disconnect: "IM 断开",
+    bluetooth_trigger: "蓝牙触发",
+  };
+  const typeLabel = typeLabels[event.type] || event.type || "控制事件";
+  const targetText = payload.command_id || payload.waveform_name || payload.waveform_id || payload.uid || "-";
+  const detailText = payload.message || (isFailed ? "执行失败" : "已执行");
+  const strengthText = payload.max_strength !== undefined ? `<small>最大强度 ${escapeHtml(payload.max_strength)}</small>` : "";
+  prependEvent(
+    controlEvents,
+    `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${escapeHtml(typeLabel)}</h3><p>${escapeHtml(targetText)}</p><small class="dispatch-chip${controlClass}">${escapeHtml(detailText)}</small>${strengthText}`
+  );
 }
 
 async function refreshStatus() {
@@ -712,6 +750,15 @@ source.onmessage = (event) => {
 
 source.onerror = () => {
   messageText.textContent = "实时事件流暂时断开，页面会继续自动刷新状态";
+};
+
+const controlSource = new EventSource("/api/control/stream");
+controlSource.onmessage = (event) => {
+  renderControlEvent(JSON.parse(event.data));
+};
+
+controlSource.onerror = () => {
+  messageText.textContent = "控制日志流暂时断开，页面会继续自动刷新状态";
 };
 
 async function refreshDashboard() {

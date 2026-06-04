@@ -21,7 +21,7 @@ def test_store_returns_default_payload_when_file_missing(tmp_path) -> None:
     assert payload.ems_waveforms[1].id == "ems-preset-01"
     assert payload.ems_waveforms[1].name == "EMS 预设 01 - 呼吸"
     assert payload.ems_waveforms[6].id == "ems-preset-06"
-    assert len(payload.bluetooth_event_rules) == 15
+    assert len(payload.bluetooth_event_rules) == 19
     assert payload.bluetooth_event_rules[0].enabled is True
     assert payload.bluetooth_event_rules[9].enabled is True
     assert payload.bluetooth_event_rules[10].enabled is True
@@ -29,6 +29,8 @@ def test_store_returns_default_payload_when_file_missing(tmp_path) -> None:
     assert payload.bluetooth_event_rules[12].enabled is True
     assert payload.bluetooth_event_rules[13].enabled is True
     assert payload.bluetooth_event_rules[14].enabled is True
+    assert payload.bluetooth_event_rules[15].enabled is True
+    assert payload.bluetooth_event_rules[18].enabled is True
     assert payload.bluetooth_event_rules[0].id == "gift-tier-01"
     assert payload.bluetooth_event_rules[0].waveform_id == "ems-preset-01"
     assert payload.bluetooth_event_rules[0].filters == {"min_price": 0, "max_price": 99}
@@ -42,6 +44,10 @@ def test_store_returns_default_payload_when_file_missing(tmp_path) -> None:
     assert payload.bluetooth_event_rules[13].waveform_id == "ems-preset-05"
     assert payload.bluetooth_event_rules[14].id == "danmaku-governor"
     assert payload.bluetooth_event_rules[14].waveform_id == "ems-preset-06"
+    assert payload.bluetooth_event_rules[15].id == "super-chat-default"
+    assert payload.bluetooth_event_rules[15].event_type == "super_chat"
+    assert payload.bluetooth_event_rules[18].id == "interact-default"
+    assert payload.bluetooth_event_rules[18].event_type == "interact"
 
 
 def test_store_loads_existing_payload_and_normalizes_fields(tmp_path) -> None:

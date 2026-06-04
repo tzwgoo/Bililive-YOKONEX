@@ -8,6 +8,7 @@ const overlayChannelBValue = document.getElementById("overlay-channel-b-value");
 const overlayChannelABar = document.getElementById("overlay-channel-a-bar");
 const overlayChannelBBar = document.getElementById("overlay-channel-b-bar");
 const overlayWaveformCanvas = document.getElementById("overlay-waveform-canvas");
+const overlayDanmakuList = document.getElementById("overlay-danmaku-list");
 
 let overlayState = {
   connected: false,
@@ -17,15 +18,16 @@ let overlayState = {
   channel_a: 0,
   channel_b: 0,
   history: [],
+  recent_events: [],
   revision: 0,
 };
 
 function clampStrength(value) {
-  return Math.max(0, Math.min(100, Number(value || 0)));
+  return Math.max(0, Math.min(180, Number(value || 0)));
 }
 
 function resolveStrengthWidth(value) {
-  return `${Math.max(0, Math.min(100, clampStrength(value) * 2))}%`;
+  return `${(clampStrength(value) / 180) * 100}%`;
 }
 
 function formatBatteryLevel(value) {
@@ -65,7 +67,7 @@ function drawOverlayHistory(history) {
     items.forEach((item, index) => {
       const x = padding + (index / Math.max(1, items.length - 1)) * (width - padding * 2);
       const strength = clampStrength(item[key]);
-      const y = height - padding - (strength / 100) * (height - padding * 2);
+      const y = height - padding - (strength / 180) * (height - padding * 2);
       if (index === 0) {
         context.moveTo(x, y);
       } else {
@@ -83,6 +85,35 @@ function drawOverlayHistory(history) {
   drawLine("channel_b", "#51a8ff");
 }
 
+function escapeOverlayHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderOverlayDanmaku(recentEvents) {
+  const items = Array.isArray(recentEvents) ? recentEvents.slice(0, 4) : [];
+  if (!items.length) {
+    overlayDanmakuList.innerHTML = '<article class="overlay-danmaku-item"><strong>等待事件</strong><span>直播触发后显示</span></article>';
+    return;
+  }
+  overlayDanmakuList.innerHTML = items
+    .map((item) => {
+      const guardLabel = item.guard_label ? ` · ${item.guard_label}` : "";
+      const waveformText = item.waveform_id ? ` · ${item.waveform_id}` : "";
+      return `
+        <article class="overlay-danmaku-item">
+          <strong>${escapeOverlayHtml(item.event_label || "事件")}${escapeOverlayHtml(guardLabel)} · ${escapeOverlayHtml(item.uname || "匿名用户")}</strong>
+          <span>${escapeOverlayHtml(item.msg || "-")}${escapeOverlayHtml(waveformText)}</span>
+        </article>
+      `;
+    })
+    .join("");
+}
+
 function renderOverlay(payload) {
   overlayState = {
     ...overlayState,
@@ -98,6 +129,7 @@ function renderOverlay(payload) {
   overlayChannelABar.style.width = resolveStrengthWidth(overlayState.channel_a);
   overlayChannelBBar.style.width = resolveStrengthWidth(overlayState.channel_b);
   drawOverlayHistory(overlayState.history || []);
+  renderOverlayDanmaku(overlayState.recent_events || []);
 }
 
 async function refreshOverlayStatus() {

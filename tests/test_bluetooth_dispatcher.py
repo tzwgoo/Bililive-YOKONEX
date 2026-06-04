@@ -60,6 +60,25 @@ async def test_dispatcher_triggers_waveform_for_like_event() -> None:
 
 
 @pytest.mark.anyio
+async def test_dispatcher_triggers_waveform_for_interact_event() -> None:
+    service = FakeBluetoothService()
+    dispatcher = BluetoothDispatcher(bluetooth_service=service)
+
+    result = await dispatcher.dispatch(
+        {
+            "event_type": "interact",
+            "payload": {
+                "interact_type": "share",
+                "interact_label": "分享",
+            },
+        }
+    )
+
+    assert result["success"] is True
+    assert service.triggered == [("interact", "ems-preset-02")]
+
+
+@pytest.mark.anyio
 async def test_dispatcher_matches_keywords_for_danmaku_event() -> None:
     service = FakeBluetoothService()
     for rule in service.payload.bluetooth_event_rules:

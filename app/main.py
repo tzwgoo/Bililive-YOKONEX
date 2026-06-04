@@ -49,9 +49,10 @@ def create_app() -> FastAPI:
     if not mapping_path.is_absolute():
         mapping_path = resolve_runtime_path(str(mapping_path))
     mapper = GiftCommandMapper.from_file(mapping_path)
-    command_session = CommandSessionService()
+    command_session = CommandSessionService(event_hub=event_hub)
     bluetooth_service = BluetoothService.create_default(
         config_path=resolve_runtime_path("config/bluetooth_settings.json"),
+        event_hub=event_hub,
     )
     gift_dispatcher = GiftCommandDispatcher(
         mapper=mapper,
