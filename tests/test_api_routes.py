@@ -244,6 +244,36 @@ def test_index_page_prefers_spa_response_when_available(monkeypatch) -> None:
     assert "spa-index" in response.text
 
 
+def test_events_page_prefers_spa_response_when_available(monkeypatch) -> None:
+    client = TestClient(create_app())
+
+    monkeypatch.setattr(
+        api_routes,
+        "_spa_index_response",
+        lambda: HTMLResponse("<html><body>spa-index-events</body></html>"),
+    )
+
+    response = client.get("/events")
+
+    assert response.status_code == 200
+    assert "spa-index-events" in response.text
+
+
+def test_waveforms_page_prefers_spa_response_when_available(monkeypatch) -> None:
+    client = TestClient(create_app())
+
+    monkeypatch.setattr(
+        api_routes,
+        "_spa_index_response",
+        lambda: HTMLResponse("<html><body>spa-index-waveforms</body></html>"),
+    )
+
+    response = client.get("/waveforms")
+
+    assert response.status_code == 200
+    assert "spa-index-waveforms" in response.text
+
+
 def test_command_connect_endpoint_uses_frontend_payload() -> None:
     app = create_app()
     fake_command_session = FakeCommandSessionService()

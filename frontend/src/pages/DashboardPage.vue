@@ -1,161 +1,51 @@
 <template>
   <main class="dashboard-page">
-    <ACard class="hero-card" :bordered="false">
-      <div>
-        <p class="hero-kicker">Bilibili Live Control Deck</p>
-        <h1>直播互动监听控制台</h1>
-        <p class="hero-subtitle">Vue + Ant Design Vue 迁移中的第一张业务页面，已接通状态轮询、实时事件流和主控操作。</p>
-      </div>
-      <StatusPill :state="sessionStore.status.status" />
-    </ACard>
+    <PageHeaderBar
+      kicker="Control Deck"
+      title="直播互动监听控制台"
+      description="集中查看当前运行状态、保留高频监听参数和连接操作，并在首页持续查看实时日志。"
+    >
+      <template #actions>
+        <StatusPill :state="sessionStore.status.status" />
+      </template>
+    </PageHeaderBar>
 
-    <ARow :gutter="[18, 18]">
-      <ACol :xs="24" :xl="16">
-        <ACard title="直播监听" :bordered="false">
-          <div class="form-grid">
-            <label class="field">
-              <span>监听模式</span>
-              <Select v-model:value="sessionForm.mode" :options="sessionModeSelectOptions" />
-            </label>
-            <label class="field">
-              <span>{{ sessionValueLabel }}</span>
-              <Input
-                data-testid="session-value-input"
-                v-model:value="sessionForm.value"
-                :placeholder="sessionValuePlaceholder"
-              />
-            </label>
-            <label class="field">
-              <span>连接方式</span>
-              <Select v-model:value="sessionForm.connection_mode" :options="connectionModeOptions" />
-            </label>
-            <label class="field">
-              <span>礼物触发模式</span>
-              <Select v-model:value="sessionForm.trigger_mode" :options="triggerModeOptions" />
-            </label>
-            <label class="field">
-              <span>点赞倍数</span>
-              <InputNumber v-model:value="sessionForm.like_multiple" :min="1" :step="1" class="field-number" />
-            </label>
-            <label class="field">
-              <span>弹幕触发</span>
-              <Select v-model:value="danmakuEnabledValue" :options="danmakuEnabledOptions" />
-            </label>
-            <label class="field field-span-2">
-              <span>弹幕关键词</span>
-              <Input v-model:value="sessionForm.danmaku_keywords" placeholder="多个关键词用逗号分隔，例如 开火,冲冲冲" />
-            </label>
-            <label class="field">
-              <span>弹幕冷却秒数</span>
-              <InputNumber v-model:value="sessionForm.danmaku_cooldown_seconds" :min="0" :step="1" class="field-number" />
-            </label>
-            <label class="field">
-              <span>每用户限流窗口</span>
-              <InputNumber v-model:value="sessionForm.danmaku_user_limit_window_seconds" :min="0" :step="1" class="field-number" />
-            </label>
-            <label class="field">
-              <span>窗口内最大触发次数</span>
-              <InputNumber v-model:value="sessionForm.danmaku_user_limit_max_triggers" :min="0" :step="1" class="field-number" />
-            </label>
-            <label class="field">
-              <span>最低舰队等级</span>
-              <Select v-model:value="sessionForm.danmaku_min_guard_level" :options="guardLevelOptions" />
-            </label>
-          </div>
-          <AAlert v-if="sessionMessage" class="section-alert" :message="sessionMessage" type="info" show-icon />
-          <div class="button-row">
-            <Button data-testid="start-session" type="primary" :loading="startingSession" @click="handleStartSession">启动监听</Button>
-            <Button :disabled="startingSession" @click="handleStopSession">停止监听</Button>
-          </div>
-        </ACard>
-      </ACol>
+    <StatusSummaryGrid
+      :session="sessionStore.status"
+      :command-status="commandStore.status"
+      :bluetooth-status="bluetoothStore.status"
+    />
 
-      <ACol :xs="24" :xl="8">
-        <div class="sidebar-stack">
-          <ACard title="连接方式" :bordered="false">
-            <label class="field">
-              <span>输出链路</span>
-              <Select v-model:value="sessionForm.connection_mode" :options="connectionModeOptions" />
-            </label>
+    <SessionControlPanel
+      :session-form="sessionForm"
+      :starting-session="startingSession"
+      :message="sessionMessage"
+      @start="handleStartSession"
+      @stop="handleStopSession"
+    />
 
-            <template v-if="sessionForm.connection_mode === 'im'">
-              <div class="section-head-inline">
-                <h3>IM 指令连接</h3>
-                <StatusPill :state="commandStore.status.status" />
-              </div>
-              <label class="field">
-                <span>WS URL</span>
-                <Input data-testid="command-ws-url" v-model:value="commandForm.ws_url" placeholder="ws://103.236.55.92:43001/" />
-              </label>
-              <label class="field">
-                <span>UID</span>
-                <Input data-testid="command-uid" v-model:value="commandForm.uid" placeholder="请输入下游服务 UID" />
-              </label>
-              <label class="field">
-                <span>TOKEN</span>
-                <InputPassword data-testid="command-token" v-model:value="commandForm.token" placeholder="请输入下游服务 TOKEN" />
-              </label>
-              <AAlert v-if="commandMessage" class="section-alert" :message="commandMessage" type="info" show-icon />
-              <div class="button-row">
-                <Button data-testid="connect-command" type="primary" :loading="connectingCommand" @click="handleConnectCommand">登录指令通道</Button>
-                <Button :disabled="connectingCommand" @click="handleDisconnectCommand">退出指令通道</Button>
-              </div>
-            </template>
+    <ConnectionAndDevicesPanel
+      :command-form="commandForm"
+      :command-status="commandStore.status"
+      :bluetooth-status="bluetoothStore.status"
+      :command-message="commandMessage"
+      :bluetooth-message="bluetoothMessage"
+      :connecting-command="connectingCommand"
+      :scanning-bluetooth="scanningBluetooth"
+      @connect-command="handleConnectCommand"
+      @disconnect-command="handleDisconnectCommand"
+      @scan-bluetooth="handleScanBluetooth"
+      @disconnect-bluetooth="handleDisconnectBluetooth"
+      @connect-bluetooth="handleConnectBluetooth"
+    />
 
-            <template v-else>
-              <div class="section-head-inline">
-                <h3>蓝牙连接</h3>
-                <StatusPill :state="bluetoothStore.status.connected ? 'connected' : 'idle'" />
-              </div>
-              <AAlert v-if="bluetoothMessage" class="section-alert" :message="bluetoothMessage" type="info" show-icon />
-              <div class="button-row">
-                <Button type="primary" :loading="scanningBluetooth" @click="handleScanBluetooth">扫描设备</Button>
-                <Button :disabled="scanningBluetooth" @click="handleDisconnectBluetooth">断开设备</Button>
-              </div>
-              <ACollapse class="bluetooth-collapse" :bordered="false">
-                <ACollapsePanel key="devices" header="设备列表">
-                  <AEmpty v-if="bluetoothStore.status.devices.length === 0" description="暂无设备" />
-                  <AList v-else :data-source="bluetoothStore.status.devices">
-                    <template #renderItem="{ item }">
-                      <AListItem>
-                        <div class="bluetooth-item-copy">
-                          <strong>{{ item.name }}</strong>
-                          <small>{{ item.protocol || "-" }} · RSSI {{ item.rssi }}</small>
-                        </div>
-                        <Button v-if="!item.connected" size="small" @click="handleConnectBluetooth(item.deviceId)">连接</Button>
-                        <StatusPill v-else state="connected" />
-                      </AListItem>
-                    </template>
-                  </AList>
-                </ACollapsePanel>
-                <ACollapsePanel key="rules" header="事件规则预览">
-                  <AEmpty v-if="bluetoothStore.status.rules.length === 0" description="暂无规则" />
-                  <AList v-else :data-source="bluetoothStore.status.rules">
-                    <template #renderItem="{ item }">
-                      <AListItem>
-                        <div class="bluetooth-item-copy">
-                          <strong>{{ item.ruleLabel }}</strong>
-                          <small>{{ item.waveformName || item.waveformId || "-" }}</small>
-                        </div>
-                        <StatusPill :state="item.enabled ? 'running' : 'idle'" />
-                      </AListItem>
-                    </template>
-                  </AList>
-                </ACollapsePanel>
-              </ACollapse>
-            </template>
-          </ACard>
+    <RuntimeSnapshotCard
+      :session="sessionStore.status"
+      :command-status="commandStore.status.status"
+      :bluetooth-status="bluetoothStore.status.connected ? 'connected' : 'idle'"
+    />
 
-          <RuntimeSnapshotCard
-            :session="sessionStore.status"
-            :command-status="commandStore.status.status"
-            :bluetooth-status="bluetoothStore.status.connected ? 'connected' : 'idle'"
-          />
-        </div>
-      </ACol>
-    </ARow>
-
-    <ACard class="event-section" title="事件流" :bordered="false">
+    <ACard class="event-section" title="实时日志" :bordered="false">
       <AAlert
         v-if="eventErrorMessage"
         class="section-alert"
@@ -173,17 +63,12 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import {
   Alert as AAlert,
   Card as ACard,
-  Col as ACol,
-  Collapse as ACollapse,
-  Empty as AEmpty,
-  Input,
-  InputNumber,
-  List as AList,
-  Row as ARow,
-  Select,
-  Button,
 } from "ant-design-vue";
+import ConnectionAndDevicesPanel from "@/components/dashboard/ConnectionAndDevicesPanel.vue";
+import SessionControlPanel from "@/components/dashboard/SessionControlPanel.vue";
+import StatusSummaryGrid from "@/components/dashboard/StatusSummaryGrid.vue";
 import RuntimeSnapshotCard from "@/components/dashboard/RuntimeSnapshotCard.vue";
+import PageHeaderBar from "@/components/layout/PageHeaderBar.vue";
 import EventStreamTabs from "@/components/shared/EventStreamTabs.vue";
 import StatusPill from "@/components/shared/StatusPill.vue";
 import { useEventStream } from "@/composables/useEventStream";
@@ -198,10 +83,6 @@ import type { SessionStartPayload } from "@/types/session";
 const sessionStore = useSessionStore();
 const commandStore = useCommandStore();
 const bluetoothStore = useBluetoothStore();
-
-const InputPassword = Input.Password;
-const AListItem = AList.Item;
-const ACollapsePanel = ACollapse.Panel;
 
 const sessionStorage = useLocalDraft<SessionStartPayload>("biliLive.sessionDraft", {
   mode: "open_live",
@@ -235,40 +116,6 @@ const bluetoothMessage = ref("未连接");
 
 const liveEventStream = useEventStream<Record<string, unknown>>("/api/events/stream");
 const controlEventStream = useEventStream<Record<string, unknown>>("/api/control/stream");
-
-const sessionModeSelectOptions = [
-  { label: "官方 open-live", value: "open_live" },
-  { label: "第三方房间消息流", value: "third_party" },
-];
-const connectionModeOptions = [
-  { label: "IM 指令", value: "im" },
-  { label: "蓝牙", value: "bluetooth" },
-];
-const triggerModeOptions = [
-  { label: "按礼物数量触发", value: "by_quantity" },
-  { label: "单次触发", value: "single" },
-];
-const danmakuEnabledOptions = [
-  { label: "关闭", value: "false" },
-  { label: "开启", value: "true" },
-];
-const guardLevelOptions = [
-  { label: "不限", value: 0 },
-  { label: "舰长及以上", value: 3 },
-  { label: "提督及以上", value: 2 },
-  { label: "总督", value: 1 },
-];
-
-const sessionValueLabel = computed(() => (sessionForm.mode === "third_party" ? "房间长 ID" : "主播身份码"));
-const sessionValuePlaceholder = computed(() =>
-  sessionForm.mode === "third_party" ? "请输入直播间房间长 ID room_id" : "请输入主播身份码 code",
-);
-const danmakuEnabledValue = computed({
-  get: () => (sessionForm.danmaku_enabled ? "true" : "false"),
-  set: (value: string) => {
-    sessionForm.danmaku_enabled = value === "true";
-  },
-});
 
 const eventTabs = computed(() => [
   { key: "gift", label: "礼物事件", events: filterEventsByType(["gift"]) },
@@ -446,107 +293,9 @@ onMounted(async () => {
 
 <style scoped>
 .dashboard-page {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 24px 24px 40px;
   display: grid;
   gap: 18px;
-}
-
-.hero-card {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.hero-kicker,
-.hero-card h1 {
-  margin: 0;
-}
-
-.hero-kicker {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #78716c;
-  margin-bottom: 8px;
-}
-
-.hero-subtitle {
-  margin: 8px 0 0;
-  color: #57534e;
-}
-
-.sidebar-stack {
-  display: grid;
-  gap: 18px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 16px;
-}
-
-.field {
-  display: grid;
-  gap: 8px;
-  color: #44403c;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.field :deep(.ant-input),
-.field :deep(.ant-input-number),
-.field :deep(.ant-select-selector) {
-  border-radius: 12px;
-}
-
-.field-number {
-  width: 100%;
-}
-
-.field-span-2 {
-  grid-column: span 2;
-}
-
-.button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.section-head-inline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 18px 0 12px;
-}
-
-.section-head-inline h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.section-alert {
-  margin-top: 16px;
-}
-
-.bluetooth-collapse {
-  margin-top: 16px;
-}
-
-.bluetooth-item-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.bluetooth-item-copy small {
-  color: #78716c;
+  padding: 24px 28px 40px;
 }
 
 .event-section :deep(.ant-card-body) {
@@ -555,12 +304,8 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .field-span-2 {
-    grid-column: span 1;
+  .dashboard-page {
+    padding: 18px 16px 32px;
   }
 }
 </style>

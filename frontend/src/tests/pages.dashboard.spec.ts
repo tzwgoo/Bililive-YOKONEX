@@ -41,7 +41,10 @@ describe("DashboardPage", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("直播互动监听控制台");
-    expect(wrapper.text()).toContain("运行状态");
+    expect(wrapper.text()).toContain("状态总览");
+    expect(wrapper.text()).toContain("监听主参数");
+    expect(wrapper.text()).toContain("蓝牙设备");
+    expect(wrapper.text()).toContain("实时日志");
     expect(wrapper.text()).toContain("123");
     expect(wrapper.text()).toContain("主播A");
   });

@@ -9,14 +9,22 @@ const router = createRouter({
       component: () => import("@/pages/DashboardPage.vue"),
     },
     {
+      path: "/events",
+      name: "events",
+      component: () => import("@/pages/EventConfigPage.vue"),
+    },
+    {
+      path: "/waveforms",
+      name: "waveforms",
+      component: () => import("@/pages/WaveformLibraryPage.vue"),
+    },
+    {
       path: "/bluetooth/studio",
-      name: "bluetooth-studio",
-      component: () => import("@/pages/BluetoothStudioPage.vue"),
+      redirect: "/waveforms",
     },
     {
       path: "/command/studio",
-      name: "command-studio",
-      component: () => import("@/pages/CommandStudioPage.vue"),
+      redirect: "/events",
     },
   ],
 });

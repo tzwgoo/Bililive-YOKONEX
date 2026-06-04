@@ -148,6 +148,30 @@ async def command_studio(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/events", response_class=HTMLResponse)
+async def events_page(request: Request) -> HTMLResponse:
+    spa_response = _spa_index_response()
+    if spa_response is not None:
+        return spa_response
+    return templates.TemplateResponse(
+        request=request,
+        name="command_studio.html",
+        context={},
+    )
+
+
+@router.get("/waveforms", response_class=HTMLResponse)
+async def waveforms_page(request: Request) -> HTMLResponse:
+    spa_response = _spa_index_response()
+    if spa_response is not None:
+        return spa_response
+    return templates.TemplateResponse(
+        request=request,
+        name="bluetooth_studio.html",
+        context={},
+    )
+
+
 @router.get("/bluetooth/overlay", response_class=HTMLResponse)
 async def bluetooth_overlay(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
