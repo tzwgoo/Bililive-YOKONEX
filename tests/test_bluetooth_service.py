@@ -60,6 +60,8 @@ async def test_service_status_payload_includes_runtime_details(
     assert status["rules"][13]["waveform_name"] == "EMS 预设 05 - 按捏渐强"
     assert status["rules"][14]["event_label"] == "总督弹幕"
     assert status["rules"][14]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
+    assert status["rules"][15]["event_label"] == "醒目留言"
+    assert status["rules"][18]["event_label"] == "互动事件"
     assert status["battery_level"] is None
 
 

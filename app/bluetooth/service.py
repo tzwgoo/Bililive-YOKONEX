@@ -28,6 +28,10 @@ RULE_GROUP_LABELS = {
     "danmaku_captain": "舰长弹幕",
     "danmaku_commander": "提督弹幕",
     "danmaku_governor": "总督弹幕",
+    "super_chat": "醒目留言",
+    "guard_buy": "上舰",
+    "guard_renew": "续费",
+    "interact": "互动事件",
 }
 
 

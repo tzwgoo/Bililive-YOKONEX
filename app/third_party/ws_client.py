@@ -40,6 +40,7 @@ class ThirdPartyWsClient:
             "USER_TOAST_MSG",
             "LIKE_INFO_V3_CLICK",
             "LIKE_INFO_V3_UPDATE",
+            "INTERACT_WORD",
         ):
             self._register_handler(
                 live_danmaku=live_danmaku,

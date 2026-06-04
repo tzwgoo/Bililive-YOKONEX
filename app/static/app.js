@@ -38,10 +38,12 @@ const bluetoothConnectionSection = document.getElementById("bluetooth-connection
 const giftEvents = document.getElementById("gift-events");
 const danmakuEvents = document.getElementById("danmaku-events");
 const likeEvents = document.getElementById("like-events");
+const interactEvents = document.getElementById("interact-events");
 const controlEvents = document.getElementById("control-events");
 const giftCount = document.getElementById("gift-count");
 const danmakuCount = document.getElementById("danmaku-count");
 const likeCount = document.getElementById("like-count");
+const interactCount = document.getElementById("interact-count");
 const controlCount = document.getElementById("control-count");
 const lastEventAt = document.getElementById("last-event-at");
 const connectionModeLabel = document.getElementById("connection-mode-label");
@@ -275,6 +277,7 @@ function updateEventCounts() {
   giftCount.textContent = String(giftEvents.children.length);
   danmakuCount.textContent = String(danmakuEvents.children.length);
   likeCount.textContent = String(likeEvents.children.length);
+  interactCount.textContent = String(interactEvents.children.length);
   controlCount.textContent = String(controlEvents.children.length);
 }
 
@@ -368,6 +371,18 @@ function renderEvent(event) {
     prependEvent(
       likeEvents,
       `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.like_text || "点赞"} (${event.payload.like_count || 0})</p>${commandText}`
+    );
+    return;
+  }
+  if (event.event_type === "interact") {
+    const dispatch = event.bluetooth_dispatch || {};
+    const dispatchClass = dispatch.success === false ? " dispatch-failed" : dispatch.success ? " dispatch-success" : "";
+    const commandText = dispatch.waveform_id
+      ? `<small class="dispatch-chip${dispatchClass}">波形 ${dispatch.waveform_id} · ${dispatch.message || "已处理"}</small>`
+      : "";
+    prependEvent(
+      interactEvents,
+      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.interact_label || "互动"}</p>${commandText}`
     );
     return;
   }

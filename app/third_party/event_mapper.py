@@ -151,6 +151,26 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
             },
         }
 
+    if cmd == "INTERACT_WORD":
+        data = message.get("data", {})
+        msg_type = _as_int(data.get("msg_type"))
+        interact_type = _resolve_interact_type(msg_type)
+        return {
+            "source": "third_party_ws",
+            "event_type": "interact",
+            "cmd": cmd,
+            "room_id": room_id,
+            "open_id": "",
+            "uname": str(data.get("uname", "")),
+            "timestamp": _as_int(data.get("timestamp") or data.get("trigger_time")),
+            "payload": {
+                "uid": _as_int(data.get("uid")),
+                "msg_type": msg_type,
+                "interact_type": interact_type,
+                "interact_label": _interact_type_to_label(interact_type),
+            },
+        }
+
     return None
 
 
@@ -231,6 +251,26 @@ def _resolve_guard_level_from_name(value: Any) -> int:
     if "舰长" in normalized:
         return 3
     return 0
+
+
+def _resolve_interact_type(msg_type: int) -> str:
+    """把第三方互动数字类型转成稳定英文类型。"""
+    return {
+        1: "enter",
+        2: "follow",
+        3: "share",
+        4: "special_follow",
+    }.get(_as_int(msg_type), "unknown")
+
+
+def _interact_type_to_label(interact_type: str) -> str:
+    """把互动英文类型转成页面展示用中文标签。"""
+    return {
+        "enter": "进房",
+        "follow": "关注",
+        "share": "分享",
+        "special_follow": "特别关注",
+    }.get(str(interact_type or ""), "互动")
 
 
 def _read_nested_dict(container: list[Any], *path: Any) -> dict[str, Any] | None:
