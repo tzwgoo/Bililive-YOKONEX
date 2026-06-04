@@ -6,7 +6,7 @@ import struct
 from typing import Any
 import zlib
 
-from app.models import EventType, LiveEvent
+from app.models import EventType, LiveEvent, resolve_danmaku_event_type
 
 
 HEADER_LENGTH = 16
@@ -96,12 +96,17 @@ def parse_event_message(message: dict[str, Any]) -> LiveEvent | None:
             "combo_gift": data.get("combo_gift", False),
         }
     elif cmd == "LIVE_OPEN_PLATFORM_DM":
-        event_type = EventType.DANMAKU
+        event_type = resolve_danmaku_event_type(int(data.get("guard_level", 0) or 0))
         payload = {
             "msg": data.get("msg", ""),
             "msg_id": data.get("msg_id", ""),
             "fans_medal_level": data.get("fans_medal_level", 0),
             "guard_level": data.get("guard_level", 0),
+            "guard_label": {
+                1: "总督",
+                2: "提督",
+                3: "舰长",
+            }.get(int(data.get("guard_level", 0) or 0), ""),
         }
     elif cmd == "LIVE_OPEN_PLATFORM_LIKE":
         event_type = EventType.LIKE

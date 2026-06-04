@@ -16,6 +16,16 @@ const duplicateWaveformButton = document.getElementById("studio-duplicate-wavefo
 const deleteWaveformButton = document.getElementById("studio-delete-waveform-btn");
 const saveWaveformButton = document.getElementById("studio-save-waveform-btn");
 const addStepButton = document.getElementById("studio-add-step-btn");
+const sortGiftRulesButton = document.getElementById("studio-sort-gift-rules-btn");
+
+const bluetoothRuleGroupLabels = {
+  gift: "礼物事件",
+  like: "点赞事件",
+  danmaku: "普通弹幕",
+  danmaku_captain: "舰长弹幕",
+  danmaku_commander: "提督弹幕",
+  danmaku_governor: "总督弹幕",
+};
 
 let studioWaveforms = [];
 let studioRuleGroups = [];
@@ -219,6 +229,44 @@ function buildWaveformOptions(selectedValue) {
     .join("");
 }
 
+function normalizeRulePriceValue(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(numericValue));
+}
+
+function normalizeRuleMaxPriceValue(value) {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  return normalizeRulePriceValue(value);
+}
+
+function sortGiftRulesByPrice(ruleGroups) {
+  return (Array.isArray(ruleGroups) ? ruleGroups : []).map((group) => {
+    if (group.group_id !== "gift") {
+      return group;
+    }
+    const nextRules = [...(group.rules || [])].sort((left, right) => {
+      const leftMinPrice = normalizeRulePriceValue(left.filters?.min_price);
+      const rightMinPrice = normalizeRulePriceValue(right.filters?.min_price);
+      const leftMaxPrice = left.filters?.max_price === null || left.filters?.max_price === undefined
+        ? Number.POSITIVE_INFINITY
+        : normalizeRulePriceValue(left.filters.max_price);
+      const rightMaxPrice = right.filters?.max_price === null || right.filters?.max_price === undefined
+        ? Number.POSITIVE_INFINITY
+        : normalizeRulePriceValue(right.filters.max_price);
+      return leftMinPrice - rightMinPrice || leftMaxPrice - rightMaxPrice || String(left.id).localeCompare(String(right.id), "zh-CN");
+    });
+    return {
+      ...group,
+      rules: nextRules,
+    };
+  });
+}
+
 function renderRuleGroups(ruleGroups) {
   if (!Array.isArray(ruleGroups) || !ruleGroups.length) {
     ruleGroupsContainer.innerHTML = '<p class="mini-empty">暂无规则。</p>';
@@ -228,7 +276,7 @@ function renderRuleGroups(ruleGroups) {
     .map((group) => `
       <section class="studio-rule-group">
         <div class="stream-head">
-          <h3>${escapeHtml(group.group_label)}</h3>
+          <h3>${escapeHtml(group.group_label || bluetoothRuleGroupLabels[group.group_id] || group.group_id)}</h3>
         </div>
         <div class="studio-rule-list">
           ${(group.rules || [])
@@ -245,6 +293,20 @@ function renderRuleGroups(ruleGroups) {
                   <span>对应波形</span>
                   <select data-role="waveform-id">${buildWaveformOptions(rule.waveform_id)}</select>
                 </label>
+                ${group.group_id === "gift"
+                  ? `
+                  <div class="studio-rule-price-grid">
+                    <label class="studio-rule-select">
+                      <span>最低价格</span>
+                      <input type="number" min="0" step="1" data-role="min-price" value="${escapeHtml(rule.filters?.min_price ?? 0)}" />
+                    </label>
+                    <label class="studio-rule-select">
+                      <span>最高价格</span>
+                      <input type="number" min="0" step="1" data-role="max-price" value="${rule.filters?.max_price === null || rule.filters?.max_price === undefined ? "" : escapeHtml(rule.filters.max_price)}" placeholder="留空表示无上限" />
+                    </label>
+                  </div>
+                `
+                  : ""}
               </article>
             `)
             .join("")}
@@ -381,6 +443,12 @@ function collectRulePayload() {
     id: item.getAttribute("data-rule-id"),
     enabled: item.querySelector('[data-role="enabled"]').checked,
     waveform_id: item.querySelector('[data-role="waveform-id"]').value,
+    min_price: item.querySelector('[data-role="min-price"]')
+      ? normalizeRulePriceValue(item.querySelector('[data-role="min-price"]').value)
+      : null,
+    max_price: item.querySelector('[data-role="max-price"]')
+      ? normalizeRuleMaxPriceValue(item.querySelector('[data-role="max-price"]').value)
+      : null,
   }));
 }
 
@@ -699,6 +767,38 @@ saveButton.addEventListener("click", async () => {
   renderRuleGroups(studioRuleGroups);
   saveButton.disabled = false;
 });
+
+sortGiftRulesButton?.addEventListener("click", () => {
+  studioRuleGroups = sortGiftRulesByPrice(collectRuleGroupsFromDom());
+  renderRuleGroups(studioRuleGroups);
+  studioMessageText.textContent = "礼物价格档位已按价格升序整理。";
+});
+
+function collectRuleGroupsFromDom() {
+  return studioRuleGroups.map((group) => ({
+    ...group,
+    rules: group.rules.map((rule) => {
+      const element = ruleGroupsContainer.querySelector(`[data-rule-id="${CSS.escape(rule.id)}"]`);
+      if (!element) {
+        return rule;
+      }
+      return {
+        ...rule,
+        enabled: element.querySelector('[data-role="enabled"]').checked,
+        waveform_id: element.querySelector('[data-role="waveform-id"]').value,
+        filters: {
+          ...(rule.filters || {}),
+          ...(element.querySelector('[data-role="min-price"]')
+            ? { min_price: normalizeRulePriceValue(element.querySelector('[data-role="min-price"]').value) }
+            : {}),
+          ...(element.querySelector('[data-role="max-price"]')
+            ? { max_price: normalizeRuleMaxPriceValue(element.querySelector('[data-role="max-price"]').value) }
+            : {}),
+        },
+      };
+    }),
+  }));
+}
 
 refreshStudio().catch((error) => {
   waveformMessageText.textContent = `页面初始化失败: ${error}`;

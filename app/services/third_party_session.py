@@ -6,12 +6,14 @@ import time
 from typing import Any, Awaitable, Callable
 
 from app.models import SessionStatus
+from app.models import is_danmaku_event_type
 from app.services.event_hub import EventHub
 from app.third_party.event_mapper import map_third_party_message
 from app.third_party.ws_client import ThirdPartyWsClient
 
 
 LOGGER = logging.getLogger("bili_live.third_party")
+GIFT_LIKE_EVENT_TYPES = {"gift", "super_chat", "guard_buy", "guard_renew"}
 
 
 class ThirdPartyLiveSessionService:
@@ -55,6 +57,9 @@ class ThirdPartyLiveSessionService:
         danmaku_keywords: str = "",
         danmaku_command_id: str = "",
         danmaku_cooldown_seconds: int = 0,
+        danmaku_user_limit_window_seconds: int = 0,
+        danmaku_user_limit_max_triggers: int = 0,
+        danmaku_min_guard_level: int = 0,
     ) -> None:
         room_id = value.strip()
         if not room_id:
@@ -79,12 +84,18 @@ class ThirdPartyLiveSessionService:
                 keywords=danmaku_keywords,
                 command_id=danmaku_command_id,
                 cooldown_seconds=danmaku_cooldown_seconds,
+                user_limit_window_seconds=danmaku_user_limit_window_seconds,
+                user_limit_max_triggers=danmaku_user_limit_max_triggers,
+                min_guard_level=danmaku_min_guard_level,
             )
         if self.bluetooth_dispatcher is not None and hasattr(self.bluetooth_dispatcher, "configure"):
             self.bluetooth_dispatcher.configure(
                 danmaku_enabled=danmaku_enabled,
                 danmaku_keywords=danmaku_keywords,
                 danmaku_cooldown_seconds=danmaku_cooldown_seconds,
+                danmaku_user_limit_window_seconds=danmaku_user_limit_window_seconds,
+                danmaku_user_limit_max_triggers=danmaku_user_limit_max_triggers,
+                danmaku_min_guard_level=danmaku_min_guard_level,
             )
         self.anchor_name = ""
         self.last_error = ""
@@ -175,7 +186,7 @@ class ThirdPartyLiveSessionService:
         event = map_third_party_message(message, room_id=self.room_id)
         if event is None:
             return
-        if self.output_mode == "im" and event.get("event_type") == "gift" and self.gift_dispatcher is not None:
+        if self.output_mode == "im" and event.get("event_type") in GIFT_LIKE_EVENT_TYPES and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_gift_event(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
@@ -185,7 +196,11 @@ class ThirdPartyLiveSessionService:
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
-        elif self.output_mode == "im" and event.get("event_type") == "danmaku" and self.danmaku_dispatcher is not None:
+        elif (
+            self.output_mode == "im"
+            and is_danmaku_event_type(str(event.get("event_type", "") or ""))
+            and self.danmaku_dispatcher is not None
+        ):
             dispatch_result = await self.danmaku_dispatcher.dispatch(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")

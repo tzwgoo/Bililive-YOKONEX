@@ -76,6 +76,28 @@ class BluetoothConnectionStatus:
     message: str = "未连接"
 
 
+BLUETOOTH_DANMAKU_RULE_DEFINITIONS = [
+    {"id": "danmaku-normal", "event_type": "danmaku", "waveform_id": "ems-preset-03", "label": "普通弹幕"},
+    {"id": "danmaku-captain", "event_type": "danmaku_captain", "waveform_id": "ems-preset-04", "label": "舰长弹幕"},
+    {"id": "danmaku-commander", "event_type": "danmaku_commander", "waveform_id": "ems-preset-05", "label": "提督弹幕"},
+    {"id": "danmaku-governor", "event_type": "danmaku_governor", "waveform_id": "ems-preset-06", "label": "总督弹幕"},
+]
+
+
+def build_default_danmaku_rules(*, enabled: bool = True) -> list[BluetoothEventRule]:
+    return [
+        BluetoothEventRule(
+            id=str(item["id"]),
+            enabled=bool(enabled),
+            event_type=str(item["event_type"]),
+            waveform_id=str(item["waveform_id"]),
+            cooldown_seconds=3,
+            filters={"keywords": []},
+        )
+        for item in BLUETOOTH_DANMAKU_RULE_DEFINITIONS
+    ]
+
+
 def build_default_payload() -> BluetoothConfigPayload:
     from app.bluetooth.gift_tiers import build_default_gift_rules
     from app.bluetooth.ems_builtin_waveforms import create_defaults
@@ -104,14 +126,7 @@ def build_default_payload() -> BluetoothConfigPayload:
                 cooldown_seconds=0,
                 filters={},
             ),
-            BluetoothEventRule(
-                id="danmaku-default",
-                enabled=True,
-                event_type="danmaku",
-                waveform_id="ems-preset-03",
-                cooldown_seconds=3,
-                filters={"keywords": []},
-            ),
+            *build_default_danmaku_rules(enabled=True),
         ],
     )
 

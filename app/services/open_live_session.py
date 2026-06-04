@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 from app.config import Settings
+from app.models import is_danmaku_event_type
 from app.models import SessionStatus
 from app.services.event_hub import EventHub
 
@@ -60,6 +61,9 @@ class OpenLiveSessionService:
         danmaku_keywords: str = "",
         danmaku_command_id: str = "",
         danmaku_cooldown_seconds: int = 0,
+        danmaku_user_limit_window_seconds: int = 0,
+        danmaku_user_limit_max_triggers: int = 0,
+        danmaku_min_guard_level: int = 0,
     ) -> None:
         code = value.strip()
         if self.config_error:
@@ -83,12 +87,18 @@ class OpenLiveSessionService:
                 keywords=danmaku_keywords,
                 command_id=danmaku_command_id,
                 cooldown_seconds=danmaku_cooldown_seconds,
+                user_limit_window_seconds=danmaku_user_limit_window_seconds,
+                user_limit_max_triggers=danmaku_user_limit_max_triggers,
+                min_guard_level=danmaku_min_guard_level,
             )
         if self.bluetooth_dispatcher is not None and hasattr(self.bluetooth_dispatcher, "configure"):
             self.bluetooth_dispatcher.configure(
                 danmaku_enabled=danmaku_enabled,
                 danmaku_keywords=danmaku_keywords,
                 danmaku_cooldown_seconds=danmaku_cooldown_seconds,
+                danmaku_user_limit_window_seconds=danmaku_user_limit_window_seconds,
+                danmaku_user_limit_max_triggers=danmaku_user_limit_max_triggers,
+                danmaku_min_guard_level=danmaku_min_guard_level,
             )
         self.status = SessionStatus.STARTING
         self.last_error = ""
@@ -237,7 +247,11 @@ class OpenLiveSessionService:
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
-        elif self.output_mode == "im" and event.get("event_type") == "danmaku" and self.danmaku_dispatcher is not None:
+        elif (
+            self.output_mode == "im"
+            and is_danmaku_event_type(str(event.get("event_type", "") or ""))
+            and self.danmaku_dispatcher is not None
+        ):
             dispatch_result = await self.danmaku_dispatcher.dispatch(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")

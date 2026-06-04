@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.runtime import resolve_bundle_path
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(resolve_bundle_path("app/templates")))
@@ -25,6 +25,9 @@ class StartSessionRequest(BaseModel):
     danmaku_enabled: bool = False
     danmaku_keywords: str = ""
     danmaku_cooldown_seconds: int = 0
+    danmaku_user_limit_window_seconds: int = 0
+    danmaku_user_limit_max_triggers: int = 0
+    danmaku_min_guard_level: int = 0
 
 
 class ConnectCommandRequest(BaseModel):
@@ -41,6 +44,8 @@ class BluetoothRuleUpdateItem(BaseModel):
     id: str
     enabled: bool
     waveform_id: str
+    min_price: int | None = None
+    max_price: int | None = None
 
 
 class UpdateBluetoothRulesRequest(BaseModel):
@@ -66,6 +71,36 @@ class UpdateBluetoothWaveformRequest(BaseModel):
     steps: list[BluetoothWaveformStepPayload]
 
 
+class CommandGiftRuleUpdateItem(BaseModel):
+    id: str
+    enabled: bool = True
+    event_type: str = "gift"
+    min_price: int = 0
+    max_price: int | None = None
+    command_slot: str = ""
+
+
+class CommandLikeRuleUpdateItem(BaseModel):
+    id: str
+    enabled: bool = True
+    like_multiple: int = 100
+    command_slot: str = ""
+
+
+class CommandDanmakuSlotRuleUpdateItem(BaseModel):
+    id: str
+    enabled: bool = False
+    event_type: str = "danmaku"
+    guard_level: int = 0
+    command_slot: str = ""
+
+
+class UpdateCommandStudioRequest(BaseModel):
+    rules: list[CommandGiftRuleUpdateItem]
+    like_rules: list[CommandLikeRuleUpdateItem] = Field(default_factory=list)
+    danmaku_slot_rules: list[CommandDanmakuSlotRuleUpdateItem] = Field(default_factory=list)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
@@ -80,6 +115,15 @@ async def bluetooth_studio(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
         name="bluetooth_studio.html",
+        context={},
+    )
+
+
+@router.get("/command/studio", response_class=HTMLResponse)
+async def command_studio(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="command_studio.html",
         context={},
     )
 
@@ -111,6 +155,11 @@ async def get_bluetooth_status(request: Request) -> dict:
 @router.get("/api/bluetooth/studio")
 async def get_bluetooth_studio_data(request: Request) -> dict:
     return request.app.state.bluetooth_service.get_studio_payload()
+
+
+@router.get("/api/command/studio")
+async def get_command_studio_data(request: Request) -> dict:
+    return request.app.state.command_rule_service.get_studio_payload()
 
 
 @router.get("/api/bluetooth/overlay/status")
@@ -165,6 +214,23 @@ async def update_bluetooth_rules(request: Request, payload: UpdateBluetoothRules
     try:
         return request.app.state.bluetooth_service.save_rules(
             [item.model_dump() for item in payload.rules]
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/command/studio")
+async def update_command_studio(
+    request: Request,
+    payload: UpdateCommandStudioRequest,
+) -> dict:
+    try:
+        return request.app.state.command_rule_service.save_rules(
+            {
+                "rules": [item.model_dump() for item in payload.rules],
+                "like_rules": [item.model_dump() for item in payload.like_rules],
+                "danmaku_slot_rules": [item.model_dump() for item in payload.danmaku_slot_rules],
+            }
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -253,6 +319,9 @@ async def start_session(request: Request, payload: StartSessionRequest) -> dict:
             danmaku_enabled=payload.danmaku_enabled,
             danmaku_keywords=payload.danmaku_keywords,
             danmaku_cooldown_seconds=payload.danmaku_cooldown_seconds,
+            danmaku_user_limit_window_seconds=payload.danmaku_user_limit_window_seconds,
+            danmaku_user_limit_max_triggers=payload.danmaku_user_limit_max_triggers,
+            danmaku_min_guard_level=payload.danmaku_min_guard_level,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

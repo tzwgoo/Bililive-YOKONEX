@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IM 规则中心</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="page studio-page">
+      <section class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Command Studio</p>
+          <h1>IM 规则中心</h1>
+          <p class="subtitle">在独立页面里维护礼物价格档位、醒目留言与上舰续费映射；点赞与弹幕事件使用固定 IM 指令 ID，不在页面内修改。</p>
+          <div class="hero-tags">
+            <span>价格区间映射</span>
+            <span>第三方独立事件</span>
+            <span>舰队等级分流</span>
+          </div>
+        </div>
+        <div class="hero-side">
+          <a class="hero-link" href="/">返回监听控制台</a>
+          <div class="studio-hero-actions">
+            <button id="command-studio-save-btn">保存 IM 规则</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="studio-layout studio-layout-single">
+        <div class="studio-main-stack">
+          <article class="panel studio-panel">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Gift Mapping</p>
+                <h2>礼物与独立事件价格档位</h2>
+              </div>
+            </div>
+            <p class="hint" id="command-studio-message-text">修改后点击“保存 IM 规则”立即生效，也支持按价格升序整理。</p>
+            <div id="command-studio-gift-rules" class="studio-rule-groups"></div>
+          </article>
+
+          <article class="panel studio-panel">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Like Command ID</p>
+                <h2>固定点赞指令 ID</h2>
+              </div>
+            </div>
+            <p class="hint">点赞指令固定，不支持在页面修改。点赞倍数阈值请在监听控制台设置。</p>
+            <div id="command-studio-like-fixed-id" class="studio-rule-groups"></div>
+          </article>
+
+          <article class="panel studio-panel">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Danmaku Command IDs</p>
+                <h2>固定弹幕指令 ID</h2>
+              </div>
+            </div>
+            <p class="hint">弹幕指令固定，不支持在页面修改。</p>
+            <div id="command-studio-danmaku-fixed-ids" class="studio-rule-groups"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/command_studio.js"></script>
+  </body>
+</html>

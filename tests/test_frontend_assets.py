@@ -64,6 +64,9 @@ def test_frontend_restores_local_draft_before_session_start() -> None:
     assert "if (data.can_stop) {" in app_js
     assert "data.danmaku_command_id" in app_js
     assert "updateStatusDraftLabels(" in app_js
+    assert "biliLive.danmakuUserLimitWindowSeconds" in app_js
+    assert "biliLive.danmakuUserLimitMaxTriggers" in app_js
+    assert "biliLive.danmakuMinGuardLevel" in app_js
 
 
 def test_frontend_does_not_restore_idle_form_on_each_poll() -> None:
@@ -80,6 +83,9 @@ def test_frontend_persists_form_draft_while_user_is_typing() -> None:
     assert 'likeMultipleInput.addEventListener("input"' in app_js
     assert 'danmakuKeywordsInput.addEventListener("input"' in app_js
     assert 'danmakuCooldownSecondsInput.addEventListener("input"' in app_js
+    assert 'danmakuUserLimitWindowSecondsInput.addEventListener("input"' in app_js
+    assert 'danmakuUserLimitMaxTriggersInput.addEventListener("input"' in app_js
+    assert 'danmakuMinGuardLevelSelect.addEventListener("change"' in app_js
     assert 'commandWsUrlInput.addEventListener("input", persistCommandForm);' in app_js
     assert 'commandUidInput.addEventListener("input", persistCommandForm);' in app_js
     assert 'commandTokenInput.addEventListener("input", persistCommandForm);' in app_js
@@ -112,6 +118,22 @@ def test_frontend_hides_removed_runtime_snapshot_fields() -> None:
     assert "const lastHeartbeatAt =" not in app_js
 
 
+def test_frontend_contains_extended_danmaku_controls() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
+    app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="danmaku-user-limit-window-seconds"' in index_html
+    assert 'id="danmaku-user-limit-max-triggers"' in index_html
+    assert 'id="danmaku-min-guard-level"' in index_html
+    assert "danmaku_user_limit_window_seconds" in app_js
+    assert "danmaku_user_limit_max_triggers" in app_js
+    assert "danmaku_min_guard_level" in app_js
+    assert 'id="danmaku-user-limit-window-seconds-label"' in index_html
+    assert 'id="danmaku-user-limit-max-triggers-label"' in index_html
+    assert 'id="danmaku-min-guard-level-label"' in index_html
+
+
 def test_frontend_contains_bluetooth_panel_skeleton() -> None:
     base_dir = Path(__file__).resolve().parent.parent
     index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
@@ -124,6 +146,8 @@ def test_frontend_contains_bluetooth_panel_skeleton() -> None:
     assert 'id="bluetooth-scan-btn"' in index_html
     assert 'id="bluetooth-devices"' in index_html
     assert 'id="bluetooth-rules"' in index_html
+    assert 'id="bluetooth-rules-details"' in index_html
+    assert "查看事件规则预览" in index_html
     assert 'href="/bluetooth/overlay"' in index_html
     assert 'id="command-connection-section"' in index_html
     assert 'id="bluetooth-connection-section"' in index_html
@@ -171,6 +195,49 @@ def test_frontend_contains_bluetooth_studio_entry_and_template() -> None:
     assert "activeDragHandle" in studio_js
     assert "最大强度 ${maxStrength}" in studio_js
     assert "rule.rule_label || rule.event_type" in studio_js
+    assert "data-role=\"min-price\"" in studio_js
+    assert "data-role=\"max-price\"" in studio_js
+    assert "按价格升序整理" in studio_html
+    assert "舰长弹幕" in studio_js
+    assert "提督弹幕" in studio_js
+    assert "总督弹幕" in studio_js
+
+
+def test_frontend_contains_command_studio_entry_and_template() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
+    studio_html = (base_dir / "app" / "templates" / "command_studio.html").read_text(encoding="utf-8")
+    studio_js = (base_dir / "app" / "static" / "command_studio.js").read_text(encoding="utf-8")
+
+    assert 'href="/command/studio"' in index_html
+    assert 'class="studio-layout studio-layout-single"' in studio_html
+    assert 'id="command-studio-gift-rules"' in studio_html
+    assert 'id="command-studio-like-fixed-id"' in studio_html
+    assert 'id="command-studio-danmaku-fixed-ids"' in studio_html
+    assert 'id="command-studio-save-btn"' in studio_html
+    assert "固定点赞指令 ID" in studio_html
+    assert "固定弹幕指令 ID" in studio_html
+    assert "点赞倍数阈值请在监听控制台设置" in studio_html
+    assert "按价格升序整理" in studio_html
+    assert 'fetch("/api/command/studio")' in studio_js
+    assert 'fetch("/api/command/studio", {' in studio_js
+    assert "function sortGiftRulesByPrice(" in studio_js
+    assert 'data-action="sort-gift-rules"' in studio_js
+    assert 'const fixedLikeIdContainer =' in studio_js
+    assert "payload.like_command_id" in studio_js
+    assert "like_trigger" in studio_js
+    assert "点赞指令固定，不支持在页面修改。" in studio_js
+    assert 'const fixedDanmakuIdsContainer =' in studio_js
+    assert "payload.danmaku_command_ids" in studio_js
+    assert "danmaku_captain_trigger" in studio_js
+    assert "弹幕指令固定，不支持在页面修改。" in studio_js
+
+
+def test_frontend_contains_single_column_command_studio_layout() -> None:
+    style_css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert ".studio-layout-single" in style_css
+    assert "grid-template-columns: minmax(0, 1fr);" in style_css
 
 
 def test_frontend_contains_bluetooth_studio_editor_styles() -> None:
@@ -208,3 +275,41 @@ def test_bluetooth_panel_uses_vertical_stack_layout() -> None:
 
     assert ".bluetooth-grid" in style_css
     assert "grid-template-columns: minmax(0, 1fr);" in style_css
+    assert ".bluetooth-preview-collapse" in style_css
+    assert ".bluetooth-preview-summary" in style_css
+
+
+def test_frontend_uses_compact_dashboard_layout() -> None:
+    style_css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in style_css
+    assert ".config-card-chat {" in style_css
+    assert "grid-column: 1 / -1;" in style_css
+    assert "justify-content: flex-start;" in style_css
+
+
+def test_frontend_renders_danmaku_guard_identity() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
+    style_css = (base_dir / "app" / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert "const danmakuGuardDisplayOptions =" in app_js
+    assert "const danmakuEventTypes = new Set" in app_js
+    assert "function resolveDanmakuGuardLabel(payload)" in app_js
+    assert "function isDanmakuEventType(eventType)" in app_js
+    assert "guard_label" in app_js
+    assert "const guardLabel = resolveDanmakuGuardLabel(event.payload || {});" in app_js
+    assert "identity-chip" in app_js
+    assert ".event-meta-line" in style_css
+    assert ".identity-chip" in style_css
+
+
+def test_frontend_uses_minimalist_visual_system() -> None:
+    style_css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert "--bg: #f3f3ef;" in style_css
+    assert "--panel: #ffffff;" in style_css
+    assert "--line: #d7d6cf;" in style_css
+    assert "--shadow: 0 10px 30px rgba(15, 23, 42, 0.04);" in style_css
+    assert 'font-family: "Aptos", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;' in style_css
+    assert "background: var(--bg);" in style_css

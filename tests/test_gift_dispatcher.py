@@ -360,3 +360,280 @@ async def test_dispatcher_blocks_danmaku_trigger_during_cooldown() -> None:
     assert second["trigger_count"] == 0
     assert "冷却中" in second["message"]
     assert command_session.called_with == ["danmaku_trigger"]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_limits_danmaku_trigger_per_user_within_window() -> None:
+    command_session = FakeCommandSession()
+    dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
+    dispatcher.configure(
+        enabled=True,
+        keywords="开火",
+        command_id="danmaku_trigger",
+        cooldown_seconds=0,
+        user_limit_window_seconds=60,
+        user_limit_max_triggers=2,
+    )
+
+    first = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1001,
+            },
+        }
+    )
+    second = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "继续开火",
+                "uid": 1001,
+            },
+        }
+    )
+    third = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "再次开火",
+                "uid": 1001,
+            },
+        }
+    )
+    another_user = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 2002,
+            },
+        }
+    )
+
+    assert first["trigger_count"] == 1
+    assert second["trigger_count"] == 1
+    assert third["trigger_count"] == 0
+    assert "限流" in third["message"]
+    assert another_user["trigger_count"] == 1
+    assert command_session.called_with == ["danmaku_trigger", "danmaku_trigger", "danmaku_trigger"]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_blocks_danmaku_when_guard_level_below_requirement() -> None:
+    command_session = FakeCommandSession()
+    dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
+    dispatcher.configure(
+        enabled=True,
+        keywords="开火",
+        command_id="danmaku_trigger",
+        cooldown_seconds=0,
+        min_guard_level=2,
+    )
+
+    blocked = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1001,
+                "guard_level": 3,
+            },
+        }
+    )
+    allowed = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1002,
+                "guard_level": 1,
+            },
+        }
+    )
+
+    assert blocked["trigger_count"] == 0
+    assert "舰队等级不足" in blocked["message"]
+    assert allowed["trigger_count"] == 1
+    assert command_session.called_with == ["danmaku_governor_trigger"]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_uses_guard_specific_command_slot_rules() -> None:
+    command_session = FakeCommandSession()
+    dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
+    dispatcher.configure(
+        enabled=True,
+        keywords="开火",
+        command_id="danmaku_trigger",
+        cooldown_seconds=0,
+    )
+    dispatcher.set_command_slot_rules(
+        [
+            {"guard_level": 0, "command_slot": "command_one", "enabled": True},
+            {"guard_level": 1, "command_slot": "command_ten", "enabled": True},
+        ]
+    )
+
+    normal_user = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1001,
+                "guard_level": 0,
+            },
+        }
+    )
+    governor_user = await dispatcher.dispatch(
+        {
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1002,
+                "guard_level": 1,
+            },
+        }
+    )
+
+    assert normal_user["command_id"] == "command_one"
+    assert governor_user["command_id"] == "command_ten"
+    assert command_session.called_with == ["command_one", "command_ten"]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_uses_explicit_danmaku_event_type_rules() -> None:
+    command_session = FakeCommandSession()
+    dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
+    dispatcher.configure(
+        enabled=True,
+        keywords="开火",
+        command_id="danmaku_trigger",
+        cooldown_seconds=0,
+    )
+    dispatcher.set_command_slot_rules(
+        [
+            {"event_type": "danmaku", "command_slot": "command_one", "enabled": True},
+            {"event_type": "danmaku_governor", "command_slot": "command_ten", "enabled": True},
+        ]
+    )
+
+    normal_user = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku",
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1001,
+                "guard_level": 0,
+            },
+        }
+    )
+    governor_user = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku_governor",
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1002,
+                "guard_level": 1,
+            },
+        }
+    )
+
+    assert normal_user["command_id"] == "command_one"
+    assert governor_user["command_id"] == "command_ten"
+    assert command_session.called_with == ["command_one", "command_ten"]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_uses_fixed_command_ids_for_each_danmaku_event_type_by_default() -> None:
+    command_session = FakeCommandSession()
+    dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
+    dispatcher.configure(
+        enabled=True,
+        keywords="开火",
+        command_id="danmaku_trigger",
+        cooldown_seconds=0,
+    )
+
+    normal_user = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku",
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1001,
+                "guard_level": 0,
+            },
+        }
+    )
+    captain_user = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku_captain",
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1002,
+                "guard_level": 3,
+            },
+        }
+    )
+    commander_user = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku_commander",
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1003,
+                "guard_level": 2,
+            },
+        }
+    )
+    governor_user = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku_governor",
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "开火",
+                "uid": 1004,
+                "guard_level": 1,
+            },
+        }
+    )
+
+    assert normal_user["command_id"] == "danmaku_trigger"
+    assert captain_user["command_id"] == "danmaku_captain_trigger"
+    assert commander_user["command_id"] == "danmaku_commander_trigger"
+    assert governor_user["command_id"] == "danmaku_governor_trigger"
+    assert command_session.called_with == [
+        "danmaku_trigger",
+        "danmaku_captain_trigger",
+        "danmaku_commander_trigger",
+        "danmaku_governor_trigger",
+    ]

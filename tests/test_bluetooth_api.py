@@ -112,6 +112,22 @@ class FakeBluetoothService:
                             "enabled": True,
                             "waveform_id": "ems-preset-01",
                             "waveform_name": "EMS 预设 01 - 呼吸",
+                            "filters": {"min_price": 0, "max_price": 99},
+                        }
+                    ],
+                },
+                {
+                    "group_id": "danmaku_captain",
+                    "group_label": "舰长弹幕",
+                    "rules": [
+                        {
+                            "id": "danmaku-captain",
+                            "event_type": "danmaku_captain",
+                            "rule_label": "舰长弹幕",
+                            "enabled": True,
+                            "waveform_id": "ems-preset-04",
+                            "waveform_name": "EMS 预设 04 - 快速按捏",
+                            "filters": {"keywords": []},
                         }
                     ],
                 }
@@ -261,6 +277,7 @@ def test_bluetooth_studio_endpoint_returns_waveforms_and_rule_groups() -> None:
     assert response.status_code == 200
     assert response.json()["waveforms"][0]["id"] == "ems-preset-01"
     assert response.json()["rule_groups"][0]["group_id"] == "gift"
+    assert any(group["group_id"] == "danmaku_captain" for group in response.json()["rule_groups"])
 
 
 def test_bluetooth_overlay_page_is_available() -> None:
@@ -322,6 +339,8 @@ def test_bluetooth_rules_endpoint_saves_rule_selection() -> None:
                     "id": "gift-tier-01",
                     "enabled": True,
                     "waveform_id": "ems-preset-06",
+                    "min_price": 0,
+                    "max_price": 199,
                 }
             ]
         },
@@ -334,6 +353,8 @@ def test_bluetooth_rules_endpoint_saves_rule_selection() -> None:
             "id": "gift-tier-01",
             "enabled": True,
             "waveform_id": "ems-preset-06",
+            "min_price": 0,
+            "max_price": 199,
         }
     ]
 

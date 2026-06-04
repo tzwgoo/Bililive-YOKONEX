@@ -51,8 +51,14 @@ async def test_service_status_payload_includes_runtime_details(
     assert status["rules"][9]["waveform_name"] == "EMS 预设 10 - 渐变弹跳"
     assert status["rules"][10]["event_label"] == "点赞事件"
     assert status["rules"][10]["waveform_name"] == "EMS 预设 01 - 呼吸"
-    assert status["rules"][11]["event_label"] == "弹幕事件"
+    assert status["rules"][11]["event_label"] == "普通弹幕"
     assert status["rules"][11]["waveform_name"] == "EMS 预设 03 - 连击"
+    assert status["rules"][12]["event_label"] == "舰长弹幕"
+    assert status["rules"][12]["waveform_name"] == "EMS 预设 04 - 快速按捏"
+    assert status["rules"][13]["event_label"] == "提督弹幕"
+    assert status["rules"][13]["waveform_name"] == "EMS 预设 05 - 按捏渐强"
+    assert status["rules"][14]["event_label"] == "总督弹幕"
+    assert status["rules"][14]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
     assert status["battery_level"] is None
 
 
@@ -178,3 +184,72 @@ def test_service_rejects_delete_when_waveform_is_still_referenced(tmp_path, monk
 
     with pytest.raises(ValueError, match="请先修改规则绑定后再删除该波形"):
         service.delete_waveform(created["waveform"]["id"])
+
+
+def test_service_save_rules_allows_editing_gift_price_ranges_and_sorts_by_price(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    payload = service.save_rules(
+        [
+            {
+                "id": "gift-tier-02",
+                "enabled": True,
+                "waveform_id": "ems-preset-02",
+                "min_price": 200,
+                "max_price": 499,
+            },
+            {
+                "id": "gift-tier-01",
+                "enabled": True,
+                "waveform_id": "ems-preset-01",
+                "min_price": 0,
+                "max_price": 199,
+            },
+        ]
+    )
+
+    gift_rules = payload["rule_groups"][0]["rules"]
+
+    assert [rule["id"] for rule in gift_rules[:2]] == ["gift-tier-01", "gift-tier-02"]
+    assert gift_rules[0]["filters"] == {"min_price": 0, "max_price": 199}
+    assert gift_rules[0]["rule_label"] == "礼物档位 01 · 0-199"
+    assert gift_rules[1]["filters"] == {"min_price": 200, "max_price": 499}
+    assert gift_rules[1]["rule_label"] == "礼物档位 02 · 200-499"
+
+
+def test_service_save_rules_rejects_overlapping_enabled_gift_price_ranges(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    with pytest.raises(ValueError, match="价格区间重叠"):
+        service.save_rules(
+            [
+                {
+                    "id": "gift-tier-01",
+                    "enabled": True,
+                    "waveform_id": "ems-preset-01",
+                    "min_price": 0,
+                    "max_price": 100,
+                },
+                {
+                    "id": "gift-tier-02",
+                    "enabled": True,
+                    "waveform_id": "ems-preset-02",
+                    "min_price": 100,
+                    "max_price": 299,
+                },
+            ]
+        )

@@ -6,12 +6,14 @@ from pathlib import Path
 from app.bluetooth.ems_builtin_waveforms import is_preset_waveform_id
 from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
 from app.bluetooth.gift_tiers import build_default_gift_rules
+from app.bluetooth.models import BLUETOOTH_DANMAKU_RULE_DEFINITIONS
 from app.bluetooth.models import BluetoothConfigPayload
 from app.bluetooth.models import BluetoothEventRule
 from app.bluetooth.models import BluetoothSettings
 from app.bluetooth.models import EmsWaveform
 from app.bluetooth.models import EmsWaveformStep
 from app.bluetooth.models import build_default_payload
+from app.bluetooth.models import build_default_danmaku_rules
 from app.bluetooth.models import payload_to_dict
 
 
@@ -123,14 +125,13 @@ def _normalize_channel_strength(value) -> int:
 
 def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
     rules = _migrate_legacy_gift_default_rule(rules)
+    rules = _migrate_legacy_danmaku_default_rules(rules)
     rule_map = {rule.id: rule for rule in rules}
-    for rule_id in ("like-default", "danmaku-default"):
+    for rule_id in ("like-default",):
         rule = rule_map.get(rule_id)
         if rule is None:
             continue
         if rule_id == "like-default" and rule.event_type == "like" and rule.waveform_id == "ems-preset-01" and rule.enabled is False:
-            rule.enabled = True
-        if rule_id == "danmaku-default" and rule.event_type == "danmaku" and rule.waveform_id == "ems-preset-03" and rule.enabled is False:
             rule.enabled = True
     return rules
 
@@ -169,3 +170,29 @@ def _migrate_legacy_gift_default_rule(rules: list[BluetoothEventRule]) -> list[B
     ]
     remaining_rules = [rule for rule in rules if rule.id != "gift-default"]
     return [*migrated_rules, *remaining_rules]
+
+
+def _migrate_legacy_danmaku_default_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
+    if any(rule.id in {item["id"] for item in BLUETOOTH_DANMAKU_RULE_DEFINITIONS} for rule in rules):
+        return rules
+
+    legacy_rule = next(
+        (
+            rule
+            for rule in rules
+            if rule.id == "danmaku-default" and rule.event_type == "danmaku"
+        ),
+        None,
+    )
+    if legacy_rule is None:
+        return rules
+
+    migrated_rules = []
+    for default_rule in build_default_danmaku_rules(enabled=legacy_rule.enabled):
+        default_rule.waveform_id = legacy_rule.waveform_id or default_rule.waveform_id
+        default_rule.filters = dict(legacy_rule.filters)
+        default_rule.cooldown_seconds = legacy_rule.cooldown_seconds
+        migrated_rules.append(default_rule)
+
+    remaining_rules = [rule for rule in rules if rule.id != "danmaku-default"]
+    return [*remaining_rules, *migrated_rules]

@@ -12,7 +12,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Bilibili Live Control Deck</p>
           <h1>直播互动监听控制台</h1>
-          <p class="subtitle">同页切换官方 open-live 与第三方房间消息流，两条链路共用礼物映射和指令通道，适合长时间挂机监听与联调。</p>
+          <p class="subtitle">同页切换官方 open-live 与第三方房间消息流，共用礼物映射和指令通道，适合挂机监听与联调。</p>
           <div class="hero-tags">
             <span>双链路监听</span>
             <span>礼物映射派发</span>
@@ -31,7 +31,7 @@
             <div>
               <p class="section-kicker">Live Session</p>
               <h2>直播监听</h2>
-              <p class="subtitle">把主监听参数、礼物点赞触发和弹幕关键词触发拆开管理，联调时会更直观，也更不容易配错。</p>
+              <p class="subtitle">主监听参数、礼物点赞触发和弹幕关键词触发拆开管理，联调更直观，也更不容易配错。</p>
             </div>
           </div>
           <div class="session-layout">
@@ -92,6 +92,23 @@
                   <label for="danmaku-cooldown-seconds">弹幕冷却秒数</label>
                   <input id="danmaku-cooldown-seconds" type="number" min="0" step="1" value="0" placeholder="0 表示不冷却" />
                 </div>
+                <div class="field">
+                  <label for="danmaku-user-limit-window-seconds">每用户限流窗口</label>
+                  <input id="danmaku-user-limit-window-seconds" type="number" min="0" step="1" value="0" placeholder="0 表示不限流" />
+                </div>
+                <div class="field">
+                  <label for="danmaku-user-limit-max-triggers">窗口内最大触发次数</label>
+                  <input id="danmaku-user-limit-max-triggers" type="number" min="0" step="1" value="0" placeholder="0 表示不限流" />
+                </div>
+                <div class="field">
+                  <label for="danmaku-min-guard-level">最低舰队等级</label>
+                  <select id="danmaku-min-guard-level">
+                    <option value="0">不限</option>
+                    <option value="3">舰长及以上</option>
+                    <option value="2">提督及以上</option>
+                    <option value="1">总督</option>
+                  </select>
+                </div>
                 <div class="field session-value-field">
                   <label for="danmaku-keywords">弹幕关键词</label>
                   <input id="danmaku-keywords" type="text" placeholder="多个关键词用逗号分隔，例如 开火,冲冲冲" />
@@ -150,6 +167,7 @@
               <div class="buttons">
                 <button id="command-connect-btn">登录指令通道</button>
                 <button id="command-disconnect-btn" class="secondary">退出指令通道</button>
+                <a class="button-link secondary-link" href="/command/studio">IM 规则中心</a>
               </div>
               <p class="hint" id="command-message-text">未登录</p>
               <div class="meta-inline">
@@ -181,12 +199,15 @@
                   </div>
                   <div id="bluetooth-devices" class="mini-list"></div>
                 </section>
-                <section class="bluetooth-card">
-                  <div class="stream-head">
-                    <h3>事件规则</h3>
-                  </div>
-                  <div id="bluetooth-rules" class="mini-list"></div>
-                </section>
+                <details class="bluetooth-preview-collapse" id="bluetooth-rules-details">
+                  <summary class="bluetooth-preview-summary">查看事件规则预览</summary>
+                  <section class="bluetooth-card bluetooth-card-preview">
+                    <div class="stream-head">
+                      <h3>事件规则</h3>
+                    </div>
+                    <div id="bluetooth-rules" class="mini-list"></div>
+                  </section>
+                </details>
               </div>
             </section>
           </article>
@@ -205,6 +226,9 @@
               <div><dt>弹幕开关</dt><dd id="danmaku-enabled-label">关闭</dd></div>
               <div><dt>弹幕关键词</dt><dd id="danmaku-keywords-label">-</dd></div>
               <div><dt>弹幕冷却</dt><dd id="danmaku-cooldown-seconds-label">0 秒</dd></div>
+              <div><dt>每用户限流</dt><dd id="danmaku-user-limit-window-seconds-label">关闭</dd></div>
+              <div><dt>窗口内上限</dt><dd id="danmaku-user-limit-max-triggers-label">关闭</dd></div>
+              <div><dt>最低舰队等级</dt><dd id="danmaku-min-guard-level-label">不限</dd></div>
               <div><dt>房间号</dt><dd id="room-id">-</dd></div>
               <div><dt>主播昵称</dt><dd id="anchor-name">-</dd></div>
               <div><dt>最近事件时间</dt><dd id="last-event-at">-</dd></div>

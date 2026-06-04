@@ -38,12 +38,14 @@ async def test_dispatcher_triggers_waveform_for_gift_event() -> None:
 @pytest.mark.anyio
 async def test_dispatcher_matches_first_gift_tier_by_price_range() -> None:
     service = FakeBluetoothService()
+    service.payload.bluetooth_event_rules[0].filters = {"min_price": 0, "max_price": 49}
+    service.payload.bluetooth_event_rules[1].filters = {"min_price": 50, "max_price": 199}
     dispatcher = BluetoothDispatcher(bluetooth_service=service)
 
     result = await dispatcher.dispatch({"event_type": "gift", "payload": {"gift_name": "小花花", "price": 80}})
 
     assert result["success"] is True
-    assert service.triggered == [("gift", "ems-preset-01")]
+    assert service.triggered == [("gift", "ems-preset-02")]
 
 
 @pytest.mark.anyio
@@ -111,3 +113,88 @@ async def test_dispatcher_uses_session_keywords_for_bluetooth_danmaku() -> None:
     assert matched["success"] is True
     assert not_matched["matched"] is False
     assert service.triggered == [("danmaku", "ems-preset-03")]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_blocks_bluetooth_danmaku_when_guard_level_below_rule_requirement() -> None:
+    service = FakeBluetoothService()
+    for rule in service.payload.bluetooth_event_rules:
+        if rule.event_type == "danmaku":
+            rule.filters = {
+                "keywords": ["开火"],
+                "min_guard_level": 2,
+            }
+    dispatcher = BluetoothDispatcher(bluetooth_service=service)
+    dispatcher.configure(danmaku_enabled=True, danmaku_keywords="开火", danmaku_cooldown_seconds=3)
+
+    blocked = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku",
+            "payload": {
+                "msg": "大家准备开火",
+                "guard_level": 3,
+            },
+        }
+    )
+    allowed = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku",
+            "payload": {
+                "msg": "大家准备开火",
+                "guard_level": 1,
+            },
+        }
+    )
+
+    assert blocked["matched"] is False
+    assert "舰队等级不足" in blocked["message"]
+    assert allowed["success"] is True
+    assert service.triggered == [("danmaku", "ems-preset-03")]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_treats_guard_specific_danmaku_event_as_danmaku_rule() -> None:
+    service = FakeBluetoothService()
+    for rule in service.payload.bluetooth_event_rules:
+        if rule.event_type == "danmaku":
+            rule.filters = {"keywords": ["开火"]}
+    dispatcher = BluetoothDispatcher(bluetooth_service=service)
+    dispatcher.configure(danmaku_enabled=True, danmaku_keywords="开火", danmaku_cooldown_seconds=3)
+
+    result = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku_captain",
+            "payload": {
+                "msg": "大家准备开火",
+                "guard_level": 3,
+            },
+        }
+    )
+
+    assert result["success"] is True
+    assert service.triggered == [("danmaku_captain", "ems-preset-03")]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_matches_guard_specific_danmaku_waveform_rule() -> None:
+    service = FakeBluetoothService()
+    for rule in service.payload.bluetooth_event_rules:
+        if rule.event_type == "danmaku_captain":
+            rule.waveform_id = "ems-preset-04"
+        elif rule.event_type.startswith("danmaku"):
+            rule.enabled = False
+    dispatcher = BluetoothDispatcher(bluetooth_service=service)
+    dispatcher.configure(danmaku_enabled=True, danmaku_keywords="开火", danmaku_cooldown_seconds=3)
+
+    result = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku_captain",
+            "payload": {
+                "msg": "大家准备开火",
+                "guard_level": 3,
+            },
+        }
+    )
+
+    assert result["success"] is True
+    assert service.triggered == [("danmaku_captain", "ems-preset-04")]

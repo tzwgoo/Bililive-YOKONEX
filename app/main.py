@@ -15,6 +15,7 @@ from app.config import Settings, load_settings
 from app.logging_config import setup_logging
 from app.runtime import resolve_bundle_path, resolve_runtime_path
 from app.services.command_session import CommandSessionService
+from app.services.command_rule_service import CommandRuleService
 from app.services.danmaku_dispatcher import DanmakuCommandDispatcher
 from app.services.event_hub import EventHub
 from app.services.gift_dispatcher import GiftCommandDispatcher
@@ -59,6 +60,11 @@ def create_app() -> FastAPI:
     danmaku_dispatcher = DanmakuCommandDispatcher(
         command_session=command_session,
     )
+    command_rule_service = CommandRuleService(
+        config_path=mapping_path,
+        mapper=mapper,
+        danmaku_dispatcher=danmaku_dispatcher,
+    )
     bluetooth_dispatcher = BluetoothDispatcher(
         bluetooth_service=bluetooth_service,
     )
@@ -89,6 +95,7 @@ def create_app() -> FastAPI:
     app.state.event_hub = event_hub
     app.state.bluetooth_service = bluetooth_service
     app.state.command_session = command_session
+    app.state.command_rule_service = command_rule_service
     app.state.session_service = session_service
     app.include_router(router)
     app.mount("/static", StaticFiles(directory=str(resolve_bundle_path("app/static"))), name="static")

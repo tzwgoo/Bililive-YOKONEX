@@ -114,3 +114,30 @@ def test_mapper_supports_like_rules_from_dict_payload(tmp_path) -> None:
 
     assert command_id == "command_four"
     assert like_multiple == 5
+
+
+def test_mapper_supports_event_specific_price_rules() -> None:
+    mapper = GiftCommandMapper(
+        [
+            {"event_type": "gift", "min_price": 0, "max_price": 999, "command_slot": "command_one"},
+            {"event_type": "super_chat", "min_price": 0, "max_price": 199, "command_slot": "command_five"},
+        ]
+    )
+
+    super_chat_command = mapper.resolve_command_id(
+        {
+            "gift_name": "醒目留言",
+            "price": 100,
+        },
+        event_type="super_chat",
+    )
+    guard_buy_fallback_command = mapper.resolve_command_id(
+        {
+            "gift_name": "舰队购买",
+            "price": 100,
+        },
+        event_type="guard_buy",
+    )
+
+    assert super_chat_command == "command_five"
+    assert guard_buy_fallback_command == "command_one"

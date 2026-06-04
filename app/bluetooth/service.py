@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 import uuid
 
 from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
@@ -22,7 +23,10 @@ logger = logging.getLogger(__name__)
 RULE_GROUP_LABELS = {
     "gift": "礼物事件",
     "like": "点赞事件",
-    "danmaku": "弹幕事件",
+    "danmaku": "普通弹幕",
+    "danmaku_captain": "舰长弹幕",
+    "danmaku_commander": "提督弹幕",
+    "danmaku_governor": "总督弹幕",
 }
 
 
@@ -209,6 +213,9 @@ class BluetoothService:
     def save_rules(self, rules: list[dict]) -> dict:
         waveform_ids = {item.id for item in self.payload.ems_waveforms}
         rule_map = {item.id: item for item in self.payload.bluetooth_event_rules}
+        next_enabled_by_rule_id: dict[str, bool] = {}
+        next_waveform_id_by_rule_id: dict[str, str] = {}
+        next_filters_by_rule_id: dict[str, dict[str, Any]] = {}
         updated_count = 0
         for item in rules:
             rule_id = str(item.get("id", "") or "")
@@ -218,9 +225,24 @@ class BluetoothService:
             if waveform_id not in waveform_ids:
                 raise ValueError(f"未找到波形: {waveform_id}")
             current = rule_map[rule_id]
-            current.enabled = bool(item.get("enabled", current.enabled))
-            current.waveform_id = waveform_id
+            next_enabled_by_rule_id[rule_id] = bool(item.get("enabled", current.enabled))
+            next_waveform_id_by_rule_id[rule_id] = waveform_id
+            next_filters_by_rule_id[rule_id] = _resolve_updated_filters(current=current, incoming=item)
             updated_count += 1
+
+        _validate_gift_rule_overlaps(
+            self.payload.bluetooth_event_rules,
+            next_filters_by_rule_id,
+            next_enabled_by_rule_id,
+        )
+
+        for rule_id, filters in next_filters_by_rule_id.items():
+            current = rule_map[rule_id]
+            current.enabled = next_enabled_by_rule_id[rule_id]
+            current.waveform_id = next_waveform_id_by_rule_id[rule_id]
+            current.filters = filters
+
+        self.payload.bluetooth_event_rules = _sort_event_rules(self.payload.bluetooth_event_rules)
         self.store.save(self.payload)
         return {
             "success": True,
@@ -310,9 +332,12 @@ def _build_rule_label(rule: dict) -> str:
     rule_id = str(rule.get("id", "") or "")
     if rule_id in GIFT_TIER_BY_RULE_ID:
         tier = GIFT_TIER_BY_RULE_ID[rule_id]
-        if tier.max_price is None:
-            return f"{tier.label} · {tier.min_price}+"
-        return f"{tier.label} · {tier.min_price}-{tier.max_price}"
+        filters = rule.get("filters", {}) if isinstance(rule.get("filters", {}), dict) else {}
+        min_price = _coerce_non_negative_int(filters.get("min_price"), fallback=tier.min_price)
+        max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
+        if max_price is None:
+            return f"{tier.label} · {min_price}+"
+        return f"{tier.label} · {min_price}-{max_price}"
     event_type = str(rule.get("event_type", "") or "")
     return RULE_GROUP_LABELS.get(event_type, event_type or "unknown")
 
@@ -381,3 +406,87 @@ def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform:
         "waveform": waveform_data,
         "waveforms": payload_to_dict(payload)["ems_waveforms"],
     }
+
+
+def _resolve_updated_filters(*, current: BluetoothEventRule, incoming: dict[str, Any]) -> dict[str, Any]:
+    next_filters = dict(current.filters)
+    if current.event_type != "gift":
+        return next_filters
+
+    min_price = _coerce_non_negative_int(incoming.get("min_price"), fallback=_coerce_non_negative_int(next_filters.get("min_price")))
+    max_price = _coerce_optional_non_negative_int(incoming.get("max_price"))
+    if max_price is not None and max_price < min_price:
+        max_price = min_price
+    return {
+        **next_filters,
+        "min_price": min_price,
+        "max_price": max_price,
+    }
+
+
+def _validate_gift_rule_overlaps(
+    rules: list[BluetoothEventRule],
+    next_filters_by_rule_id: dict[str, dict[str, Any]],
+    next_enabled_by_rule_id: dict[str, bool],
+) -> None:
+    enabled_gift_rules: list[tuple[str, int, int | None]] = []
+    for rule in rules:
+        if rule.event_type != "gift":
+            continue
+        is_enabled = next_enabled_by_rule_id.get(rule.id, rule.enabled)
+        if not is_enabled:
+            continue
+        filters = next_filters_by_rule_id.get(rule.id, dict(rule.filters))
+        min_price = _coerce_non_negative_int(filters.get("min_price"))
+        max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
+        enabled_gift_rules.append((rule.id, min_price, max_price))
+
+    enabled_gift_rules.sort(
+        key=lambda item: (
+            item[1],
+            float("inf") if item[2] is None else item[2],
+            item[0],
+        )
+    )
+
+    previous_rule_id = ""
+    previous_max_price: int | None = None
+    for rule_id, min_price, max_price in enabled_gift_rules:
+        if previous_max_price is not None and min_price <= previous_max_price:
+            raise ValueError(f"礼物事件的价格区间重叠: {previous_rule_id} 与 {rule_id}")
+        previous_rule_id = rule_id
+        previous_max_price = max_price
+        if previous_max_price is None:
+            break
+
+
+def _sort_event_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
+    grouped_rules: list[BluetoothEventRule] = []
+    for event_type in RULE_GROUP_LABELS:
+        event_rules = [item for item in rules if item.event_type == event_type]
+        if event_type == "gift":
+            event_rules = sorted(
+                event_rules,
+                key=lambda item: (
+                    _coerce_non_negative_int(item.filters.get("min_price")),
+                    float("inf") if item.filters.get("max_price") in (None, "") else _coerce_non_negative_int(item.filters.get("max_price")),
+                    item.id,
+                ),
+            )
+        grouped_rules.extend(event_rules)
+    grouped_rules.extend([item for item in rules if item.event_type not in RULE_GROUP_LABELS])
+    return grouped_rules
+
+
+def _coerce_non_negative_int(value: Any, *, fallback: int = 0) -> int:
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError):
+        normalized = fallback
+    return max(0, normalized)
+
+
+def _coerce_optional_non_negative_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    return _coerce_non_negative_int(value)

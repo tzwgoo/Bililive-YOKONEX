@@ -53,7 +53,10 @@ class GiftCommandDispatcher:
 
     async def dispatch_gift_event(self, event: dict[str, Any]) -> dict[str, Any]:
         payload = event.get("payload", {})
-        command_id = self.mapper.resolve_command_id(payload)
+        command_id = self.mapper.resolve_command_id(
+            payload,
+            event_type=str(event.get("event_type", "gift") or "gift"),
+        )
         if not command_id:
             gift_name = payload.get("gift_name") or payload.get("gift_id") or "未知礼物"
             message = f"礼物 {gift_name} 未命中指令映射"

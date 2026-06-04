@@ -229,7 +229,7 @@ async def test_handle_danmaku_event_dispatches_command(fake_dependencies: dict) 
     service = LiveSessionService(**fake_dependencies)
 
     event = {
-        "event_type": "danmaku",
+        "event_type": "danmaku_governor",
         "cmd": "LIVE_OPEN_PLATFORM_DM",
         "room_id": 1,
         "open_id": "user-open-id",
@@ -237,6 +237,7 @@ async def test_handle_danmaku_event_dispatches_command(fake_dependencies: dict) 
         "timestamp": 1714113037,
         "payload": {
             "msg": "大家准备开火",
+            "guard_level": 1,
         },
     }
 
@@ -313,10 +314,16 @@ async def test_start_configures_bluetooth_danmaku_keywords(fake_dependencies: di
         danmaku_enabled=True,
         danmaku_keywords="开火,冲冲冲",
         danmaku_cooldown_seconds=5,
+        danmaku_user_limit_window_seconds=60,
+        danmaku_user_limit_max_triggers=2,
+        danmaku_min_guard_level=2,
     )
 
     assert service.bluetooth_dispatcher.config == {
         "danmaku_enabled": True,
         "danmaku_keywords": "开火,冲冲冲",
         "danmaku_cooldown_seconds": 5,
+        "danmaku_user_limit_window_seconds": 60,
+        "danmaku_user_limit_max_triggers": 2,
+        "danmaku_min_guard_level": 2,
     }

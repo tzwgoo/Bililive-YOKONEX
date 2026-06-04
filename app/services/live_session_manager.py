@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
+from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_IDS
 from app.services.gift_dispatcher import normalize_trigger_mode
 
 
@@ -34,6 +35,9 @@ class LiveSessionManager:
         self.danmaku_keywords = ""
         self.danmaku_command_id = FIXED_DANMAKU_COMMAND_ID
         self.danmaku_cooldown_seconds = 0
+        self.danmaku_user_limit_window_seconds = 0
+        self.danmaku_user_limit_max_triggers = 0
+        self.danmaku_min_guard_level = 0
 
     async def start(
         self,
@@ -47,6 +51,9 @@ class LiveSessionManager:
         danmaku_keywords: str = "",
         danmaku_command_id: str = "",
         danmaku_cooldown_seconds: int = 0,
+        danmaku_user_limit_window_seconds: int = 0,
+        danmaku_user_limit_max_triggers: int = 0,
+        danmaku_min_guard_level: int = 0,
     ) -> None:
         normalized_mode = self._normalize_mode(mode)
         normalized_value = value.strip()
@@ -57,6 +64,9 @@ class LiveSessionManager:
         normalized_danmaku_keywords = str(danmaku_keywords or "").strip()
         normalized_danmaku_command_id = FIXED_DANMAKU_COMMAND_ID
         normalized_danmaku_cooldown_seconds = max(0, int(danmaku_cooldown_seconds))
+        normalized_danmaku_user_limit_window_seconds = max(0, int(danmaku_user_limit_window_seconds))
+        normalized_danmaku_user_limit_max_triggers = max(0, int(danmaku_user_limit_max_triggers))
+        normalized_danmaku_min_guard_level = max(0, int(danmaku_min_guard_level))
         if not normalized_value:
             raise ValueError("启动参数不能为空")
         if normalized_danmaku_enabled and not normalized_danmaku_keywords:
@@ -73,6 +83,9 @@ class LiveSessionManager:
         self.danmaku_keywords = normalized_danmaku_keywords
         self.danmaku_command_id = normalized_danmaku_command_id
         self.danmaku_cooldown_seconds = normalized_danmaku_cooldown_seconds
+        self.danmaku_user_limit_window_seconds = normalized_danmaku_user_limit_window_seconds
+        self.danmaku_user_limit_max_triggers = normalized_danmaku_user_limit_max_triggers
+        self.danmaku_min_guard_level = normalized_danmaku_min_guard_level
         await self._get_service(normalized_mode).start(
             value=normalized_value,
             output_mode=normalized_output_mode,
@@ -82,6 +95,9 @@ class LiveSessionManager:
             danmaku_keywords=normalized_danmaku_keywords,
             danmaku_command_id=normalized_danmaku_command_id,
             danmaku_cooldown_seconds=normalized_danmaku_cooldown_seconds,
+            danmaku_user_limit_window_seconds=normalized_danmaku_user_limit_window_seconds,
+            danmaku_user_limit_max_triggers=normalized_danmaku_user_limit_max_triggers,
+            danmaku_min_guard_level=normalized_danmaku_min_guard_level,
         )
         self._active_mode = normalized_mode
 
@@ -105,7 +121,11 @@ class LiveSessionManager:
         payload["danmaku_enabled"] = self.danmaku_enabled
         payload["danmaku_keywords"] = self.danmaku_keywords
         payload["danmaku_command_id"] = self.danmaku_command_id
+        payload["danmaku_command_ids"] = dict(FIXED_DANMAKU_COMMAND_IDS)
         payload["danmaku_cooldown_seconds"] = self.danmaku_cooldown_seconds
+        payload["danmaku_user_limit_window_seconds"] = self.danmaku_user_limit_window_seconds
+        payload["danmaku_user_limit_max_triggers"] = self.danmaku_user_limit_max_triggers
+        payload["danmaku_min_guard_level"] = self.danmaku_min_guard_level
         return payload
 
     def _get_service(self, mode: str) -> Any:

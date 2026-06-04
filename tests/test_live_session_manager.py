@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
+from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_IDS
 from app.services.live_session_manager import LiveSessionManager
 
 
@@ -41,6 +42,9 @@ class FakeSession:
         danmaku_keywords: str = "",
         danmaku_command_id: str = "",
         danmaku_cooldown_seconds: int = 0,
+        danmaku_user_limit_window_seconds: int = 0,
+        danmaku_user_limit_max_triggers: int = 0,
+        danmaku_min_guard_level: int = 0,
     ) -> None:
         self.started_with = value
         self.trigger_mode = trigger_mode
@@ -55,6 +59,9 @@ class FakeSession:
             "danmaku_keywords": danmaku_keywords,
             "danmaku_command_id": danmaku_command_id,
             "danmaku_cooldown_seconds": danmaku_cooldown_seconds,
+            "danmaku_user_limit_window_seconds": danmaku_user_limit_window_seconds,
+            "danmaku_user_limit_max_triggers": danmaku_user_limit_max_triggers,
+            "danmaku_min_guard_level": danmaku_min_guard_level,
             "can_start": False,
             "can_stop": True,
         }
@@ -173,3 +180,35 @@ def test_manager_status_includes_current_mode() -> None:
     assert payload["output_mode"] == "im"
     assert payload["trigger_mode"] == "by_quantity"
     assert payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
+    assert payload["danmaku_command_ids"] == FIXED_DANMAKU_COMMAND_IDS
+    assert payload["danmaku_user_limit_window_seconds"] == 0
+    assert payload["danmaku_user_limit_max_triggers"] == 0
+    assert payload["danmaku_min_guard_level"] == 0
+
+
+@pytest.mark.anyio
+async def test_manager_passes_extended_danmaku_controls_to_session() -> None:
+    open_live = FakeSession(mode="open_live")
+    third_party = FakeSession(mode="third_party")
+    manager = LiveSessionManager(
+        open_live_session=open_live,
+        third_party_session=third_party,
+    )
+
+    await manager.start(
+        mode="third_party",
+        value="123456",
+        danmaku_enabled=True,
+        danmaku_keywords="开火",
+        danmaku_cooldown_seconds=15,
+        danmaku_user_limit_window_seconds=60,
+        danmaku_user_limit_max_triggers=2,
+        danmaku_min_guard_level=2,
+    )
+
+    assert third_party.status_payload["danmaku_user_limit_window_seconds"] == 60
+    assert third_party.status_payload["danmaku_user_limit_max_triggers"] == 2
+    assert third_party.status_payload["danmaku_min_guard_level"] == 2
+    assert manager.danmaku_user_limit_window_seconds == 60
+    assert manager.danmaku_user_limit_max_triggers == 2
+    assert manager.danmaku_min_guard_level == 2

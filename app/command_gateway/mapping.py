@@ -21,11 +21,19 @@ ALLOWED_COMMAND_SLOTS = {
 
 class GiftCommandMapper:
     def __init__(self, rules: list[dict[str, Any]] | None = None) -> None:
-        self.rules = rules or []
+        self.rules: list[dict[str, Any]] = []
         self._price_rules: list[tuple[int, int | None, str]] = []
         self._like_rules: list[tuple[int, str]] = []
+        self.replace_rules(rules or [])
+
+    def replace_rules(self, rules: list[dict[str, Any]] | None) -> None:
+        self.rules = rules or []
+        self._price_rules = []
+        self._like_rules = []
 
         for rule in self.rules:
+            if not bool(rule.get("enabled", True)):
+                continue
             event_type = str(rule.get("event_type", "gift")).strip() or "gift"
             command_slot = str(rule.get("command_slot", "")).strip()
             if command_slot not in ALLOWED_COMMAND_SLOTS:
@@ -44,7 +52,7 @@ class GiftCommandMapper:
             max_price = self._coerce_price(rule.get("max_price"), allow_none=True)
             if max_price is not None and max_price < min_price:
                 continue
-            self._price_rules.append((min_price, max_price, command_slot))
+            self._price_rules.append((event_type, min_price, max_price, command_slot))
 
     @classmethod
     def from_file(cls, path: str | Path) -> "GiftCommandMapper":
@@ -71,13 +79,24 @@ class GiftCommandMapper:
             raise ValueError("礼物映射文件格式错误，必须是 JSON 数组或包含 rules 的对象")
         return cls(payload)
 
-    def resolve_command_id(self, gift_payload: dict[str, Any]) -> str | None:
+    def resolve_command_id(self, gift_payload: dict[str, Any], *, event_type: str = "gift") -> str | None:
         price = self._coerce_price(
             gift_payload.get("price", gift_payload.get("r_price")),
         )
         if price is None:
             return None
-        for min_price, max_price, command_slot in self._price_rules:
+        normalized_event_type = str(event_type or "gift").strip() or "gift"
+        command_id = self._resolve_price_rule(price=price, event_type=normalized_event_type)
+        if command_id is not None:
+            return command_id
+        if normalized_event_type != "gift":
+            return self._resolve_price_rule(price=price, event_type="gift")
+        return None
+
+    def _resolve_price_rule(self, *, price: int, event_type: str) -> str | None:
+        for rule_event_type, min_price, max_price, command_slot in self._price_rules:
+            if rule_event_type != event_type:
+                continue
             if price < min_price:
                 continue
             if max_price is not None and price > max_price:

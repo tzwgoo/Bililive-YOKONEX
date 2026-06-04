@@ -9,6 +9,9 @@ const likeMultipleInput = document.getElementById("like-multiple");
 const danmakuEnabledSelect = document.getElementById("danmaku-enabled");
 const danmakuKeywordsInput = document.getElementById("danmaku-keywords");
 const danmakuCooldownSecondsInput = document.getElementById("danmaku-cooldown-seconds");
+const danmakuUserLimitWindowSecondsInput = document.getElementById("danmaku-user-limit-window-seconds");
+const danmakuUserLimitMaxTriggersInput = document.getElementById("danmaku-user-limit-max-triggers");
+const danmakuMinGuardLevelSelect = document.getElementById("danmaku-min-guard-level");
 const sessionValueLabel = document.getElementById("session-value-label");
 const sessionValueInput = document.getElementById("session-value-input");
 const startBtn = document.getElementById("start-btn");
@@ -45,6 +48,9 @@ const likeMultipleLabel = document.getElementById("like-multiple-label");
 const danmakuEnabledLabel = document.getElementById("danmaku-enabled-label");
 const danmakuKeywordsLabel = document.getElementById("danmaku-keywords-label");
 const danmakuCooldownSecondsLabel = document.getElementById("danmaku-cooldown-seconds-label");
+const danmakuUserLimitWindowSecondsLabel = document.getElementById("danmaku-user-limit-window-seconds-label");
+const danmakuUserLimitMaxTriggersLabel = document.getElementById("danmaku-user-limit-max-triggers-label");
+const danmakuMinGuardLevelLabel = document.getElementById("danmaku-min-guard-level-label");
 const fixedDanmakuCommandId = "danmaku_trigger";
 const commandWsUrlStorageKey = "biliLive.commandWsUrl";
 const commandUidStorageKey = "biliLive.commandUid";
@@ -57,6 +63,9 @@ const likeMultipleStorageKey = "biliLive.likeMultiple";
 const danmakuEnabledStorageKey = "biliLive.danmakuEnabled";
 const danmakuKeywordsStorageKey = "biliLive.danmakuKeywords";
 const danmakuCooldownSecondsStorageKey = "biliLive.danmakuCooldownSeconds";
+const danmakuUserLimitWindowSecondsStorageKey = "biliLive.danmakuUserLimitWindowSeconds";
+const danmakuUserLimitMaxTriggersStorageKey = "biliLive.danmakuUserLimitMaxTriggers";
+const danmakuMinGuardLevelStorageKey = "biliLive.danmakuMinGuardLevel";
 const bluetoothOverlayWindowName = "biliLiveBluetoothOverlay";
 const triggerModeOptions = {
   by_quantity: "按礼物数量触发",
@@ -78,6 +87,18 @@ const sessionModeOptions = {
     placeholder: "请输入直播间房间长 ID room_id",
   },
 };
+const guardLevelOptions = {
+  0: "不限",
+  1: "总督",
+  2: "提督及以上",
+  3: "舰长及以上",
+};
+const danmakuGuardDisplayOptions = {
+  1: "总督",
+  2: "提督",
+  3: "舰长",
+};
+const danmakuEventTypes = new Set(["danmaku", "danmaku_captain", "danmaku_commander", "danmaku_governor"]);
 
 function restoreCommandForm() {
   const savedWsUrl = window.localStorage.getItem(commandWsUrlStorageKey);
@@ -109,6 +130,9 @@ function restoreSessionDraft() {
   const savedDanmakuEnabled = window.localStorage.getItem(danmakuEnabledStorageKey);
   const savedDanmakuKeywords = window.localStorage.getItem(danmakuKeywordsStorageKey);
   const savedDanmakuCooldownSeconds = window.localStorage.getItem(danmakuCooldownSecondsStorageKey);
+  const savedDanmakuUserLimitWindowSeconds = window.localStorage.getItem(danmakuUserLimitWindowSecondsStorageKey);
+  const savedDanmakuUserLimitMaxTriggers = window.localStorage.getItem(danmakuUserLimitMaxTriggersStorageKey);
+  const savedDanmakuMinGuardLevel = window.localStorage.getItem(danmakuMinGuardLevelStorageKey);
   if (savedSessionMode && sessionModeOptions[savedSessionMode]) {
     sessionModeSelect.value = savedSessionMode;
   }
@@ -137,6 +161,19 @@ function restoreSessionDraft() {
   } else if (!danmakuCooldownSecondsInput.value) {
     danmakuCooldownSecondsInput.value = "0";
   }
+  if (savedDanmakuUserLimitWindowSeconds && Number(savedDanmakuUserLimitWindowSeconds) >= 0) {
+    danmakuUserLimitWindowSecondsInput.value = savedDanmakuUserLimitWindowSeconds;
+  } else if (!danmakuUserLimitWindowSecondsInput.value) {
+    danmakuUserLimitWindowSecondsInput.value = "0";
+  }
+  if (savedDanmakuUserLimitMaxTriggers && Number(savedDanmakuUserLimitMaxTriggers) >= 0) {
+    danmakuUserLimitMaxTriggersInput.value = savedDanmakuUserLimitMaxTriggers;
+  } else if (!danmakuUserLimitMaxTriggersInput.value) {
+    danmakuUserLimitMaxTriggersInput.value = "0";
+  }
+  if (savedDanmakuMinGuardLevel && Object.hasOwn(guardLevelOptions, savedDanmakuMinGuardLevel)) {
+    danmakuMinGuardLevelSelect.value = savedDanmakuMinGuardLevel;
+  }
 }
 
 function persistSessionDraft() {
@@ -148,10 +185,17 @@ function persistSessionDraft() {
   likeMultipleInput.value = normalizedLikeMultiple;
   window.localStorage.setItem(likeMultipleStorageKey, normalizedLikeMultiple);
   const normalizedDanmakuCooldownSeconds = String(Math.max(0, Number(danmakuCooldownSecondsInput.value || 0) || 0));
+  const normalizedDanmakuUserLimitWindowSeconds = String(Math.max(0, Number(danmakuUserLimitWindowSecondsInput.value || 0) || 0));
+  const normalizedDanmakuUserLimitMaxTriggers = String(Math.max(0, Number(danmakuUserLimitMaxTriggersInput.value || 0) || 0));
   danmakuCooldownSecondsInput.value = normalizedDanmakuCooldownSeconds;
+  danmakuUserLimitWindowSecondsInput.value = normalizedDanmakuUserLimitWindowSeconds;
+  danmakuUserLimitMaxTriggersInput.value = normalizedDanmakuUserLimitMaxTriggers;
   window.localStorage.setItem(danmakuEnabledStorageKey, danmakuEnabledSelect.value);
   window.localStorage.setItem(danmakuKeywordsStorageKey, danmakuKeywordsInput.value.trim());
   window.localStorage.setItem(danmakuCooldownSecondsStorageKey, normalizedDanmakuCooldownSeconds);
+  window.localStorage.setItem(danmakuUserLimitWindowSecondsStorageKey, normalizedDanmakuUserLimitWindowSeconds);
+  window.localStorage.setItem(danmakuUserLimitMaxTriggersStorageKey, normalizedDanmakuUserLimitMaxTriggers);
+  window.localStorage.setItem(danmakuMinGuardLevelStorageKey, danmakuMinGuardLevelSelect.value);
 }
 
 function updateStatusDraftLabels(
@@ -163,7 +207,10 @@ function updateStatusDraftLabels(
   serverDanmakuEnabled,
   serverDanmakuKeywords,
   serverDanmakuCommandId,
-  serverDanmakuCooldownSeconds
+  serverDanmakuCooldownSeconds,
+  serverDanmakuUserLimitWindowSeconds,
+  serverDanmakuUserLimitMaxTriggers,
+  serverDanmakuMinGuardLevel
 ) {
   if (isRunning) {
     connectionModeLabel.textContent = connectionModeOptions[serverConnectionMode] || connectionModeOptions.im;
@@ -172,6 +219,11 @@ function updateStatusDraftLabels(
     danmakuEnabledLabel.textContent = serverDanmakuEnabled ? "开启" : "关闭";
     danmakuKeywordsLabel.textContent = serverDanmakuKeywords || "-";
     danmakuCooldownSecondsLabel.textContent = `${serverDanmakuCooldownSeconds || 0} 秒`;
+    danmakuUserLimitWindowSecondsLabel.textContent =
+      (serverDanmakuUserLimitWindowSeconds || 0) > 0 ? `${serverDanmakuUserLimitWindowSeconds} 秒` : "关闭";
+    danmakuUserLimitMaxTriggersLabel.textContent =
+      (serverDanmakuUserLimitMaxTriggers || 0) > 0 ? `${serverDanmakuUserLimitMaxTriggers} 次` : "关闭";
+    danmakuMinGuardLevelLabel.textContent = guardLevelOptions[serverDanmakuMinGuardLevel || 0] || guardLevelOptions[0];
     return;
   }
 
@@ -181,6 +233,15 @@ function updateStatusDraftLabels(
   danmakuEnabledLabel.textContent = danmakuEnabledSelect.value === "true" ? "开启" : "关闭";
   danmakuKeywordsLabel.textContent = danmakuKeywordsInput.value.trim() || "-";
   danmakuCooldownSecondsLabel.textContent = `${Math.max(0, Number(danmakuCooldownSecondsInput.value || 0) || 0)} 秒`;
+  danmakuUserLimitWindowSecondsLabel.textContent =
+    Math.max(0, Number(danmakuUserLimitWindowSecondsInput.value || 0) || 0) > 0
+      ? `${Math.max(0, Number(danmakuUserLimitWindowSecondsInput.value || 0) || 0)} 秒`
+      : "关闭";
+  danmakuUserLimitMaxTriggersLabel.textContent =
+    Math.max(0, Number(danmakuUserLimitMaxTriggersInput.value || 0) || 0) > 0
+      ? `${Math.max(0, Number(danmakuUserLimitMaxTriggersInput.value || 0) || 0)} 次`
+      : "关闭";
+  danmakuMinGuardLevelLabel.textContent = guardLevelOptions[Number(danmakuMinGuardLevelSelect.value || 0)] || guardLevelOptions[0];
 }
 
 function formatTimestamp(value) {
@@ -251,6 +312,19 @@ function formatGiftValue(payload) {
   return "价值 0";
 }
 
+function resolveDanmakuGuardLabel(payload) {
+  const directLabel = String(payload?.guard_label || "").trim();
+  if (directLabel) {
+    return directLabel;
+  }
+  const guardLevel = Math.max(0, Number(payload?.guard_level || 0) || 0);
+  return danmakuGuardDisplayOptions[guardLevel] || "";
+}
+
+function isDanmakuEventType(eventType) {
+  return danmakuEventTypes.has(String(eventType || ""));
+}
+
 function renderEvent(event) {
   if (event.event_type === "gift") {
     const dispatch = event.command_dispatch || {};
@@ -265,15 +339,19 @@ function renderEvent(event) {
     );
     return;
   }
-  if (event.event_type === "danmaku") {
+  if (isDanmakuEventType(event.event_type)) {
     const dispatch = event.command_dispatch || {};
     const dispatchClass = dispatch.ok === false ? " dispatch-failed" : dispatch.command_id ? " dispatch-success" : "";
+    const guardLabel = resolveDanmakuGuardLabel(event.payload || {});
     const commandText = dispatch.command_id
       ? `<small class="dispatch-chip${dispatchClass}">指令 ${dispatch.command_id} · ${dispatch.message || "已处理"}</small>`
       : "";
+    const identityText = guardLabel
+      ? `<div class="event-meta-line"><span class="identity-chip">${escapeHtml(guardLabel)}</span></div>`
+      : "";
     prependEvent(
       danmakuEvents,
-      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3><p>${event.payload.msg || ""}</p>${commandText}`
+      `<div class="event-card-head"><small>${formatTimestamp(event.timestamp)}</small></div><h3>${event.uname || "匿名用户"}</h3>${identityText}<p>${event.payload.msg || ""}</p>${commandText}`
     );
     return;
   }
@@ -330,6 +408,15 @@ async function refreshStatus() {
     if (typeof data.danmaku_cooldown_seconds === "number") {
       danmakuCooldownSecondsInput.value = String(data.danmaku_cooldown_seconds);
     }
+    if (typeof data.danmaku_user_limit_window_seconds === "number") {
+      danmakuUserLimitWindowSecondsInput.value = String(data.danmaku_user_limit_window_seconds);
+    }
+    if (typeof data.danmaku_user_limit_max_triggers === "number") {
+      danmakuUserLimitMaxTriggersInput.value = String(data.danmaku_user_limit_max_triggers);
+    }
+    if (typeof data.danmaku_min_guard_level === "number") {
+      danmakuMinGuardLevelSelect.value = String(data.danmaku_min_guard_level);
+    }
     persistSessionDraft();
   }
   updateSessionModeForm();
@@ -343,7 +430,10 @@ async function refreshStatus() {
     data.danmaku_enabled,
     data.danmaku_keywords,
     data.danmaku_command_id,
-    data.danmaku_cooldown_seconds
+    data.danmaku_cooldown_seconds,
+    data.danmaku_user_limit_window_seconds,
+    data.danmaku_user_limit_max_triggers,
+    data.danmaku_min_guard_level
   );
 }
 
@@ -451,6 +541,9 @@ startBtn.addEventListener("click", async () => {
       danmaku_enabled: danmakuEnabledSelect.value === "true",
       danmaku_keywords: danmakuKeywordsInput.value.trim(),
       danmaku_cooldown_seconds: Math.max(0, Number(danmakuCooldownSecondsInput.value || 0) || 0),
+      danmaku_user_limit_window_seconds: Math.max(0, Number(danmakuUserLimitWindowSecondsInput.value || 0) || 0),
+      danmaku_user_limit_max_triggers: Math.max(0, Number(danmakuUserLimitMaxTriggersInput.value || 0) || 0),
+      danmaku_min_guard_level: Math.max(0, Number(danmakuMinGuardLevelSelect.value || 0) || 0),
     }),
   });
   const payload = await response.json().catch(() => ({}));
@@ -575,6 +668,31 @@ danmakuCooldownSecondsInput.addEventListener("change", () => {
 });
 
 danmakuCooldownSecondsInput.addEventListener("input", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuUserLimitWindowSecondsInput.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuUserLimitWindowSecondsInput.addEventListener("input", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuUserLimitMaxTriggersInput.addEventListener("change", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuUserLimitMaxTriggersInput.addEventListener("input", () => {
+  persistSessionDraft();
+  updateStatusDraftLabels(false);
+});
+
+danmakuMinGuardLevelSelect.addEventListener("change", () => {
   persistSessionDraft();
   updateStatusDraftLabels(false);
 });

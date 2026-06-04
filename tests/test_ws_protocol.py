@@ -73,3 +73,26 @@ def test_parse_event_message_builds_interaction_end_event() -> None:
     assert event is not None
     assert event.event_type == EventType.SYSTEM
     assert event.payload["game_id"] == "game-123"
+
+
+def test_parse_event_message_builds_guard_specific_danmaku_event() -> None:
+    event = parse_event_message(
+        {
+            "cmd": "LIVE_OPEN_PLATFORM_DM",
+            "data": {
+                "room_id": 1,
+                "open_id": "user-open-id",
+                "uname": "测试提督",
+                "timestamp": 1714113037,
+                "msg": "提督弹幕",
+                "msg_id": "msg-1",
+                "fans_medal_level": 25,
+                "guard_level": 2,
+            },
+        }
+    )
+
+    assert event is not None
+    assert event.event_type == EventType.DANMAKU_COMMANDER
+    assert event.payload["guard_level"] == 2
+    assert event.payload["guard_label"] == "提督"

@@ -210,6 +210,49 @@ async def test_third_party_session_consumes_combo_gift_and_dispatches_command() 
 
 
 @pytest.mark.anyio
+async def test_third_party_session_consumes_super_chat_and_dispatches_command() -> None:
+    event_hub = EventHub()
+    gift_dispatcher = FakeGiftDispatcher()
+    ws_client = FakeThirdPartyWsClient(
+        messages=[
+            {
+                "cmd": "SUPER_CHAT_MESSAGE",
+                "data": {
+                    "price": 100,
+                    "message": "测试 SC",
+                    "ts": 1714113037,
+                    "gift": {
+                        "gift_id": 12000,
+                        "gift_name": "醒目留言",
+                        "num": 1,
+                    },
+                    "user_info": {
+                        "uname": "SC用户",
+                    },
+                },
+            }
+        ]
+    )
+    service = ThirdPartyLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=gift_dispatcher,
+        ws_client=ws_client,
+        room_info_fetcher=fake_room_info_fetcher,
+    )
+
+    await service.start(value="123456")
+    await asyncio.sleep(0.05)
+
+    events = event_hub.snapshot()
+
+    assert gift_dispatcher.called_with is not None
+    assert events[-1]["event_type"] == "super_chat"
+    assert events[-1]["command_dispatch"]["command_id"] == "player_hurt"
+
+    await service.stop()
+
+
+@pytest.mark.anyio
 async def test_third_party_session_consumes_like_and_dispatches_command() -> None:
     class FakeLikeDispatcher(FakeGiftDispatcher):
         async def dispatch_like_event(self, event: dict) -> dict:
@@ -289,6 +332,7 @@ async def test_third_party_session_consumes_danmaku_and_dispatches_command() -> 
                     [],
                     "现在开火",
                     [123, "弹幕用户"],
+                    [30, "粉丝牌", "主播", 870004, 2951253, "", 0, 6809855, 2951253, 10329087, 3, 1, 620903],
                 ],
             }
         ]
@@ -307,7 +351,7 @@ async def test_third_party_session_consumes_danmaku_and_dispatches_command() -> 
     events = event_hub.snapshot()
 
     assert danmaku_dispatcher.called_with is not None
-    assert events[-1]["event_type"] == "danmaku"
+    assert events[-1]["event_type"] == "danmaku_captain"
     assert events[-1]["command_dispatch"]["command_id"] == "command_seven"
 
     await service.stop()
@@ -409,12 +453,18 @@ async def test_third_party_session_configures_bluetooth_danmaku_keywords() -> No
         danmaku_enabled=True,
         danmaku_keywords="开火,冲冲冲",
         danmaku_cooldown_seconds=6,
+        danmaku_user_limit_window_seconds=90,
+        danmaku_user_limit_max_triggers=3,
+        danmaku_min_guard_level=1,
     )
 
     assert bluetooth_dispatcher.config == {
         "danmaku_enabled": True,
         "danmaku_keywords": "开火,冲冲冲",
         "danmaku_cooldown_seconds": 6,
+        "danmaku_user_limit_window_seconds": 90,
+        "danmaku_user_limit_max_triggers": 3,
+        "danmaku_min_guard_level": 1,
     }
 
     await service.stop()

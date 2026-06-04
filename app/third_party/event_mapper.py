@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.models import resolve_danmaku_event_type
+
 
 def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[str, Any] | None:
     cmd = str(message.get("cmd", ""))
@@ -35,6 +37,7 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
     if cmd == "GUARD_BUY":
         data = message.get("data", {})
         return _build_gift_event(
+            event_type="guard_buy",
             cmd=cmd,
             room_id=room_id,
             uname=str(data.get("username") or data.get("uname") or ""),
@@ -45,6 +48,10 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
                 "gift_num": _as_int(data.get("num") or 1),
                 "price": _as_int(data.get("price")),
                 "r_price": _as_int(data.get("price")),
+                "guard_level": _resolve_guard_level_from_name(
+                    data.get("gift_name") or data.get("giftName") or data.get("role_name")
+                ),
+                "guard_label": str(data.get("gift_name") or data.get("giftName") or data.get("role_name") or "大航海"),
             },
         )
 
@@ -55,6 +62,7 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
         uinfo = data.get("uinfo", {})
         base_info = uinfo.get("base", {}) if isinstance(uinfo, dict) else {}
         return _build_gift_event(
+            event_type="super_chat",
             cmd=cmd,
             room_id=room_id,
             uname=str(user_info.get("uname") or base_info.get("name") or base_info.get("uname") or ""),
@@ -72,6 +80,7 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
     if cmd == "USER_TOAST_MSG":
         data = message.get("data", {})
         return _build_gift_event(
+            event_type="guard_renew",
             cmd=cmd,
             room_id=room_id,
             uname=str(data.get("username") or data.get("uname") or ""),
@@ -83,6 +92,10 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
                 "price": _as_int(data.get("price")),
                 "r_price": _as_int(data.get("price")),
                 "toast_msg": str(data.get("toast_msg") or ""),
+                "guard_level": _resolve_guard_level_from_name(
+                    data.get("gift_name") or data.get("giftName") or data.get("role_name")
+                ),
+                "guard_label": str(data.get("gift_name") or data.get("giftName") or data.get("role_name") or "庆祝消息"),
             },
         )
 
@@ -91,16 +104,22 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
         content = ""
         uname = ""
         timestamp = _as_int(message.get("timestamp"))
+        uid = 0
+        guard_level = 0
         if isinstance(info, list):
             if len(info) > 1:
                 content = str(info[1] or "")
             if len(info) > 2 and isinstance(info[2], list) and len(info[2]) > 1:
+                uid = _as_int(info[2][0] if len(info[2]) > 0 else 0)
                 uname = str(info[2][1] or "")
             if len(info) > 0 and isinstance(info[0], list) and len(info[0]) > 4:
                 timestamp = _as_int(info[0][4])
+            guard_level = _extract_danmaku_guard_level(info)
+            if uid <= 0:
+                uid = _extract_danmaku_uid(info)
         return {
             "source": "third_party_ws",
-            "event_type": "danmaku",
+            "event_type": resolve_danmaku_event_type(guard_level).value,
             "cmd": cmd,
             "room_id": room_id,
             "open_id": "",
@@ -108,6 +127,9 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
             "timestamp": timestamp,
             "payload": {
                 "msg": content,
+                "uid": uid,
+                "guard_level": guard_level,
+                "guard_label": _guard_level_to_label(guard_level),
             },
         }
 
@@ -134,6 +156,7 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
 
 def _build_gift_event(
     *,
+    event_type: str = "gift",
     cmd: str,
     room_id: int,
     uname: str,
@@ -142,7 +165,7 @@ def _build_gift_event(
 ) -> dict[str, Any]:
     return {
         "source": "third_party_ws",
-        "event_type": "gift",
+        "event_type": event_type,
         "cmd": cmd,
         "room_id": room_id,
         "open_id": "",
@@ -164,3 +187,61 @@ def _resolve_like_count(data: dict[str, Any]) -> int:
         if key in data:
             return _as_int(data.get(key))
     return 0
+
+
+def _extract_danmaku_uid(info: list[Any]) -> int:
+    nested_user = _read_nested_dict(info, 0, 15, "user")
+    if isinstance(nested_user, dict):
+        return _as_int(nested_user.get("uid"))
+    return 0
+
+
+def _extract_danmaku_guard_level(info: list[Any]) -> int:
+    if len(info) > 7:
+        direct_guard_level = _as_int(info[7])
+        if direct_guard_level > 0:
+            return direct_guard_level
+
+    if len(info) > 3 and isinstance(info[3], list) and len(info[3]) > 10:
+        medal_guard_level = _as_int(info[3][10])
+        if medal_guard_level > 0:
+            return medal_guard_level
+
+    nested_medal = _read_nested_dict(info, 0, 15, "user", "medal")
+    if isinstance(nested_medal, dict):
+        return _as_int(nested_medal.get("guard_level"))
+
+    return 0
+
+
+def _guard_level_to_label(guard_level: int) -> str:
+    return {
+        1: "总督",
+        2: "提督",
+        3: "舰长",
+    }.get(_as_int(guard_level), "")
+
+
+def _resolve_guard_level_from_name(value: Any) -> int:
+    normalized = str(value or "").strip()
+    if "总督" in normalized:
+        return 1
+    if "提督" in normalized:
+        return 2
+    if "舰长" in normalized:
+        return 3
+    return 0
+
+
+def _read_nested_dict(container: list[Any], *path: Any) -> dict[str, Any] | None:
+    current: Any = container
+    for key in path:
+        if isinstance(key, int):
+            if not isinstance(current, list) or key >= len(current):
+                return None
+            current = current[key]
+            continue
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current if isinstance(current, dict) else None

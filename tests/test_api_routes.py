@@ -4,6 +4,8 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
+from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_IDS
+from app.services.danmaku_settings import FIXED_LIKE_COMMAND_ID
 
 
 class FakeCommandSessionService:
@@ -69,7 +71,11 @@ class FakeSessionManager:
             "danmaku_enabled": False,
             "danmaku_keywords": "",
             "danmaku_command_id": FIXED_DANMAKU_COMMAND_ID,
+            "danmaku_command_ids": FIXED_DANMAKU_COMMAND_IDS,
             "danmaku_cooldown_seconds": 0,
+            "danmaku_user_limit_window_seconds": 0,
+            "danmaku_user_limit_max_triggers": 0,
+            "danmaku_min_guard_level": 0,
             "game_id": "",
             "room_id": 0,
             "anchor_name": "",
@@ -99,6 +105,9 @@ class FakeSessionManager:
         danmaku_enabled: bool = False,
         danmaku_keywords: str = "",
         danmaku_cooldown_seconds: int = 0,
+        danmaku_user_limit_window_seconds: int = 0,
+        danmaku_user_limit_max_triggers: int = 0,
+        danmaku_min_guard_level: int = 0,
     ) -> None:
         self.start_called_with = {
             "mode": mode,
@@ -109,6 +118,9 @@ class FakeSessionManager:
             "danmaku_enabled": danmaku_enabled,
             "danmaku_keywords": danmaku_keywords,
             "danmaku_cooldown_seconds": danmaku_cooldown_seconds,
+            "danmaku_user_limit_window_seconds": danmaku_user_limit_window_seconds,
+            "danmaku_user_limit_max_triggers": danmaku_user_limit_max_triggers,
+            "danmaku_min_guard_level": danmaku_min_guard_level,
         }
         self.status = {
             **self.status,
@@ -119,7 +131,11 @@ class FakeSessionManager:
             "danmaku_enabled": danmaku_enabled,
             "danmaku_keywords": danmaku_keywords,
             "danmaku_command_id": FIXED_DANMAKU_COMMAND_ID,
+            "danmaku_command_ids": FIXED_DANMAKU_COMMAND_IDS,
             "danmaku_cooldown_seconds": danmaku_cooldown_seconds,
+            "danmaku_user_limit_window_seconds": danmaku_user_limit_window_seconds,
+            "danmaku_user_limit_max_triggers": danmaku_user_limit_max_triggers,
+            "danmaku_min_guard_level": danmaku_min_guard_level,
             "can_start": False,
             "can_stop": True,
         }
@@ -131,6 +147,43 @@ class FakeSessionManager:
             "status": "idle",
             "can_start": True,
             "can_stop": False,
+        }
+
+
+class FakeCommandRuleService:
+    def __init__(self) -> None:
+        self.payload = {
+            "rules": [
+                {
+                    "id": "gift-tier-1",
+                    "enabled": True,
+                    "event_type": "gift",
+                    "min_price": 0,
+                    "max_price": 99,
+                    "command_slot": "command_one",
+                }
+            ],
+            "like_rules": [],
+            "like_command_id": FIXED_LIKE_COMMAND_ID,
+            "danmaku_slot_rules": [],
+            "danmaku_command_ids": {
+                "danmaku": "danmaku_trigger",
+                "danmaku_captain": "danmaku_captain_trigger",
+                "danmaku_commander": "danmaku_commander_trigger",
+                "danmaku_governor": "danmaku_governor_trigger",
+            },
+            "command_slots": ["command_one", "command_two"],
+        }
+        self.saved_payload: dict | None = None
+
+    def get_studio_payload(self) -> dict:
+        return self.payload
+
+    def save_rules(self, payload: dict) -> dict:
+        self.saved_payload = payload
+        return {
+            "success": True,
+            **self.payload,
         }
 
 
@@ -148,6 +201,10 @@ def test_status_endpoint_returns_idle_state() -> None:
     assert response.json()["output_mode"] == "im"
     assert response.json()["trigger_mode"] == "by_quantity"
     assert response.json()["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
+    assert response.json()["danmaku_command_ids"] == FIXED_DANMAKU_COMMAND_IDS
+    assert response.json()["danmaku_user_limit_window_seconds"] == 0
+    assert response.json()["danmaku_user_limit_max_triggers"] == 0
+    assert response.json()["danmaku_min_guard_level"] == 0
 
 
 def test_command_status_endpoint_returns_idle_state() -> None:
@@ -209,6 +266,9 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
             "danmaku_enabled": True,
             "danmaku_keywords": "开火,冲冲冲",
             "danmaku_cooldown_seconds": 15,
+            "danmaku_user_limit_window_seconds": 60,
+            "danmaku_user_limit_max_triggers": 2,
+            "danmaku_min_guard_level": 2,
         },
     )
 
@@ -222,6 +282,9 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
         "danmaku_enabled": True,
         "danmaku_keywords": "开火,冲冲冲",
         "danmaku_cooldown_seconds": 15,
+        "danmaku_user_limit_window_seconds": 60,
+        "danmaku_user_limit_max_triggers": 2,
+        "danmaku_min_guard_level": 2,
     }
 
 
@@ -235,3 +298,58 @@ def test_command_disconnect_endpoint_calls_command_session() -> None:
 
     assert response.status_code == 200
     assert fake_command_session.disconnect_called is True
+
+
+def test_command_studio_endpoint_returns_rule_payload() -> None:
+    app = create_app()
+    fake_command_rule_service = FakeCommandRuleService()
+    app.state.command_rule_service = fake_command_rule_service
+    client = TestClient(app)
+
+    response = client.get("/api/command/studio")
+
+    assert response.status_code == 200
+    assert response.json()["rules"][0]["event_type"] == "gift"
+    assert response.json()["like_rules"] == []
+    assert response.json()["like_command_id"] == FIXED_LIKE_COMMAND_ID
+    assert response.json()["danmaku_slot_rules"] == []
+    assert response.json()["danmaku_command_ids"]["danmaku_governor"] == "danmaku_governor_trigger"
+
+
+def test_command_studio_save_endpoint_uses_frontend_payload() -> None:
+    app = create_app()
+    fake_command_rule_service = FakeCommandRuleService()
+    app.state.command_rule_service = fake_command_rule_service
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/command/studio",
+        json={
+            "rules": [
+                {
+                    "id": "gift-tier-1",
+                    "enabled": True,
+                    "event_type": "super_chat",
+                    "min_price": 0,
+                    "max_price": 199,
+                    "command_slot": "command_five",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert fake_command_rule_service.saved_payload == {
+        "rules": [
+            {
+                "id": "gift-tier-1",
+                "enabled": True,
+                "event_type": "super_chat",
+                "min_price": 0,
+                "max_price": 199,
+                "command_slot": "command_five",
+            }
+        ],
+        "like_rules": [],
+        "danmaku_slot_rules": [],
+    }
