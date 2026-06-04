@@ -38,70 +38,62 @@
       </div>
 
       <div class="waveform-timeline">
-        <article
-          v-for="(step, index) in waveform.steps"
-          :key="`${waveform.id}-drag-${index}`"
-          class="timeline-segment"
-          :style="{ flexGrow: Math.max(1, step.duration_ms) }"
-        >
-          <div
-            :data-testid="`waveform-drag-surface-${index}`"
-            class="timeline-surface"
+        <div data-testid="waveform-drag-track" class="waveform-track">
+          <article
+            v-for="(step, index) in waveform.steps"
+            :key="`${waveform.id}-drag-${index}`"
+            class="timeline-segment"
+            :style="{ flexGrow: Math.max(1, step.duration_ms) }"
           >
-            <span class="timeline-grid"></span>
-            <span
-              class="timeline-bar is-a"
-              :style="{ height: `${(step.channel_a / 180) * 100}%` }"
-            ></span>
-            <span
-              class="timeline-bar is-b"
-              :style="{ height: `${(step.channel_b / 180) * 100}%` }"
-            ></span>
-            <button
-              :data-testid="`waveform-handle-channel-a-${index}`"
-              type="button"
-              class="timeline-handle is-a"
-              :class="{ 'is-disabled': waveform.builtin }"
-              :style="{ bottom: `${(step.channel_a / 180) * 100}%` }"
-              :disabled="waveform.builtin"
-              @mousedown="startDrag(index, 'channel_a', $event)"
+            <div
+              :data-testid="`waveform-drag-surface-${index}`"
+              class="timeline-surface"
             >
-              A
-            </button>
-            <button
-              :data-testid="`waveform-handle-channel-b-${index}`"
-              type="button"
-              class="timeline-handle is-b"
-              :class="{ 'is-disabled': waveform.builtin }"
-              :style="{ bottom: `${(step.channel_b / 180) * 100}%` }"
-              :disabled="waveform.builtin"
-              @mousedown="startDrag(index, 'channel_b', $event)"
-            >
-              B
-            </button>
-            <button
-              :data-testid="`waveform-handle-duration-${index}`"
-              type="button"
-              class="timeline-duration-handle"
-              :class="{ 'is-disabled': waveform.builtin }"
-              :disabled="waveform.builtin"
-              @mousedown="startDrag(index, 'duration_ms', $event)"
-            >
-              {{ step.duration_ms }} ms
-            </button>
-          </div>
-        </article>
-      </div>
-
-      <div class="waveform-preview">
-        <div
-          v-for="(step, index) in waveform.steps"
-          :key="`${waveform.id}-preview-${index}`"
-          class="preview-segment"
-        >
-          <span class="preview-bar is-a" :style="{ height: `${(step.channel_a / 180) * 100}%` }"></span>
-          <span class="preview-bar is-b" :style="{ height: `${(step.channel_b / 180) * 100}%` }"></span>
-          <small>{{ step.duration_ms }} ms</small>
+              <span class="timeline-grid"></span>
+              <span class="timeline-axis-label is-a">A</span>
+              <span class="timeline-axis-label is-b">B</span>
+              <span
+                class="timeline-bar is-a"
+                :style="{ height: `${(step.channel_a / 180) * 100}%` }"
+              ></span>
+              <span
+                class="timeline-bar is-b"
+                :style="{ height: `${(step.channel_b / 180) * 100}%` }"
+              ></span>
+              <button
+                :data-testid="`waveform-handle-channel-a-${index}`"
+                type="button"
+                class="timeline-handle is-a"
+                :class="{ 'is-disabled': waveform.builtin }"
+                :style="{ bottom: `${(step.channel_a / 180) * 100}%` }"
+                :disabled="waveform.builtin"
+                @mousedown="startDrag(index, 'channel_a', $event)"
+              >
+                A
+              </button>
+              <button
+                :data-testid="`waveform-handle-channel-b-${index}`"
+                type="button"
+                class="timeline-handle is-b"
+                :class="{ 'is-disabled': waveform.builtin }"
+                :style="{ bottom: `${(step.channel_b / 180) * 100}%` }"
+                :disabled="waveform.builtin"
+                @mousedown="startDrag(index, 'channel_b', $event)"
+              >
+                B
+              </button>
+              <button
+                :data-testid="`waveform-handle-duration-${index}`"
+                type="button"
+                class="timeline-duration-handle"
+                :class="{ 'is-disabled': waveform.builtin }"
+                :disabled="waveform.builtin"
+                @mousedown="startDrag(index, 'duration_ms', $event)"
+              >
+                {{ step.duration_ms }} ms
+              </button>
+            </div>
+          </article>
         </div>
       </div>
 
@@ -282,51 +274,81 @@ onBeforeUnmount(() => {
 
 .waveform-timeline {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
+}
+
+.waveform-track {
+  display: flex;
+  align-items: stretch;
+  min-height: 280px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,236,229,0.96));
+  border: 1px solid rgba(120, 113, 108, 0.12);
+  box-shadow: 0 10px 24px rgba(28, 25, 23, 0.04);
+  overflow: hidden;
 }
 
 .timeline-segment {
   min-width: 0;
+  flex-basis: 0;
+  border-right: 1px solid rgba(120, 113, 108, 0.12);
+}
+
+.timeline-segment:last-child {
+  border-right: 0;
 }
 
 .timeline-surface {
   position: relative;
-  min-height: 220px;
-  padding: 16px 12px 42px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,236,229,0.96));
-  border: 1px solid rgba(120, 113, 108, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+  min-height: 280px;
+  height: 100%;
+  padding: 18px 14px 48px;
   overflow: hidden;
 }
 
 .timeline-grid {
   position: absolute;
-  inset: 12px 12px 40px;
-  border-radius: 14px;
+  inset: 16px 14px 44px;
+  border-radius: 16px;
   background:
     linear-gradient(180deg, rgba(120, 113, 108, 0.06), rgba(120, 113, 108, 0) 1px) 0 0 / 100% 25%,
     linear-gradient(90deg, rgba(120, 113, 108, 0.06), rgba(120, 113, 108, 0) 1px) 0 0 / 25% 100%;
   pointer-events: none;
 }
 
+.timeline-axis-label {
+  position: absolute;
+  top: 18px;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(68, 64, 60, 0.72);
+}
+
+.timeline-axis-label.is-a {
+  left: 20px;
+}
+
+.timeline-axis-label.is-b {
+  right: 20px;
+}
+
 .timeline-bar {
   position: absolute;
-  bottom: 40px;
-  width: calc(50% - 18px);
+  bottom: 48px;
+  width: calc(50% - 22px);
   min-height: 8px;
   border-radius: 16px 16px 10px 10px;
   box-shadow: 0 12px 20px rgba(28, 25, 23, 0.08);
 }
 
 .timeline-bar.is-a {
-  left: 12px;
+  left: 14px;
   background: linear-gradient(180deg, #fb923c, #f97316);
 }
 
 .timeline-bar.is-b {
-  right: 12px;
+  right: 14px;
   background: linear-gradient(180deg, #60a5fa, #2563eb);
 }
 
@@ -351,19 +373,19 @@ onBeforeUnmount(() => {
 }
 
 .timeline-handle.is-a {
-  left: 22px;
+  left: 24px;
   background: #ea580c;
 }
 
 .timeline-handle.is-b {
-  right: 22px;
+  right: 24px;
   background: #1d4ed8;
 }
 
 .timeline-duration-handle {
-  left: 12px;
-  right: 12px;
-  bottom: 10px;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
@@ -398,37 +420,6 @@ onBeforeUnmount(() => {
 .stats-grid article {
   display: grid;
   gap: 6px;
-}
-
-.waveform-preview {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-  gap: 12px;
-}
-
-.preview-segment {
-  display: grid;
-  align-items: end;
-  gap: 8px;
-  min-height: 160px;
-  padding: 12px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(240,236,230,0.95));
-  border: 1px solid rgba(120, 113, 108, 0.12);
-}
-
-.preview-bar {
-  display: block;
-  min-height: 4px;
-  border-radius: 999px;
-}
-
-.preview-bar.is-a {
-  background: #f97316;
-}
-
-.preview-bar.is-b {
-  background: #2563eb;
 }
 
 .step-toolbar {
@@ -468,7 +459,11 @@ onBeforeUnmount(() => {
   }
 
   .waveform-timeline {
-    grid-template-columns: 1fr;
+    overflow-x: auto;
+  }
+
+  .waveform-track {
+    min-width: 720px;
   }
 }
 </style>

@@ -9,6 +9,7 @@ const waveform = {
   editable: true,
   steps: [
     { duration_ms: 200, channel_a: 20, channel_b: 40 },
+    { duration_ms: 400, channel_a: 60, channel_b: 80 },
   ],
 };
 
@@ -17,7 +18,7 @@ describe("WaveformEditorPanel", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders drag timeline handles for duration and channel strengths", () => {
+  it("renders one continuous drag track with proportional segments and handles", () => {
     const wrapper = mount(WaveformEditorPanel, {
       props: {
         waveform,
@@ -25,7 +26,13 @@ describe("WaveformEditorPanel", () => {
       },
     });
 
+    expect(wrapper.find('[data-testid="waveform-drag-track"]').exists()).toBe(true);
+    expect(wrapper.find(".waveform-preview").exists()).toBe(false);
+    expect(wrapper.findAll(".timeline-segment")).toHaveLength(2);
+    expect(wrapper.findAll(".timeline-segment")[0].attributes("style")).toContain("flex-grow: 200");
+    expect(wrapper.findAll(".timeline-segment")[1].attributes("style")).toContain("flex-grow: 400");
     expect(wrapper.find('[data-testid="waveform-drag-surface-0"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="waveform-drag-surface-1"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="waveform-handle-channel-a-0"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="waveform-handle-channel-b-0"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="waveform-handle-duration-0"]').exists()).toBe(true);
