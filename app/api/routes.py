@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from app.runtime import resolve_bundle_path
@@ -13,6 +13,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(resolve_bundle_path("app/templates")))
 
 router = APIRouter()
+
+
+def _spa_index_path() -> Path:
+    return resolve_bundle_path("frontend/dist/index.html")
+
+
+def _spa_index_response() -> FileResponse | None:
+    spa_index = _spa_index_path()
+    if spa_index.exists():
+        return FileResponse(spa_index)
+    return None
 
 
 class StartSessionRequest(BaseModel):
@@ -103,6 +114,9 @@ class UpdateCommandStudioRequest(BaseModel):
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
+    spa_response = _spa_index_response()
+    if spa_response is not None:
+        return spa_response
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -112,6 +126,9 @@ async def index(request: Request) -> HTMLResponse:
 
 @router.get("/bluetooth/studio", response_class=HTMLResponse)
 async def bluetooth_studio(request: Request) -> HTMLResponse:
+    spa_response = _spa_index_response()
+    if spa_response is not None:
+        return spa_response
     return templates.TemplateResponse(
         request=request,
         name="bluetooth_studio.html",
@@ -121,6 +138,9 @@ async def bluetooth_studio(request: Request) -> HTMLResponse:
 
 @router.get("/command/studio", response_class=HTMLResponse)
 async def command_studio(request: Request) -> HTMLResponse:
+    spa_response = _spa_index_response()
+    if spa_response is not None:
+        return spa_response
     return templates.TemplateResponse(
         request=request,
         name="command_studio.html",

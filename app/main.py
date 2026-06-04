@@ -100,6 +100,9 @@ def create_app() -> FastAPI:
     app.state.session_service = session_service
     app.include_router(router)
     app.mount("/static", StaticFiles(directory=str(resolve_bundle_path("app/static"))), name="static")
+    frontend_assets_dir = resolve_bundle_path("frontend/dist/assets")
+    if frontend_assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(frontend_assets_dir)), name="frontend-assets")
     return app
 
 

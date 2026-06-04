@@ -6,8 +6,8 @@ export interface BluetoothStatusResponse {
 }
 
 export interface BluetoothStudioResponse {
-  waveforms: Array<Record<string, unknown>>;
-  rule_groups: Array<Record<string, unknown>>;
+  waveforms: BluetoothWaveform[];
+  rule_groups: BluetoothRuleGroup[];
 }
 
 export interface BluetoothDeviceResponse {
@@ -52,4 +52,64 @@ export interface BluetoothStatusModel {
   message: string;
   devices: BluetoothDeviceModel[];
   rules: BluetoothRuleModel[];
+}
+
+export interface BluetoothWaveformStep {
+  duration_ms: number;
+  channel_a: number;
+  channel_b: number;
+}
+
+export interface BluetoothWaveform {
+  id: string;
+  name: string;
+  builtin: boolean;
+  editable: boolean;
+  execution_mode?: string;
+  loop_count?: number;
+  steps: BluetoothWaveformStep[];
+}
+
+export interface BluetoothStudioRule {
+  id: string;
+  event_type: string;
+  rule_label: string;
+  enabled: boolean;
+  waveform_id: string;
+  waveform_name: string;
+  cooldown_seconds?: number;
+  filters?: Record<string, unknown>;
+}
+
+export interface BluetoothRuleGroup {
+  group_id: string;
+  group_label: string;
+  rules: BluetoothStudioRule[];
+}
+
+export interface SaveBluetoothRulesPayload {
+  rules: Array<{
+    id: string;
+    enabled: boolean;
+    waveform_id: string;
+    min_price: number | null;
+    max_price: number | null;
+  }>;
+}
+
+export interface SaveBluetoothRulesResponse {
+  success: boolean;
+  updated_count: number;
+  rule_groups: BluetoothRuleGroup[];
+}
+
+export interface BluetoothWaveformMutationResponse {
+  success: boolean;
+  waveform: BluetoothWaveform;
+  waveforms: BluetoothWaveform[];
+}
+
+export interface UpdateBluetoothWaveformPayload {
+  name: string;
+  steps: BluetoothWaveformStep[];
 }
