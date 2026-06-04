@@ -1,4 +1,5 @@
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WaveformEditorPanel from "@/components/waveforms/WaveformEditorPanel.vue";
 
@@ -108,5 +109,92 @@ describe("WaveformEditorPanel", () => {
     const updates = wrapper.emitted("update-step") || [];
     expect(updates.length).toBeGreaterThan(0);
     expect(updates[0]).toEqual([0, "duration_ms", 360]);
+  });
+
+  it("collapses the step list by default and toggles it on demand", async () => {
+    const wrapper = mount(WaveformEditorPanel, {
+      props: {
+        waveform,
+        savingWaveform: false,
+      },
+    });
+
+    expect(wrapper.find('[data-testid="step-list"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="toggle-step-list"]').trigger("click");
+    expect(wrapper.find('[data-testid="step-list"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="toggle-step-list"]').trigger("click");
+    expect(wrapper.find('[data-testid="step-list"]').exists()).toBe(false);
+  });
+
+  it("marks the active segment and renders a guide line while dragging", async () => {
+    const wrapper = mount(WaveformEditorPanel, {
+      props: {
+        waveform,
+        savingWaveform: false,
+      },
+      attachTo: document.body,
+    });
+
+    const surface = wrapper.get('[data-testid="waveform-drag-surface-0"]').element as HTMLDivElement;
+    vi.spyOn(surface, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 120,
+      height: 180,
+      top: 0,
+      left: 0,
+      right: 120,
+      bottom: 180,
+      toJSON: () => ({}),
+    });
+
+    await wrapper.get('[data-testid="waveform-handle-channel-a-0"]').trigger("mousedown", {
+      button: 0,
+      clientX: 60,
+      clientY: 160,
+    });
+
+    expect(wrapper.get('[data-testid="timeline-segment-0"]').classes()).toContain("is-active");
+    expect(wrapper.find('[data-testid="timeline-guide-line-0"]').exists()).toBe(true);
+
+    window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+
+  it("shows live numeric labels on handles while dragging", async () => {
+    const wrapper = mount(WaveformEditorPanel, {
+      props: {
+        waveform,
+        savingWaveform: false,
+      },
+      attachTo: document.body,
+    });
+
+    const surface = wrapper.get('[data-testid="waveform-drag-surface-0"]').element as HTMLDivElement;
+    vi.spyOn(surface, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 120,
+      height: 180,
+      top: 0,
+      left: 0,
+      right: 120,
+      bottom: 180,
+      toJSON: () => ({}),
+    });
+
+    await wrapper.get('[data-testid="waveform-handle-duration-0"]').trigger("mousedown", {
+      button: 0,
+      clientX: 40,
+      clientY: 180,
+    });
+
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: 90, clientY: 180, bubbles: true }));
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="waveform-handle-duration-0"]').text()).toContain("360 ms");
+
+    window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
 });

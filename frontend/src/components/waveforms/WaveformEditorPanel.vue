@@ -38,59 +38,80 @@
       </div>
 
       <div class="waveform-timeline">
-        <div data-testid="waveform-drag-track" class="waveform-track">
+        <div
+          data-testid="waveform-drag-track"
+          class="waveform-track"
+          :class="{ 'is-dragging': activeSegmentIndex !== null }"
+        >
           <article
             v-for="(step, index) in waveform.steps"
             :key="`${waveform.id}-drag-${index}`"
             class="timeline-segment"
-            :style="{ flexGrow: Math.max(1, step.duration_ms) }"
+            :data-testid="`timeline-segment-${index}`"
+            :class="{ 'is-active': activeSegmentIndex === index }"
+            :style="{ flexGrow: Math.max(1, resolveStepDuration(step, index)) }"
           >
             <div
               :data-testid="`waveform-drag-surface-${index}`"
               class="timeline-surface"
             >
               <span class="timeline-grid"></span>
+              <span
+                v-if="activeSegmentIndex === index"
+                :data-testid="`timeline-guide-line-${index}`"
+                class="timeline-guide-line"
+                :style="{ bottom: `${resolveGuideLineBottom(step, index)}%` }"
+              ></span>
               <span class="timeline-axis-label is-a">A</span>
               <span class="timeline-axis-label is-b">B</span>
               <span
                 class="timeline-bar is-a"
-                :style="{ height: `${(step.channel_a / 180) * 100}%` }"
+                :style="{ height: `${(resolveStepStrength(step, index, 'channel_a') / 180) * 100}%` }"
               ></span>
               <span
                 class="timeline-bar is-b"
-                :style="{ height: `${(step.channel_b / 180) * 100}%` }"
+                :style="{ height: `${(resolveStepStrength(step, index, 'channel_b') / 180) * 100}%` }"
               ></span>
               <button
                 :data-testid="`waveform-handle-channel-a-${index}`"
                 type="button"
                 class="timeline-handle is-a"
-                :class="{ 'is-disabled': waveform.builtin }"
-                :style="{ bottom: `${(step.channel_a / 180) * 100}%` }"
+                :class="{
+                  'is-disabled': waveform.builtin,
+                  'is-active': activeSegmentIndex === index && dragField === 'channel_a',
+                }"
+                :style="{ bottom: `${(resolveStepStrength(step, index, 'channel_a') / 180) * 100}%` }"
                 :disabled="waveform.builtin"
                 @mousedown="startDrag(index, 'channel_a', $event)"
               >
-                A
+                {{ resolveHandleLabel(step, index, "channel_a") }}
               </button>
               <button
                 :data-testid="`waveform-handle-channel-b-${index}`"
                 type="button"
                 class="timeline-handle is-b"
-                :class="{ 'is-disabled': waveform.builtin }"
-                :style="{ bottom: `${(step.channel_b / 180) * 100}%` }"
+                :class="{
+                  'is-disabled': waveform.builtin,
+                  'is-active': activeSegmentIndex === index && dragField === 'channel_b',
+                }"
+                :style="{ bottom: `${(resolveStepStrength(step, index, 'channel_b') / 180) * 100}%` }"
                 :disabled="waveform.builtin"
                 @mousedown="startDrag(index, 'channel_b', $event)"
               >
-                B
+                {{ resolveHandleLabel(step, index, "channel_b") }}
               </button>
               <button
                 :data-testid="`waveform-handle-duration-${index}`"
                 type="button"
                 class="timeline-duration-handle"
-                :class="{ 'is-disabled': waveform.builtin }"
+                :class="{
+                  'is-disabled': waveform.builtin,
+                  'is-active': activeSegmentIndex === index && dragField === 'duration_ms',
+                }"
                 :disabled="waveform.builtin"
                 @mousedown="startDrag(index, 'duration_ms', $event)"
               >
-                {{ step.duration_ms }} ms
+                {{ resolveHandleLabel(step, index, "duration_ms") }}
               </button>
             </div>
           </article>
@@ -98,10 +119,13 @@
       </div>
 
       <div class="step-toolbar">
+        <Button data-testid="toggle-step-list" size="small" @click="toggleStepList">
+          {{ isStepListExpanded ? "收起分段配置" : "展开分段配置" }}
+        </Button>
         <Button size="small" :disabled="waveform.builtin" @click="emit('add-step')">新增分段</Button>
       </div>
 
-      <div class="step-list">
+      <div v-if="isStepListExpanded" data-testid="step-list" class="step-list">
         <article v-for="(step, index) in waveform.steps" :key="`${waveform.id}-step-${index}`" class="step-row">
           <strong>{{ index + 1 }}</strong>
           <label class="field">
@@ -190,8 +214,12 @@ const dragState = ref<{
   field: DragField;
   startX: number;
   startValue: number;
+  currentValue: number;
   surface: HTMLElement;
 } | null>(null);
+const activeSegmentIndex = ref<number | null>(null);
+const dragField = ref<DragField | null>(null);
+const isStepListExpanded = ref(false);
 
 const DURATION_DRAG_FACTOR = 3.2;
 
@@ -214,6 +242,39 @@ function resolveMaxStrength(waveform: BluetoothWaveform) {
   );
 }
 
+function resolvePreviewValue(index: number, field: DragField, fallbackValue: number) {
+  if (dragState.value && dragState.value.index === index && dragState.value.field === field) {
+    return dragState.value.currentValue;
+  }
+  return fallbackValue;
+}
+
+function resolveStepStrength(step: BluetoothWaveformStep, index: number, field: "channel_a" | "channel_b") {
+  return normalizeStrength(resolvePreviewValue(index, field, Number(step[field])));
+}
+
+function resolveStepDuration(step: BluetoothWaveformStep, index: number) {
+  return normalizeDuration(resolvePreviewValue(index, "duration_ms", Number(step.duration_ms)));
+}
+
+function resolveHandleLabel(step: BluetoothWaveformStep, index: number, field: DragField) {
+  if (field === "duration_ms") {
+    return `${resolveStepDuration(step, index)} ms`;
+  }
+  const prefix = field === "channel_a" ? "A" : "B";
+  const value = resolveStepStrength(step, index, field);
+  return activeSegmentIndex.value === index && dragField.value === field ? `${prefix} ${value}` : prefix;
+}
+
+function resolveGuideLineBottom(step: BluetoothWaveformStep, index: number) {
+  const strengthField = dragField.value === "channel_b" ? "channel_b" : "channel_a";
+  return (resolveStepStrength(step, index, strengthField) / 180) * 100;
+}
+
+function toggleStepList() {
+  isStepListExpanded.value = !isStepListExpanded.value;
+}
+
 function startDrag(index: number, field: DragField, event: MouseEvent) {
   if (!props.waveform || props.waveform.builtin || event.button !== 0) {
     return;
@@ -231,8 +292,11 @@ function startDrag(index: number, field: DragField, event: MouseEvent) {
     field,
     startX: event.clientX,
     startValue: Number(step[field]),
+    currentValue: Number(step[field]),
     surface,
   };
+  activeSegmentIndex.value = index;
+  dragField.value = field;
   window.addEventListener("mousemove", handleDragMove);
   window.addEventListener("mouseup", stopDrag);
   event.preventDefault();
@@ -245,17 +309,23 @@ function handleDragMove(event: MouseEvent) {
   const { index, field, startX, startValue, surface } = dragState.value;
   if (field === "duration_ms") {
     const deltaX = event.clientX - startX;
-    emit("update-step", index, field, normalizeDuration(startValue + deltaX * DURATION_DRAG_FACTOR));
+    const nextValue = normalizeDuration(startValue + deltaX * DURATION_DRAG_FACTOR);
+    dragState.value.currentValue = nextValue;
+    emit("update-step", index, field, nextValue);
     return;
   }
   const rect = surface.getBoundingClientRect();
   const offsetY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
   const ratio = rect.height === 0 ? 0 : (rect.height - offsetY) / rect.height;
-  emit("update-step", index, field, normalizeStrength(ratio * 180));
+  const nextValue = normalizeStrength(ratio * 180);
+  dragState.value.currentValue = nextValue;
+  emit("update-step", index, field, nextValue);
 }
 
 function stopDrag() {
   dragState.value = null;
+  activeSegmentIndex.value = null;
+  dragField.value = null;
   window.removeEventListener("mousemove", handleDragMove);
   window.removeEventListener("mouseup", stopDrag);
 }
@@ -288,10 +358,20 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+.waveform-track.is-dragging .timeline-segment:not(.is-active) {
+  opacity: 0.56;
+}
+
 .timeline-segment {
   min-width: 0;
   flex-basis: 0;
   border-right: 1px solid rgba(120, 113, 108, 0.12);
+  transition: opacity 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.timeline-segment.is-active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(255, 247, 237, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.14);
 }
 
 .timeline-segment:last-child {
@@ -313,6 +393,15 @@ onBeforeUnmount(() => {
   background:
     linear-gradient(180deg, rgba(120, 113, 108, 0.06), rgba(120, 113, 108, 0) 1px) 0 0 / 100% 25%,
     linear-gradient(90deg, rgba(120, 113, 108, 0.06), rgba(120, 113, 108, 0) 1px) 0 0 / 25% 100%;
+  pointer-events: none;
+}
+
+.timeline-guide-line {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  z-index: 1;
+  border-top: 1px dashed rgba(249, 115, 22, 0.42);
   pointer-events: none;
 }
 
@@ -362,7 +451,9 @@ onBeforeUnmount(() => {
 
 .timeline-handle {
   z-index: 1;
-  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 10px;
   height: 28px;
   border-radius: 999px;
   color: #fafaf9;
@@ -370,6 +461,8 @@ onBeforeUnmount(() => {
   font-weight: 700;
   box-shadow: 0 10px 18px rgba(28, 25, 23, 0.16);
   transform: translateY(50%);
+  transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+  white-space: nowrap;
 }
 
 .timeline-handle.is-a {
@@ -394,12 +487,27 @@ onBeforeUnmount(() => {
   color: #44403c;
   font-size: 12px;
   font-weight: 700;
+  transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
 }
 
 .timeline-handle.is-disabled,
 .timeline-duration-handle.is-disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.timeline-handle.is-active,
+.timeline-duration-handle.is-active {
+  box-shadow: 0 14px 28px rgba(28, 25, 23, 0.22);
+}
+
+.timeline-handle.is-active {
+  transform: translateY(50%) scale(1.04);
+}
+
+.timeline-duration-handle.is-active {
+  transform: scale(1.02);
+  border-color: rgba(249, 115, 22, 0.32);
 }
 
 .stats-grid {
@@ -424,7 +532,9 @@ onBeforeUnmount(() => {
 
 .step-toolbar {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .step-row,

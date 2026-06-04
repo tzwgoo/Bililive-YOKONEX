@@ -81,6 +81,7 @@ describe("BluetoothStudioPage", () => {
     expect(wrapper.text()).toContain("自定义波形 01");
 
     await wrapper.get('[data-testid="waveform-name-input"] input').setValue("重命名波形");
+    await wrapper.get('[data-testid="toggle-step-list"]').trigger("click");
     await wrapper.get('[data-testid="step-duration-0"] input').setValue("240");
     await wrapper.get('[data-testid="step-channel-a-0"] input').setValue("60");
     await wrapper.get('[data-testid="step-channel-b-0"] input').setValue("80");
