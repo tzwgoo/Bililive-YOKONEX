@@ -371,6 +371,28 @@ async def event_stream(request: Request) -> StreamingResponse:
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@router.get("/api/control/stream")
+async def control_stream(request: Request, once: bool = False) -> StreamingResponse:
+    event_hub = request.app.state.event_hub
+
+    async def generate():
+        queue = event_hub.subscribe_control()
+        try:
+            for item in event_hub.control_snapshot():
+                yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+                if once:
+                    return
+            while True:
+                event = await queue.get()
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if once:
+                    return
+        finally:
+            event_hub.unsubscribe_control(queue)
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
 def _read_bluetooth_value(item: object, key: str):
     if isinstance(item, dict):
         return item.get(key)

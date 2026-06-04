@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any
+import time
 import uuid
 
 from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
@@ -37,13 +38,19 @@ class BluetoothService:
         store: BluetoothSettingsStore,
         runtime: BluetoothRuntime,
         payload: BluetoothConfigPayload | None = None,
+        event_hub: Any | None = None,
     ) -> None:
+        # 蓝牙配置存储，用于持久化设备、波形和事件规则。
         self.store = store
+        # 蓝牙运行时，用于扫描、连接和执行波形。
         self.runtime = runtime
+        # 当前蓝牙配置快照，页面和调度器共用此对象。
         self.payload = payload or self.store.load()
+        # 控制日志事件中心，用于记录波形触发结果。
+        self.event_hub = event_hub
 
     @classmethod
-    def create_default(cls, *, config_path: Path) -> "BluetoothService":
+    def create_default(cls, *, config_path: Path, event_hub: Any | None = None) -> "BluetoothService":
         store = BluetoothSettingsStore(config_path)
         payload = store.load()
         try:
@@ -59,6 +66,7 @@ class BluetoothService:
             store=store,
             runtime=runtime,
             payload=payload,
+            event_hub=event_hub,
         )
 
     async def scan(self) -> list[BluetoothDevice]:
@@ -80,30 +88,40 @@ class BluetoothService:
     async def trigger_waveform(self, *, event_type: str, waveform_id: str) -> dict:
         waveform = next((item for item in self.payload.ems_waveforms if item.id == waveform_id), None)
         if waveform is None:
-            return {
+            result = {
                 "matched": True,
                 "event_type": event_type,
                 "waveform_id": waveform_id,
                 "success": False,
                 "message": "目标波形不存在",
             }
+            self._publish_bluetooth_control(result)
+            return result
         try:
             await self.runtime.play_waveform(waveform)
         except Exception as exc:
-            return {
+            result = {
                 "matched": True,
                 "event_type": event_type,
                 "waveform_id": waveform_id,
+                "waveform_name": waveform.name,
+                "max_strength": _resolve_waveform_max_strength(waveform),
                 "success": False,
                 "message": f"波形执行失败: {exc}",
             }
-        return {
+            self._publish_bluetooth_control(result)
+            return result
+        result = {
             "matched": True,
             "event_type": event_type,
             "waveform_id": waveform_id,
+            "waveform_name": waveform.name,
+            "max_strength": _resolve_waveform_max_strength(waveform),
             "success": True,
             "message": f"{event_type} 已触发波形 {waveform.name}",
         }
+        self._publish_bluetooth_control(result)
+        return result
 
     def get_status_payload(self) -> dict:
         status = self.runtime.get_status()
@@ -312,6 +330,18 @@ class BluetoothService:
             raise ValueError(f"未找到波形: {waveform_id}")
         return waveform
 
+    def _publish_bluetooth_control(self, payload: dict[str, Any]) -> None:
+        """写入蓝牙波形控制日志。"""
+        if self.event_hub is None or not hasattr(self.event_hub, "publish_control"):
+            return
+        self.event_hub.publish_control(
+            {
+                "type": "bluetooth_trigger",
+                "timestamp": int(time.time()),
+                "payload": payload,
+            }
+        )
+
 
 def create_real_bluetooth_runtime(
     *,
@@ -397,6 +427,13 @@ def _merge_editable_steps(*, existing_steps: list[EmsWaveformStep], incoming_ste
 
 def _normalize_waveform_strength(value) -> int:
     return max(0, min(int(value), 180))
+
+
+def _resolve_waveform_max_strength(waveform: EmsWaveform) -> int:
+    """计算波形在 A/B 通道中的最大强度。"""
+    if not waveform.steps:
+        return 0
+    return max(max(step.channel_a, step.channel_b) for step in waveform.steps)
 
 
 def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform: EmsWaveform) -> dict:

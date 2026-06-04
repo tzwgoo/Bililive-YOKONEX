@@ -4,6 +4,7 @@ import pytest
 
 from app.bluetooth.runtime.memory_runtime import MemoryBluetoothRuntime
 from app.bluetooth.service import BluetoothService
+from app.services.event_hub import EventHub
 
 
 @pytest.mark.anyio
@@ -78,6 +79,26 @@ async def test_service_overlay_payload_includes_battery_level(
     overlay = service.get_overlay_payload()
 
     assert overlay["battery_level"] == 100
+
+
+@pytest.mark.anyio
+async def test_service_waveform_trigger_publishes_control_log(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    result = await service.trigger_waveform(event_type="gift", waveform_id="ems-preset-01")
+
+    assert result["success"] is True
+    assert event_hub.control_snapshot()[-1]["type"] == "bluetooth_trigger"
+    assert event_hub.control_snapshot()[-1]["payload"]["waveform_id"] == "ems-preset-01"
+    assert event_hub.control_snapshot()[-1]["payload"]["max_strength"] > 0
 
 
 def test_create_default_prefers_real_runtime_when_available(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

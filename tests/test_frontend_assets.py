@@ -270,6 +270,18 @@ def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
     assert 'overlayState.battery_level' in overlay_js
 
 
+def test_frontend_contains_control_log_panel_and_stream() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
+    app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="control-events"' in index_html
+    assert 'id="control-count"' in index_html
+    assert 'new EventSource("/api/events/stream")' in app_js
+    assert 'new EventSource("/api/control/stream")' in app_js
+    assert "function renderControlEvent(event)" in app_js
+
+
 def test_bluetooth_panel_uses_vertical_stack_layout() -> None:
     style_css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
 

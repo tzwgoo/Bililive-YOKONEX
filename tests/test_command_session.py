@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.services.command_session import CommandSessionService
+from app.services.event_hub import EventHub
 
 
 class FakeCommandClient:
@@ -44,6 +45,19 @@ async def test_connect_updates_status_and_user_id() -> None:
     assert payload["uid"] == "game_123456"
     assert payload["user_id"] == "123456"
     assert payload["can_disconnect"] is True
+
+
+@pytest.mark.anyio
+async def test_send_command_publishes_control_log() -> None:
+    event_hub = EventHub()
+    service = CommandSessionService(client_factory=FakeCommandClient, event_hub=event_hub)
+    await service.connect(ws_url="ws://127.0.0.1:43001/", uid="game_123456", token="token")
+
+    await service.send_command(command_id="command_one")
+
+    control_events = event_hub.control_snapshot()
+    assert control_events[-1]["type"] == "command_send"
+    assert control_events[-1]["payload"]["command_id"] == "command_one"
 
 
 @pytest.mark.anyio
