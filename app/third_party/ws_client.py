@@ -41,6 +41,7 @@ class ThirdPartyWsClient:
             "LIKE_INFO_V3_CLICK",
             "LIKE_INFO_V3_UPDATE",
             "INTERACT_WORD",
+            "INTERACT_WORD_V2",
         ):
             self._register_handler(
                 live_danmaku=live_danmaku,

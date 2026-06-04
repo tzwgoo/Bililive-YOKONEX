@@ -34,6 +34,7 @@ RULE_GROUP_LABELS = {
     "guard_renew": "续费",
     "interact": "互动事件",
 }
+PRICE_FILTER_EVENT_TYPES = {"gift", "super_chat", "guard_buy", "guard_renew"}
 
 
 class BluetoothService:
@@ -375,6 +376,17 @@ def _build_rule_label(rule: dict) -> str:
             return f"{tier.label} · {min_price}+"
         return f"{tier.label} · {min_price}-{max_price}"
     event_type = str(rule.get("event_type", "") or "")
+    filters = rule.get("filters", {}) if isinstance(rule.get("filters", {}), dict) else {}
+    if event_type in PRICE_FILTER_EVENT_TYPES and (
+        filters.get("min_price") not in (None, "")
+        or filters.get("max_price") not in (None, "")
+    ):
+        min_price = _coerce_non_negative_int(filters.get("min_price"))
+        max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
+        event_label = RULE_GROUP_LABELS.get(event_type, event_type or "事件")
+        if max_price is None:
+            return f"{event_label}档位 · {min_price}+"
+        return f"{event_label}档位 · {min_price}-{max_price}"
     return RULE_GROUP_LABELS.get(event_type, event_type or "unknown")
 
 
@@ -457,7 +469,7 @@ def _build_overlay_recent_events(event_hub: Any | None) -> list[dict[str, Any]]:
 def _is_overlay_recent_event(event: dict[str, Any]) -> bool:
     """判断直播事件是否需要进入 OBS 小窗列表。"""
     event_type = str(event.get("event_type", "") or "")
-    return event_type in {"gift", "super_chat", "guard_buy", "guard_renew", "interact"} or is_danmaku_event_type(event_type)
+    return event_type in {"gift", "super_chat", "guard_buy", "guard_renew", "interact", "like"} or is_danmaku_event_type(event_type)
 
 
 def _summarize_overlay_event(event: dict[str, Any]) -> dict[str, Any]:
@@ -483,6 +495,7 @@ def _resolve_overlay_event_label(event_type: str) -> str:
         return "弹幕"
     return {
         "gift": "礼物",
+        "like": "点赞",
         "super_chat": "醒目留言",
         "guard_buy": "上舰",
         "guard_renew": "续费",
@@ -494,6 +507,10 @@ def _resolve_overlay_event_message(event_type: str, payload: dict[str, Any]) -> 
     """从不同事件负载中提取 OBS 小窗主文本。"""
     if is_danmaku_event_type(event_type):
         return str(payload.get("msg", "") or "")
+    if event_type == "like":
+        like_text = str(payload.get("like_text", "") or "点赞")
+        like_count = _coerce_non_negative_int(payload.get("like_count"))
+        return f"{like_text} ({like_count})" if like_count > 0 else like_text
     if event_type == "super_chat":
         return str(payload.get("message", "") or payload.get("gift_name", "") or "")
     if event_type in {"gift", "guard_buy", "guard_renew"}:
@@ -516,7 +533,7 @@ def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform:
 
 def _resolve_updated_filters(*, current: BluetoothEventRule, incoming: dict[str, Any]) -> dict[str, Any]:
     next_filters = dict(current.filters)
-    if current.event_type != "gift":
+    if current.event_type not in PRICE_FILTER_EVENT_TYPES:
         return next_filters
 
     min_price = _coerce_non_negative_int(incoming.get("min_price"), fallback=_coerce_non_negative_int(next_filters.get("min_price")))
@@ -535,42 +552,44 @@ def _validate_gift_rule_overlaps(
     next_filters_by_rule_id: dict[str, dict[str, Any]],
     next_enabled_by_rule_id: dict[str, bool],
 ) -> None:
-    enabled_gift_rules: list[tuple[str, int, int | None]] = []
-    for rule in rules:
-        if rule.event_type != "gift":
-            continue
-        is_enabled = next_enabled_by_rule_id.get(rule.id, rule.enabled)
-        if not is_enabled:
-            continue
-        filters = next_filters_by_rule_id.get(rule.id, dict(rule.filters))
-        min_price = _coerce_non_negative_int(filters.get("min_price"))
-        max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
-        enabled_gift_rules.append((rule.id, min_price, max_price))
+    for event_type in PRICE_FILTER_EVENT_TYPES:
+        enabled_rules: list[tuple[str, int, int | None]] = []
+        for rule in rules:
+            if rule.event_type != event_type:
+                continue
+            is_enabled = next_enabled_by_rule_id.get(rule.id, rule.enabled)
+            if not is_enabled:
+                continue
+            filters = next_filters_by_rule_id.get(rule.id, dict(rule.filters))
+            min_price = _coerce_non_negative_int(filters.get("min_price"))
+            max_price = _coerce_optional_non_negative_int(filters.get("max_price"))
+            enabled_rules.append((rule.id, min_price, max_price))
 
-    enabled_gift_rules.sort(
-        key=lambda item: (
-            item[1],
-            float("inf") if item[2] is None else item[2],
-            item[0],
+        enabled_rules.sort(
+            key=lambda item: (
+                item[1],
+                float("inf") if item[2] is None else item[2],
+                item[0],
+            )
         )
-    )
 
-    previous_rule_id = ""
-    previous_max_price: int | None = None
-    for rule_id, min_price, max_price in enabled_gift_rules:
-        if previous_max_price is not None and min_price <= previous_max_price:
-            raise ValueError(f"礼物事件的价格区间重叠: {previous_rule_id} 与 {rule_id}")
-        previous_rule_id = rule_id
-        previous_max_price = max_price
-        if previous_max_price is None:
-            break
+        previous_rule_id = ""
+        previous_max_price: int | None = None
+        for rule_id, min_price, max_price in enabled_rules:
+            if previous_max_price is not None and min_price <= previous_max_price:
+                event_label = RULE_GROUP_LABELS.get(event_type, event_type or "事件")
+                raise ValueError(f"{event_label}的价格区间重叠: {previous_rule_id} 与 {rule_id}")
+            previous_rule_id = rule_id
+            previous_max_price = max_price
+            if previous_max_price is None:
+                break
 
 
 def _sort_event_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
     grouped_rules: list[BluetoothEventRule] = []
     for event_type in RULE_GROUP_LABELS:
         event_rules = [item for item in rules if item.event_type == event_type]
-        if event_type == "gift":
+        if event_type in PRICE_FILTER_EVENT_TYPES:
             event_rules = sorted(
                 event_rules,
                 key=lambda item: (

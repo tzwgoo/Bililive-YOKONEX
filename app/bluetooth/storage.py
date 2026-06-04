@@ -127,6 +127,7 @@ def _normalize_channel_strength(value) -> int:
 def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
     rules = _migrate_legacy_gift_default_rule(rules)
     rules = _migrate_legacy_danmaku_default_rules(rules)
+    rules = _migrate_legacy_special_event_rules(rules)
     rules = _append_missing_special_event_rules(rules)
     rule_map = {rule.id: rule for rule in rules}
     for rule_id in ("like-default",):
@@ -136,6 +137,49 @@ def _migrate_legacy_default_rules(rules: list[BluetoothEventRule]) -> list[Bluet
         if rule_id == "like-default" and rule.event_type == "like" and rule.waveform_id == "ems-preset-01" and rule.enabled is False:
             rule.enabled = True
     return rules
+
+
+def _migrate_legacy_special_event_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:
+    legacy_rule_ids = {
+        "super-chat-default",
+        "guard-buy-default",
+        "guard-renew-default",
+    }
+    has_legacy_special_rule = any(rule.id in legacy_rule_ids for rule in rules)
+    has_new_special_rule = any(
+        rule.id.startswith("super-chat-tier-")
+        or rule.id.startswith("guard-buy-tier-")
+        or rule.id.startswith("guard-renew-tier-")
+        for rule in rules
+    )
+    if not has_legacy_special_rule or has_new_special_rule:
+        return rules
+
+    legacy_rules_by_event_type = {
+        rule.event_type: rule
+        for rule in rules
+        if rule.id in legacy_rule_ids
+    }
+    migrated_rules: list[BluetoothEventRule] = []
+    for default_rule in build_default_special_event_rules(enabled=True):
+        if default_rule.event_type == "interact":
+            continue
+        legacy_rule = legacy_rules_by_event_type.get(default_rule.event_type)
+        if legacy_rule is None:
+            migrated_rules.append(default_rule)
+            continue
+        migrated_rules.append(
+            BluetoothEventRule(
+                id=default_rule.id,
+                enabled=legacy_rule.enabled,
+                event_type=default_rule.event_type,
+                waveform_id=default_rule.waveform_id,
+                cooldown_seconds=legacy_rule.cooldown_seconds,
+                filters=dict(default_rule.filters),
+            )
+        )
+    remaining_rules = [rule for rule in rules if rule.id not in legacy_rule_ids]
+    return [*remaining_rules, *migrated_rules]
 
 
 def _append_missing_special_event_rules(rules: list[BluetoothEventRule]) -> list[BluetoothEventRule]:

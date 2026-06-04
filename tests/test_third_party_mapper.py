@@ -302,3 +302,29 @@ def test_map_interact_word_to_standard_interact_event() -> None:
     assert event["payload"]["uid"] == 10086
     assert event["payload"]["interact_type"] == "share"
     assert event["payload"]["interact_label"] == "分享"
+
+
+def test_map_interact_word_v2_to_standard_interact_event() -> None:
+    event = map_third_party_message(
+        {
+            "cmd": "INTERACT_WORD_V2",
+            "data": {
+                "pb_decoded": {
+                    "uid": 10010,
+                    "uname": "进房用户",
+                    "msg_type": 1,
+                    "trigger_time": 1714113099,
+                }
+            },
+        },
+        room_id=789,
+    )
+
+    assert event is not None
+    assert event["event_type"] == "interact"
+    assert event["source"] == "third_party_ws"
+    assert event["uname"] == "进房用户"
+    assert event["payload"]["uid"] == 10010
+    assert event["payload"]["msg_type"] == 1
+    assert event["payload"]["interact_type"] == "enter"
+    assert event["payload"]["interact_label"] == "进房"

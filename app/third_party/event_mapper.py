@@ -151,8 +151,8 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
             },
         }
 
-    if cmd == "INTERACT_WORD":
-        data = message.get("data", {})
+    if cmd in {"INTERACT_WORD", "INTERACT_WORD_V2"}:
+        data = _resolve_interact_data(message.get("data", {}))
         msg_type = _as_int(data.get("msg_type"))
         interact_type = _resolve_interact_type(msg_type)
         return {
@@ -207,6 +207,15 @@ def _resolve_like_count(data: dict[str, Any]) -> int:
         if key in data:
             return _as_int(data.get(key))
     return 0
+
+
+def _resolve_interact_data(data: Any) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return {}
+    pb_decoded = data.get("pb_decoded")
+    if isinstance(pb_decoded, dict) and pb_decoded:
+        return pb_decoded
+    return data
 
 
 def _extract_danmaku_uid(info: list[Any]) -> int:

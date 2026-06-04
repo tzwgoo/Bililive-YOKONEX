@@ -85,9 +85,90 @@ BLUETOOTH_DANMAKU_RULE_DEFINITIONS = [
 
 
 BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS = [
-    {"id": "super-chat-default", "event_type": "super_chat", "waveform_id": "ems-preset-07", "label": "醒目留言", "filters": {}},
-    {"id": "guard-buy-default", "event_type": "guard_buy", "waveform_id": "ems-preset-08", "label": "上舰", "filters": {}},
-    {"id": "guard-renew-default", "event_type": "guard_renew", "waveform_id": "ems-preset-08", "label": "续费", "filters": {}},
+    {
+        "id": "super-chat-tier-01",
+        "event_type": "super_chat",
+        "waveform_id": "ems-preset-07",
+        "label": "醒目留言档位 01",
+        "filters": {"min_price": 30, "max_price": 49},
+    },
+    {
+        "id": "super-chat-tier-02",
+        "event_type": "super_chat",
+        "waveform_id": "ems-preset-08",
+        "label": "醒目留言档位 02",
+        "filters": {"min_price": 50, "max_price": 99},
+    },
+    {
+        "id": "super-chat-tier-03",
+        "event_type": "super_chat",
+        "waveform_id": "ems-preset-09",
+        "label": "醒目留言档位 03",
+        "filters": {"min_price": 100, "max_price": 499},
+    },
+    {
+        "id": "super-chat-tier-04",
+        "event_type": "super_chat",
+        "waveform_id": "ems-preset-10",
+        "label": "醒目留言档位 04",
+        "filters": {"min_price": 500, "max_price": 999},
+    },
+    {
+        "id": "super-chat-tier-05",
+        "event_type": "super_chat",
+        "waveform_id": "ems-preset-11",
+        "label": "醒目留言档位 05",
+        "filters": {"min_price": 1000, "max_price": 1999},
+    },
+    {
+        "id": "super-chat-tier-06",
+        "event_type": "super_chat",
+        "waveform_id": "ems-preset-12",
+        "label": "醒目留言档位 06",
+        "filters": {"min_price": 2000, "max_price": None},
+    },
+    {
+        "id": "guard-buy-tier-01",
+        "event_type": "guard_buy",
+        "waveform_id": "ems-preset-13",
+        "label": "上舰档位 01",
+        "filters": {"min_price": 100000, "max_price": 999999},
+    },
+    {
+        "id": "guard-buy-tier-02",
+        "event_type": "guard_buy",
+        "waveform_id": "ems-preset-14",
+        "label": "上舰档位 02",
+        "filters": {"min_price": 1000000, "max_price": 9999999},
+    },
+    {
+        "id": "guard-buy-tier-03",
+        "event_type": "guard_buy",
+        "waveform_id": "ems-preset-15",
+        "label": "上舰档位 03",
+        "filters": {"min_price": 10000000, "max_price": None},
+    },
+    {
+        "id": "guard-renew-tier-01",
+        "event_type": "guard_renew",
+        "waveform_id": "ems-preset-10",
+        "label": "续费档位 01",
+        "filters": {"min_price": 50000, "max_price": 999999},
+    },
+    {
+        "id": "guard-renew-tier-02",
+        "event_type": "guard_renew",
+        "waveform_id": "ems-preset-11",
+        "label": "续费档位 02",
+        "filters": {"min_price": 1000000, "max_price": 9999999},
+    },
+    {
+        "id": "guard-renew-tier-03",
+        "event_type": "guard_renew",
+        "waveform_id": "ems-preset-12",
+        "label": "续费档位 03",
+        "filters": {"min_price": 10000000, "max_price": None},
+    },
     {"id": "interact-default", "event_type": "interact", "waveform_id": "ems-preset-02", "label": "互动事件", "filters": {"interact_types": []}},
 ]
 

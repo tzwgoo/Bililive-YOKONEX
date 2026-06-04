@@ -131,3 +131,4 @@ async def test_ws_client_registers_extended_gift_related_events() -> None:
     assert "SUPER_CHAT_MESSAGE_JPN" in registered_events
     assert "USER_TOAST_MSG" in registered_events
     assert "INTERACT_WORD" in registered_events
+    assert "INTERACT_WORD_V2" in registered_events

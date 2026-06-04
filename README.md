@@ -99,9 +99,16 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
       "command_slot": "command_one"
     },
     {
-      "min_price": 100,
-      "max_price": 999,
-      "command_slot": "command_two"
+      "event_type": "super_chat",
+      "min_price": 30,
+      "max_price": 49,
+      "command_slot": "command_one"
+    },
+    {
+      "event_type": "guard_buy",
+      "min_price": 100000,
+      "max_price": 999999,
+      "command_slot": "command_eight"
     }
   ],
   "like_rules": [
@@ -116,8 +123,18 @@ GIFT_MAPPING_PATH=config/gift_command_mappings.json
 规则说明：
 
 - 取礼物事件里的单个礼物价格，优先使用 `r_price`，没有时回退到 `price`
+- 默认配置已经预置四组独立事件规则：
+  - 普通礼物 `gift`
+  - 醒目留言 `super_chat`
+  - 上舰 `guard_buy`
+  - 续费 `guard_renew`
 - 如果价格落在某个 `min_price ~ max_price` 区间内，就命中对应的 `command_slot`
+- `event_type` 不填时默认按普通礼物 `gift` 处理
 - `max_price` 可以填 `null`，表示“不设上限”
+- 默认醒目留言档位按 B 站当前公开价格区间预置：`30~49 / 50~99 / 100~499 / 500~999 / 1000~1999 / 2000+`
+- 默认上舰 / 续费档位按项目当前接收的原始价格字段预置，便于直接匹配第三方事件：
+  - `guard_buy`：舰长常见落在 `100000~999999`，提督 `1000000~9999999`，总督 `10000000+`
+  - `guard_renew`：续费舰长常见落在 `50000~999999`，提督 `1000000~9999999`，总督 `10000000+`
 - `command_slot` 只允许使用以下 10 个固定值：
   - `command_one`
   - `command_two`

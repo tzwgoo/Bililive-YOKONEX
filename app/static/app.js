@@ -55,10 +55,13 @@ const danmakuCooldownSecondsLabel = document.getElementById("danmaku-cooldown-se
 const danmakuUserLimitWindowSecondsLabel = document.getElementById("danmaku-user-limit-window-seconds-label");
 const danmakuUserLimitMaxTriggersLabel = document.getElementById("danmaku-user-limit-max-triggers-label");
 const danmakuMinGuardLevelLabel = document.getElementById("danmaku-min-guard-level-label");
+const dashboardTabButtons = Array.from(document.querySelectorAll("#dashboard-tab-nav [data-tab-target]"));
+const dashboardTabPanels = Array.from(document.querySelectorAll('.dashboard-tabs [data-tab-panel]'));
 const fixedDanmakuCommandId = "danmaku_trigger";
 const commandWsUrlStorageKey = "biliLive.commandWsUrl";
 const commandUidStorageKey = "biliLive.commandUid";
 const commandTokenStorageKey = "biliLive.commandToken";
+const dashboardTabStorageKey = "biliLive.dashboardTab";
 const sessionModeStorageKey = "biliLive.sessionMode";
 const sessionValueStorageKey = "biliLive.sessionValue";
 const connectionModeStorageKey = "biliLive.connectionMode";
@@ -103,6 +106,25 @@ const danmakuGuardDisplayOptions = {
   3: "舰长",
 };
 const danmakuEventTypes = new Set(["danmaku", "danmaku_captain", "danmaku_commander", "danmaku_governor"]);
+
+function activateDashboardTab(tabId) {
+  if (!tabId) {
+    return;
+  }
+  let matched = false;
+  dashboardTabButtons.forEach((button) => {
+    const isActive = button.dataset.tabTarget === tabId;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    matched = matched || isActive;
+  });
+  dashboardTabPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.tabPanel !== tabId;
+  });
+  if (matched) {
+    window.localStorage.setItem(dashboardTabStorageKey, tabId);
+  }
+}
 
 function restoreCommandForm() {
   const savedWsUrl = window.localStorage.getItem(commandWsUrlStorageKey);
@@ -743,6 +765,12 @@ commandWsUrlInput.addEventListener("change", persistCommandForm);
 commandUidInput.addEventListener("change", persistCommandForm);
 commandTokenInput.addEventListener("change", persistCommandForm);
 
+dashboardTabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    activateDashboardTab(button.dataset.tabTarget || "");
+  });
+});
+
 const source = new EventSource("/api/events/stream");
 source.onmessage = (event) => {
   renderEvent(JSON.parse(event.data));
@@ -770,5 +798,6 @@ restoreSessionDraft();
 updateSessionModeForm();
 updateConnectionModeForm();
 updateEventCounts();
+activateDashboardTab(window.localStorage.getItem(dashboardTabStorageKey) || dashboardTabButtons[0]?.dataset.tabTarget || "session-panel");
 refreshDashboard();
 setInterval(refreshDashboard, 5000);

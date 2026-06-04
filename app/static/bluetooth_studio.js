@@ -17,6 +17,9 @@ const deleteWaveformButton = document.getElementById("studio-delete-waveform-btn
 const saveWaveformButton = document.getElementById("studio-save-waveform-btn");
 const addStepButton = document.getElementById("studio-add-step-btn");
 const sortGiftRulesButton = document.getElementById("studio-sort-gift-rules-btn");
+const bluetoothStudioTabButtons = Array.from(document.querySelectorAll("#bluetooth-studio-tab-nav [data-tab-target]"));
+const bluetoothStudioTabPanels = Array.from(document.querySelectorAll('.studio-tabs [data-tab-panel]'));
+const bluetoothStudioTabStorageKey = "biliLive.bluetoothStudioTab";
 
 const bluetoothRuleGroupLabels = {
   gift: "礼物事件",
@@ -30,6 +33,7 @@ const bluetoothRuleGroupLabels = {
   guard_renew: "续费",
   interact: "互动事件",
 };
+const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_renew"]);
 
 let studioWaveforms = [];
 let studioRuleGroups = [];
@@ -37,6 +41,25 @@ let selectedWaveformId = "";
 let draftWaveform = null;
 let draftDirty = false;
 let activeDragHandle = null;
+
+function activateBluetoothStudioTab(tabId) {
+  if (!tabId) {
+    return;
+  }
+  let matched = false;
+  bluetoothStudioTabButtons.forEach((button) => {
+    const isActive = button.dataset.tabTarget === tabId;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    matched = matched || isActive;
+  });
+  bluetoothStudioTabPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.tabPanel !== tabId;
+  });
+  if (matched) {
+    window.localStorage.setItem(bluetoothStudioTabStorageKey, tabId);
+  }
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -250,7 +273,7 @@ function normalizeRuleMaxPriceValue(value) {
 
 function sortGiftRulesByPrice(ruleGroups) {
   return (Array.isArray(ruleGroups) ? ruleGroups : []).map((group) => {
-    if (group.group_id !== "gift") {
+    if (!priceFilterGroupIds.has(group.group_id)) {
       return group;
     }
     const nextRules = [...(group.rules || [])].sort((left, right) => {
@@ -297,7 +320,7 @@ function renderRuleGroups(ruleGroups) {
                   <span>对应波形</span>
                   <select data-role="waveform-id">${buildWaveformOptions(rule.waveform_id)}</select>
                 </label>
-                ${group.group_id === "gift"
+                ${priceFilterGroupIds.has(group.group_id)
                   ? `
                   <div class="studio-rule-price-grid">
                     <label class="studio-rule-select">
@@ -775,7 +798,13 @@ saveButton.addEventListener("click", async () => {
 sortGiftRulesButton?.addEventListener("click", () => {
   studioRuleGroups = sortGiftRulesByPrice(collectRuleGroupsFromDom());
   renderRuleGroups(studioRuleGroups);
-  studioMessageText.textContent = "礼物价格档位已按价格升序整理。";
+  studioMessageText.textContent = "价格档位已按价格升序整理。";
+});
+
+bluetoothStudioTabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    activateBluetoothStudioTab(button.dataset.tabTarget || "");
+  });
 });
 
 function collectRuleGroupsFromDom() {
@@ -807,3 +836,7 @@ function collectRuleGroupsFromDom() {
 refreshStudio().catch((error) => {
   waveformMessageText.textContent = `页面初始化失败: ${error}`;
 });
+
+activateBluetoothStudioTab(
+  window.localStorage.getItem(bluetoothStudioTabStorageKey) || bluetoothStudioTabButtons[0]?.dataset.tabTarget || "waveform-library-panel"
+);

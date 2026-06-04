@@ -27,19 +27,31 @@
         </div>
       </section>
 
-      <section class="studio-layout studio-layout-single">
-        <div class="studio-main-stack">
-          <article class="panel studio-panel">
-            <div class="section-head">
-              <div>
-                <p class="section-kicker">Gift Mapping</p>
-                <h2>礼物与独立事件价格档位</h2>
-              </div>
-            </div>
-            <p class="hint" id="command-studio-message-text">修改后点击“保存 IM 规则”立即生效，也支持按价格升序整理。</p>
-            <div id="command-studio-gift-rules" class="studio-rule-groups"></div>
-          </article>
+      <section class="tab-shell studio-tabs">
+        <div class="tab-nav" id="command-studio-tab-nav" role="tablist" aria-label="IM 规则标签切换">
+          <button class="tab-button" type="button" data-tab-target="gift-rules-panel" role="tab" aria-selected="false">价格规则</button>
+          <button class="tab-button" type="button" data-tab-target="like-command-panel" role="tab" aria-selected="false">点赞指令</button>
+          <button class="tab-button" type="button" data-tab-target="danmaku-command-panel" role="tab" aria-selected="false">弹幕指令</button>
+        </div>
 
+        <section class="tab-panel" data-tab-panel="gift-rules-panel">
+          <div class="studio-layout studio-layout-single">
+            <div class="studio-main-stack">
+              <article class="panel studio-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="section-kicker">Gift Mapping</p>
+                    <h2>礼物与独立事件价格档位</h2>
+                  </div>
+                </div>
+                <p class="hint" id="command-studio-message-text">修改后点击“保存 IM 规则”立即生效，也支持按价格升序整理。</p>
+                <div id="command-studio-gift-rules" class="studio-rule-groups"></div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-tab-panel="like-command-panel" hidden>
           <article class="panel studio-panel">
             <div class="section-head">
               <div>
@@ -50,7 +62,9 @@
             <p class="hint">点赞指令固定，不支持在页面修改。点赞倍数阈值请在监听控制台设置。</p>
             <div id="command-studio-like-fixed-id" class="studio-rule-groups"></div>
           </article>
+        </section>
 
+        <section class="tab-panel" data-tab-panel="danmaku-command-panel" hidden>
           <article class="panel studio-panel">
             <div class="section-head">
               <div>
@@ -61,7 +75,7 @@
             <p class="hint">弹幕指令固定，不支持在页面修改。</p>
             <div id="command-studio-danmaku-fixed-ids" class="studio-rule-groups"></div>
           </article>
-        </div>
+        </section>
       </section>
     </main>
 

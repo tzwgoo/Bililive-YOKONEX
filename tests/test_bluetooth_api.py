@@ -333,6 +333,28 @@ def test_bluetooth_overlay_status_endpoint_includes_recent_events() -> None:
     assert response.json()["recent_events"][0]["msg"] == "开火"
 
 
+def test_bluetooth_overlay_status_endpoint_includes_recent_like_event() -> None:
+    app = create_app()
+    app.state.event_hub.publish(
+        {
+            "event_type": "like",
+            "uname": "点赞用户",
+            "timestamp": 1714113038,
+            "payload": {
+                "like_text": "点赞了直播间",
+                "like_count": 120,
+            },
+        }
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/bluetooth/overlay/status")
+
+    assert response.status_code == 200
+    assert response.json()["recent_events"][0]["event_label"] == "点赞"
+    assert response.json()["recent_events"][0]["msg"] == "点赞了直播间 (120)"
+
+
 def test_bluetooth_overlay_stream_endpoint_uses_sse_content_type() -> None:
     app = create_app()
     app.state.bluetooth_service = FakeBluetoothService()

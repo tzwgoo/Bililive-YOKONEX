@@ -61,7 +61,12 @@ async def test_service_status_payload_includes_runtime_details(
     assert status["rules"][14]["event_label"] == "总督弹幕"
     assert status["rules"][14]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
     assert status["rules"][15]["event_label"] == "醒目留言"
-    assert status["rules"][18]["event_label"] == "互动事件"
+    assert status["rules"][15]["rule_label"] == "醒目留言档位 · 30-49"
+    assert status["rules"][21]["event_label"] == "上舰"
+    assert status["rules"][21]["rule_label"] == "上舰档位 · 100000-999999"
+    assert status["rules"][24]["event_label"] == "续费"
+    assert status["rules"][24]["rule_label"] == "续费档位 · 50000-999999"
+    assert status["rules"][27]["event_label"] == "互动事件"
     assert status["battery_level"] is None
 
 
@@ -130,6 +135,34 @@ def test_service_overlay_payload_includes_recent_live_events(
     assert overlay["recent_events"][0]["msg"] == "开火"
     assert overlay["recent_events"][0]["event_label"] == "弹幕"
     assert overlay["recent_events"][0]["guard_label"] == "舰长"
+
+
+def test_service_overlay_payload_includes_recent_like_event(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    event_hub.publish(
+        {
+            "event_type": "like",
+            "uname": "点赞用户",
+            "timestamp": 1714113038,
+            "payload": {
+                "like_text": "点赞了直播间",
+                "like_count": 120,
+            },
+        }
+    )
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    overlay = service.get_overlay_payload()
+
+    assert overlay["recent_events"][0]["event_label"] == "点赞"
+    assert overlay["recent_events"][0]["msg"] == "点赞了直播间 (120)"
 
 
 def test_create_default_prefers_real_runtime_when_available(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -302,6 +335,66 @@ def test_service_save_rules_rejects_overlapping_enabled_gift_price_ranges(
                     "waveform_id": "ems-preset-02",
                     "min_price": 100,
                     "max_price": 299,
+                },
+            ]
+        )
+
+
+def test_service_save_rules_allows_editing_super_chat_price_ranges(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    payload = service.save_rules(
+        [
+            {
+                "id": "super-chat-tier-02",
+                "enabled": True,
+                "waveform_id": "ems-preset-08",
+                "min_price": 60,
+                "max_price": 99,
+            }
+        ]
+    )
+
+    sc_group = next(group for group in payload["rule_groups"] if group["group_id"] == "super_chat")
+    sc_rule = next(rule for rule in sc_group["rules"] if rule["id"] == "super-chat-tier-02")
+
+    assert sc_rule["filters"] == {"min_price": 60, "max_price": 99}
+    assert sc_rule["rule_label"] == "醒目留言档位 · 60-99"
+
+
+def test_service_save_rules_rejects_overlapping_enabled_super_chat_price_ranges(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    with pytest.raises(ValueError, match="醒目留言的价格区间重叠"):
+        service.save_rules(
+            [
+                {
+                    "id": "super-chat-tier-01",
+                    "enabled": True,
+                    "waveform_id": "ems-preset-07",
+                    "min_price": 30,
+                    "max_price": 80,
+                },
+                {
+                    "id": "super-chat-tier-02",
+                    "enabled": True,
+                    "waveform_id": "ems-preset-08",
+                    "min_price": 80,
+                    "max_price": 120,
                 },
             ]
         )

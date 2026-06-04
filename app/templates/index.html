@@ -25,258 +25,270 @@
         </div>
       </section>
 
-      <section class="controls-shell">
-        <article class="panel controls control-panel live-panel">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">Live Session</p>
-              <h2>直播监听</h2>
-              <p class="subtitle">主监听参数、礼物点赞触发和弹幕关键词触发拆开管理，联调更直观，也更不容易配错。</p>
-            </div>
-          </div>
-          <div class="session-layout">
-            <section class="config-card config-card-primary">
-              <div class="config-card-head">
-                <p class="section-kicker">Session Core</p>
-                <h3>监听主参数</h3>
-              </div>
-              <div class="control-grid session-grid session-grid-primary">
-                <div class="field">
-                  <label for="session-mode">监听模式</label>
-                  <select id="session-mode">
-                    <option value="open_live">官方 open-live</option>
-                    <option value="third_party">第三方房间消息流</option>
-                  </select>
-                </div>
-                <div class="field session-value-field">
-                  <label for="session-value-input" id="session-value-label">主播身份码</label>
-                  <input id="session-value-input" type="text" placeholder="请输入主播身份码 code" />
-                </div>
-              </div>
-            </section>
+      <section class="tab-shell dashboard-tabs">
+        <div class="tab-nav" id="dashboard-tab-nav" role="tablist" aria-label="主控台标签切换">
+          <button class="tab-button" type="button" data-tab-target="session-panel" role="tab" aria-selected="false">监听配置</button>
+          <button class="tab-button" type="button" data-tab-target="connection-panel" role="tab" aria-selected="false">连接中心</button>
+          <button class="tab-button" type="button" data-tab-target="events-panel" role="tab" aria-selected="false">事件流</button>
+        </div>
 
-            <section class="config-card config-card-signal">
-              <div class="config-card-head">
-                <p class="section-kicker">Gift & Like</p>
-                <h3>礼物 / 点赞触发</h3>
-              </div>
-              <div class="control-grid session-grid">
-                <div class="field">
-                  <label for="trigger-mode">礼物触发模式</label>
-                  <select id="trigger-mode">
-                    <option value="by_quantity">按礼物数量触发</option>
-                    <option value="single">单次触发</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="like-multiple">点赞倍数</label>
-                  <input id="like-multiple" type="number" min="1" step="1" value="100" placeholder="点赞每满多少触发一次" />
-                </div>
-              </div>
-            </section>
-
-            <section class="config-card config-card-chat">
-              <div class="config-card-head">
-                <p class="section-kicker">Danmaku Trigger</p>
-                <h3>弹幕关键词触发</h3>
-              </div>
-              <div class="control-grid session-grid">
-                <div class="field">
-                  <label for="danmaku-enabled">触发开关</label>
-                  <select id="danmaku-enabled">
-                    <option value="false">关闭</option>
-                    <option value="true">开启</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="danmaku-cooldown-seconds">弹幕冷却秒数</label>
-                  <input id="danmaku-cooldown-seconds" type="number" min="0" step="1" value="0" placeholder="0 表示不冷却" />
-                </div>
-                <div class="field">
-                  <label for="danmaku-user-limit-window-seconds">每用户限流窗口</label>
-                  <input id="danmaku-user-limit-window-seconds" type="number" min="0" step="1" value="0" placeholder="0 表示不限流" />
-                </div>
-                <div class="field">
-                  <label for="danmaku-user-limit-max-triggers">窗口内最大触发次数</label>
-                  <input id="danmaku-user-limit-max-triggers" type="number" min="0" step="1" value="0" placeholder="0 表示不限流" />
-                </div>
-                <div class="field">
-                  <label for="danmaku-min-guard-level">最低舰队等级</label>
-                  <select id="danmaku-min-guard-level">
-                    <option value="0">不限</option>
-                    <option value="3">舰长及以上</option>
-                    <option value="2">提督及以上</option>
-                    <option value="1">总督</option>
-                  </select>
-                </div>
-                <div class="field session-value-field">
-                  <label for="danmaku-keywords">弹幕关键词</label>
-                  <input id="danmaku-keywords" type="text" placeholder="多个关键词用逗号分隔，例如 开火,冲冲冲" />
-                </div>
-              </div>
-            </section>
-          </div>
-          <div class="buttons">
-            <button id="start-btn">启动监听</button>
-            <button id="stop-btn" class="secondary">停止监听</button>
-          </div>
-          <p class="hint" id="message-text">等待启动</p>
-        </article>
-
-        <aside class="sidebar-stack">
-          <article class="panel controls control-panel command-panel" id="connection-mode-panel">
+        <section class="tab-panel" data-tab-panel="session-panel">
+          <article class="panel controls control-panel live-panel">
             <div class="section-head">
               <div>
-                <p class="section-kicker">Connection Mode</p>
-                <h2>连接方式</h2>
-                <p class="subtitle">在同一个入口里切换 IM 指令或蓝牙连接，连接成功后再启动直播监听。</p>
+                <p class="section-kicker">Live Session</p>
+                <h2>直播监听</h2>
+                <p class="subtitle">主监听参数、礼物点赞触发和弹幕关键词触发拆开管理，联调更直观，也更不容易配错。</p>
               </div>
             </div>
-            <div class="control-grid command-grid">
-              <div class="field field-span-2">
-                <label for="connection-mode">连接方式</label>
-                <select id="connection-mode">
-                  <option value="im">IM 指令</option>
-                  <option value="bluetooth">蓝牙</option>
-                </select>
-              </div>
-            </div>
-
-            <section id="command-connection-section">
-              <div class="section-head section-head-compact">
-                <div>
-                  <p class="section-kicker">Command Gateway</p>
-                  <h3>IM 指令连接</h3>
+            <div class="session-layout">
+              <section class="config-card config-card-primary">
+                <div class="config-card-head">
+                  <p class="section-kicker">Session Core</p>
+                  <h3>监听主参数</h3>
                 </div>
-                <div class="status-pill" id="command-status-pill">idle</div>
+                <div class="control-grid session-grid session-grid-primary">
+                  <div class="field">
+                    <label for="session-mode">监听模式</label>
+                    <select id="session-mode">
+                      <option value="open_live">官方 open-live</option>
+                      <option value="third_party">第三方房间消息流</option>
+                    </select>
+                  </div>
+                  <div class="field session-value-field">
+                    <label for="session-value-input" id="session-value-label">主播身份码</label>
+                    <input id="session-value-input" type="text" placeholder="请输入主播身份码 code" />
+                  </div>
+                </div>
+              </section>
+
+              <section class="config-card config-card-signal">
+                <div class="config-card-head">
+                  <p class="section-kicker">Gift & Like</p>
+                  <h3>礼物 / 点赞触发</h3>
+                </div>
+                <div class="control-grid session-grid">
+                  <div class="field">
+                    <label for="trigger-mode">礼物触发模式</label>
+                    <select id="trigger-mode">
+                      <option value="by_quantity">按礼物数量触发</option>
+                      <option value="single">单次触发</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="like-multiple">点赞倍数</label>
+                    <input id="like-multiple" type="number" min="1" step="1" value="100" placeholder="点赞每满多少触发一次" />
+                  </div>
+                </div>
+              </section>
+
+              <section class="config-card config-card-chat">
+                <div class="config-card-head">
+                  <p class="section-kicker">Danmaku Trigger</p>
+                  <h3>弹幕关键词触发</h3>
+                </div>
+                <div class="control-grid session-grid">
+                  <div class="field">
+                    <label for="danmaku-enabled">触发开关</label>
+                    <select id="danmaku-enabled">
+                      <option value="false">关闭</option>
+                      <option value="true">开启</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="danmaku-cooldown-seconds">弹幕冷却秒数</label>
+                    <input id="danmaku-cooldown-seconds" type="number" min="0" step="1" value="0" placeholder="0 表示不冷却" />
+                  </div>
+                  <div class="field">
+                    <label for="danmaku-user-limit-window-seconds">每用户限流窗口</label>
+                    <input id="danmaku-user-limit-window-seconds" type="number" min="0" step="1" value="0" placeholder="0 表示不限流" />
+                  </div>
+                  <div class="field">
+                    <label for="danmaku-user-limit-max-triggers">窗口内最大触发次数</label>
+                    <input id="danmaku-user-limit-max-triggers" type="number" min="0" step="1" value="0" placeholder="0 表示不限流" />
+                  </div>
+                  <div class="field">
+                    <label for="danmaku-min-guard-level">最低舰队等级</label>
+                    <select id="danmaku-min-guard-level">
+                      <option value="0">不限</option>
+                      <option value="3">舰长及以上</option>
+                      <option value="2">提督及以上</option>
+                      <option value="1">总督</option>
+                    </select>
+                  </div>
+                  <div class="field session-value-field">
+                    <label for="danmaku-keywords">弹幕关键词</label>
+                    <input id="danmaku-keywords" type="text" placeholder="多个关键词用逗号分隔，例如 开火,冲冲冲" />
+                  </div>
+                </div>
+              </section>
+            </div>
+            <div class="buttons">
+              <button id="start-btn">启动监听</button>
+              <button id="stop-btn" class="secondary">停止监听</button>
+            </div>
+            <p class="hint" id="message-text">等待启动</p>
+          </article>
+        </section>
+
+        <section class="tab-panel" data-tab-panel="connection-panel" hidden>
+          <section class="controls-shell dashboard-controls-shell">
+            <article class="panel controls control-panel command-panel" id="connection-mode-panel">
+              <div class="section-head">
+                <div>
+                  <p class="section-kicker">Connection Mode</p>
+                  <h2>连接方式</h2>
+                  <p class="subtitle">在同一个入口里切换 IM 指令或蓝牙连接，连接成功后再启动直播监听。</p>
+                </div>
               </div>
               <div class="control-grid command-grid">
                 <div class="field field-span-2">
-                  <label for="command-ws-url">WS URL</label>
-                  <input id="command-ws-url" type="text" placeholder="ws://103.236.55.92:43001/" />
-                </div>
-                <div class="field">
-                  <label for="command-uid">UID</label>
-                  <input id="command-uid" type="text" placeholder="请输入下游服务 UID" />
-                </div>
-                <div class="field">
-                  <label for="command-token">TOKEN</label>
-                  <input id="command-token" type="password" placeholder="请输入下游服务 TOKEN" />
+                  <label for="connection-mode">连接方式</label>
+                  <select id="connection-mode">
+                    <option value="im">IM 指令</option>
+                    <option value="bluetooth">蓝牙</option>
+                  </select>
                 </div>
               </div>
-              <div class="buttons">
-                <button id="command-connect-btn">登录指令通道</button>
-                <button id="command-disconnect-btn" class="secondary">退出指令通道</button>
-                <a class="button-link secondary-link" href="/command/studio">IM 规则中心</a>
-              </div>
-              <p class="hint" id="command-message-text">未登录</p>
-              <div class="meta-inline">
-                <span>当前 UID：<strong id="command-status-uid">-</strong></span>
-                <span>当前 User ID：<strong id="command-user-id">-</strong></span>
-                <span>最近登录时间：<strong id="command-last-login-at">-</strong></span>
-              </div>
-            </section>
 
-            <section id="bluetooth-connection-section">
+              <section id="command-connection-section">
+                <div class="section-head section-head-compact">
+                  <div>
+                    <p class="section-kicker">Command Gateway</p>
+                    <h3>IM 指令连接</h3>
+                  </div>
+                  <div class="status-pill" id="command-status-pill">idle</div>
+                </div>
+                <div class="control-grid command-grid">
+                  <div class="field field-span-2">
+                    <label for="command-ws-url">WS URL</label>
+                    <input id="command-ws-url" type="text" placeholder="ws://103.236.55.92:43001/" />
+                  </div>
+                  <div class="field">
+                    <label for="command-uid">UID</label>
+                    <input id="command-uid" type="text" placeholder="请输入下游服务 UID" />
+                  </div>
+                  <div class="field">
+                    <label for="command-token">TOKEN</label>
+                    <input id="command-token" type="password" placeholder="请输入下游服务 TOKEN" />
+                  </div>
+                </div>
+                <div class="buttons">
+                  <button id="command-connect-btn">登录指令通道</button>
+                  <button id="command-disconnect-btn" class="secondary">退出指令通道</button>
+                  <a class="button-link secondary-link" href="/command/studio">IM 规则中心</a>
+                </div>
+                <p class="hint" id="command-message-text">未登录</p>
+                <div class="meta-inline">
+                  <span>当前 UID：<strong id="command-status-uid">-</strong></span>
+                  <span>当前 User ID：<strong id="command-user-id">-</strong></span>
+                  <span>最近登录时间：<strong id="command-last-login-at">-</strong></span>
+                </div>
+              </section>
+
+              <section id="bluetooth-connection-section">
+                <div class="section-head section-head-compact">
+                  <div>
+                    <p class="section-kicker">EMS Bluetooth</p>
+                    <h3>蓝牙连接</h3>
+                  </div>
+                  <div class="status-pill" id="bluetooth-status-pill">idle</div>
+                </div>
+                <div class="buttons">
+                  <button id="bluetooth-scan-btn">扫描设备</button>
+                  <button id="bluetooth-disconnect-btn" class="secondary">断开设备</button>
+                  <a class="button-link secondary-link" href="/bluetooth/overlay" target="_blank" rel="noopener noreferrer">OBS 小窗</a>
+                  <a class="button-link secondary-link" href="/bluetooth/studio">波形与事件规则</a>
+                </div>
+                <p class="hint" id="bluetooth-message-text">未连接</p>
+                <div class="bluetooth-grid">
+                  <section class="bluetooth-card">
+                    <div class="stream-head">
+                      <h3>设备列表</h3>
+                    </div>
+                    <div id="bluetooth-devices" class="mini-list"></div>
+                  </section>
+                  <details class="bluetooth-preview-collapse" id="bluetooth-rules-details">
+                    <summary class="bluetooth-preview-summary">查看事件规则预览</summary>
+                    <section class="bluetooth-card bluetooth-card-preview">
+                      <div class="stream-head">
+                        <h3>事件规则</h3>
+                      </div>
+                      <div id="bluetooth-rules" class="mini-list"></div>
+                    </section>
+                  </details>
+                </div>
+              </section>
+            </article>
+
+            <article class="panel meta meta-sidebar">
               <div class="section-head section-head-compact">
                 <div>
-                  <p class="section-kicker">EMS Bluetooth</p>
-                  <h3>蓝牙连接</h3>
+                  <p class="section-kicker">Runtime Snapshot</p>
+                  <h2>运行状态</h2>
                 </div>
-                <div class="status-pill" id="bluetooth-status-pill">idle</div>
               </div>
-              <div class="buttons">
-                <button id="bluetooth-scan-btn">扫描设备</button>
-                <button id="bluetooth-disconnect-btn" class="secondary">断开设备</button>
-                <a class="button-link secondary-link" href="/bluetooth/overlay" target="_blank" rel="noopener noreferrer">OBS 小窗</a>
-                <a class="button-link secondary-link" href="/bluetooth/studio">波形与事件规则</a>
+              <dl>
+                <div><dt>连接方式</dt><dd id="connection-mode-label">IM 指令</dd></div>
+                <div><dt>触发模式</dt><dd id="trigger-mode-label">按礼物数量触发</dd></div>
+                <div><dt>点赞倍数</dt><dd id="like-multiple-label">100</dd></div>
+                <div><dt>弹幕开关</dt><dd id="danmaku-enabled-label">关闭</dd></div>
+                <div><dt>弹幕关键词</dt><dd id="danmaku-keywords-label">-</dd></div>
+                <div><dt>弹幕冷却</dt><dd id="danmaku-cooldown-seconds-label">0 秒</dd></div>
+                <div><dt>每用户限流</dt><dd id="danmaku-user-limit-window-seconds-label">关闭</dd></div>
+                <div><dt>窗口内上限</dt><dd id="danmaku-user-limit-max-triggers-label">关闭</dd></div>
+                <div><dt>最低舰队等级</dt><dd id="danmaku-min-guard-level-label">不限</dd></div>
+                <div><dt>房间号</dt><dd id="room-id">-</dd></div>
+                <div><dt>主播昵称</dt><dd id="anchor-name">-</dd></div>
+                <div><dt>最近事件时间</dt><dd id="last-event-at">-</dd></div>
+              </dl>
+            </article>
+          </section>
+        </section>
+
+        <section class="tab-panel" data-tab-panel="events-panel" hidden>
+          <section class="grid">
+            <article class="panel stream">
+              <div class="stream-head">
+                <h2>礼物事件</h2>
+                <span class="count-badge" id="gift-count">0</span>
               </div>
-              <p class="hint" id="bluetooth-message-text">未连接</p>
-              <div class="bluetooth-grid">
-                <section class="bluetooth-card">
-                  <div class="stream-head">
-                    <h3>设备列表</h3>
-                  </div>
-                  <div id="bluetooth-devices" class="mini-list"></div>
-                </section>
-                <details class="bluetooth-preview-collapse" id="bluetooth-rules-details">
-                  <summary class="bluetooth-preview-summary">查看事件规则预览</summary>
-                  <section class="bluetooth-card bluetooth-card-preview">
-                    <div class="stream-head">
-                      <h3>事件规则</h3>
-                    </div>
-                    <div id="bluetooth-rules" class="mini-list"></div>
-                  </section>
-                </details>
+              <div id="gift-events" class="event-list"></div>
+            </article>
+
+            <article class="panel stream">
+              <div class="stream-head">
+                <h2>弹幕事件</h2>
+                <span class="count-badge" id="danmaku-count">0</span>
               </div>
-            </section>
-          </article>
+              <div id="danmaku-events" class="event-list"></div>
+            </article>
 
-          <article class="panel meta meta-sidebar">
-            <div class="section-head section-head-compact">
-              <div>
-                <p class="section-kicker">Runtime Snapshot</p>
-                <h2>运行状态</h2>
+            <article class="panel stream">
+              <div class="stream-head">
+                <h2>点赞事件</h2>
+                <span class="count-badge" id="like-count">0</span>
               </div>
-            </div>
-            <dl>
-              <div><dt>连接方式</dt><dd id="connection-mode-label">IM 指令</dd></div>
-              <div><dt>触发模式</dt><dd id="trigger-mode-label">按礼物数量触发</dd></div>
-              <div><dt>点赞倍数</dt><dd id="like-multiple-label">100</dd></div>
-              <div><dt>弹幕开关</dt><dd id="danmaku-enabled-label">关闭</dd></div>
-              <div><dt>弹幕关键词</dt><dd id="danmaku-keywords-label">-</dd></div>
-              <div><dt>弹幕冷却</dt><dd id="danmaku-cooldown-seconds-label">0 秒</dd></div>
-              <div><dt>每用户限流</dt><dd id="danmaku-user-limit-window-seconds-label">关闭</dd></div>
-              <div><dt>窗口内上限</dt><dd id="danmaku-user-limit-max-triggers-label">关闭</dd></div>
-              <div><dt>最低舰队等级</dt><dd id="danmaku-min-guard-level-label">不限</dd></div>
-              <div><dt>房间号</dt><dd id="room-id">-</dd></div>
-              <div><dt>主播昵称</dt><dd id="anchor-name">-</dd></div>
-              <div><dt>最近事件时间</dt><dd id="last-event-at">-</dd></div>
-            </dl>
-          </article>
-        </aside>
-      </section>
+              <div id="like-events" class="event-list"></div>
+            </article>
 
-      <section class="grid">
-        <article class="panel stream">
-          <div class="stream-head">
-            <h2>礼物事件</h2>
-            <span class="count-badge" id="gift-count">0</span>
-          </div>
-          <div id="gift-events" class="event-list"></div>
-        </article>
+            <article class="panel stream">
+              <div class="stream-head">
+                <h2>互动事件</h2>
+                <span class="count-badge" id="interact-count">0</span>
+              </div>
+              <div id="interact-events" class="event-list"></div>
+            </article>
 
-        <article class="panel stream">
-          <div class="stream-head">
-            <h2>弹幕事件</h2>
-            <span class="count-badge" id="danmaku-count">0</span>
-          </div>
-          <div id="danmaku-events" class="event-list"></div>
-        </article>
-
-        <article class="panel stream">
-          <div class="stream-head">
-            <h2>点赞事件</h2>
-            <span class="count-badge" id="like-count">0</span>
-          </div>
-          <div id="like-events" class="event-list"></div>
-        </article>
-
-        <article class="panel stream">
-          <div class="stream-head">
-            <h2>互动事件</h2>
-            <span class="count-badge" id="interact-count">0</span>
-          </div>
-          <div id="interact-events" class="event-list"></div>
-        </article>
-
-        <article class="panel stream">
-          <div class="stream-head">
-            <h2>控制日志</h2>
-            <span class="count-badge" id="control-count">0</span>
-          </div>
-          <div id="control-events" class="event-list"></div>
-        </article>
+            <article class="panel stream">
+              <div class="stream-head">
+                <h2>控制日志</h2>
+                <span class="count-badge" id="control-count">0</span>
+              </div>
+              <div id="control-events" class="event-list"></div>
+            </article>
+          </section>
+        </section>
       </section>
     </main>
 

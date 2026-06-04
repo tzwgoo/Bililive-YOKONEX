@@ -3,6 +3,9 @@ const fixedLikeIdContainer = document.getElementById("command-studio-like-fixed-
 const fixedDanmakuIdsContainer = document.getElementById("command-studio-danmaku-fixed-ids");
 const saveButton = document.getElementById("command-studio-save-btn");
 const messageText = document.getElementById("command-studio-message-text");
+const commandStudioTabButtons = Array.from(document.querySelectorAll("#command-studio-tab-nav [data-tab-target]"));
+const commandStudioTabPanels = Array.from(document.querySelectorAll('.studio-tabs [data-tab-panel]'));
+const commandStudioTabStorageKey = "biliLive.commandStudioTab";
 
 const eventTypeLabels = {
   gift: "礼物",
@@ -34,6 +37,25 @@ let studioState = {
   danmaku_command_ids: {},
   command_slots: [],
 };
+
+function activateCommandStudioTab(tabId) {
+  if (!tabId) {
+    return;
+  }
+  let matched = false;
+  commandStudioTabButtons.forEach((button) => {
+    const isActive = button.dataset.tabTarget === tabId;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    matched = matched || isActive;
+  });
+  commandStudioTabPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.tabPanel !== tabId;
+  });
+  if (matched) {
+    window.localStorage.setItem(commandStudioTabStorageKey, tabId);
+  }
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -259,4 +281,13 @@ saveButton.addEventListener("click", async () => {
   saveButton.disabled = false;
 });
 
+commandStudioTabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    activateCommandStudioTab(button.dataset.tabTarget || "");
+  });
+});
+
 refreshStudio();
+activateCommandStudioTab(
+  window.localStorage.getItem(commandStudioTabStorageKey) || commandStudioTabButtons[0]?.dataset.tabTarget || "gift-rules-panel"
+);

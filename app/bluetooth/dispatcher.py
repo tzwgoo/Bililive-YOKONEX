@@ -62,7 +62,7 @@ class BluetoothDispatcher:
         for rule in payload.bluetooth_event_rules:
             if not rule.enabled or not self._rule_matches_event_type(rule.event_type, original_event_type):
                 continue
-            if original_event_type == "gift" and not self._match_gift_rule(rule.filters, payload_data):
+            if self._is_price_filter_event_type(original_event_type) and not self._match_gift_rule(rule.filters, payload_data):
                 continue
             if is_danmaku_event_type(original_event_type):
                 danmaku_rule_result = self._match_danmaku_rule(rule.filters, payload_data)
@@ -78,6 +78,9 @@ class BluetoothDispatcher:
             "success": False,
             "message": "未命中蓝牙规则",
         }
+
+    def _is_price_filter_event_type(self, event_type: str) -> bool:
+        return str(event_type or "") in {"gift", "super_chat", "guard_buy", "guard_renew"}
 
     def _rule_matches_event_type(self, rule_event_type: str, original_event_type: str) -> bool:
         normalized_rule_event_type = str(rule_event_type or "")

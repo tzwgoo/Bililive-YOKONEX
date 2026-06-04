@@ -79,6 +79,28 @@ async def test_dispatcher_triggers_waveform_for_interact_event() -> None:
 
 
 @pytest.mark.anyio
+async def test_dispatcher_matches_super_chat_price_tier() -> None:
+    service = FakeBluetoothService()
+    dispatcher = BluetoothDispatcher(bluetooth_service=service)
+
+    result = await dispatcher.dispatch({"event_type": "super_chat", "payload": {"price": 1200}})
+
+    assert result["success"] is True
+    assert service.triggered == [("super_chat", "ems-preset-11")]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_matches_guard_renew_price_tier() -> None:
+    service = FakeBluetoothService()
+    dispatcher = BluetoothDispatcher(bluetooth_service=service)
+
+    result = await dispatcher.dispatch({"event_type": "guard_renew", "payload": {"price": 500000}})
+
+    assert result["success"] is True
+    assert service.triggered == [("guard_renew", "ems-preset-10")]
+
+
+@pytest.mark.anyio
 async def test_dispatcher_matches_keywords_for_danmaku_event() -> None:
     service = FakeBluetoothService()
     for rule in service.payload.bluetooth_event_rules:

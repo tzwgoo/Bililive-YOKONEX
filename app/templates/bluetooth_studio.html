@@ -28,18 +28,26 @@
         </div>
       </section>
 
-      <section class="studio-layout">
-        <article class="panel studio-panel">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">Waveform Library</p>
-              <h2>波形库</h2>
-            </div>
-          </div>
-          <div id="studio-waveform-library" class="studio-waveform-library"></div>
-        </article>
+      <section class="tab-shell studio-tabs">
+        <div class="tab-nav" id="bluetooth-studio-tab-nav" role="tablist" aria-label="蓝牙 Studio 标签切换">
+          <button class="tab-button" type="button" data-tab-target="waveform-library-panel" role="tab" aria-selected="false">波形库</button>
+          <button class="tab-button" type="button" data-tab-target="waveform-editor-panel" role="tab" aria-selected="false">波形编辑</button>
+          <button class="tab-button" type="button" data-tab-target="rule-groups-panel" role="tab" aria-selected="false">事件规则</button>
+        </div>
 
-        <div class="studio-main-stack">
+        <section class="tab-panel" data-tab-panel="waveform-library-panel">
+          <article class="panel studio-panel">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Waveform Library</p>
+                <h2>波形库</h2>
+              </div>
+            </div>
+            <div id="studio-waveform-library" class="studio-waveform-library"></div>
+          </article>
+        </section>
+
+        <section class="tab-panel" data-tab-panel="waveform-editor-panel" hidden>
           <article class="panel studio-waveform-editor" id="studio-waveform-editor">
             <div class="section-head">
               <div>
@@ -71,7 +79,9 @@
             </div>
             <div id="studio-waveform-steps" class="studio-waveform-steps"></div>
           </article>
+        </section>
 
+        <section class="tab-panel" data-tab-panel="rule-groups-panel" hidden>
           <article class="panel studio-panel">
             <div class="section-head">
               <div>
@@ -85,7 +95,7 @@
             <p class="hint" id="studio-message-text">修改完成后点击“保存规则”。</p>
             <div id="studio-rule-groups" class="studio-rule-groups"></div>
           </article>
-        </div>
+        </section>
       </section>
     </main>
 

@@ -31,6 +31,24 @@ def test_frontend_contains_dual_mode_controls() -> None:
     assert "trigger_mode: triggerModeSelect.value" in app_js
 
 
+def test_frontend_contains_dashboard_tabs() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+    app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
+    index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
+
+    assert 'class="tab-shell dashboard-tabs"' in index_html
+    assert 'id="dashboard-tab-nav"' in index_html
+    assert 'data-tab-target="session-panel"' in index_html
+    assert 'data-tab-target="connection-panel"' in index_html
+    assert 'data-tab-target="events-panel"' in index_html
+    assert 'data-tab-panel="session-panel"' in index_html
+    assert 'data-tab-panel="connection-panel"' in index_html
+    assert 'data-tab-panel="events-panel"' in index_html
+    assert "const dashboardTabStorageKey = \"biliLive.dashboardTab\";" in app_js
+    assert "function activateDashboardTab(tabId)" in app_js
+    assert "dashboardTabButtons.forEach" in app_js
+
+
 def test_event_panels_use_fixed_height_scroll_layout() -> None:
     style_css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
 
@@ -197,12 +215,23 @@ def test_frontend_contains_bluetooth_studio_entry_and_template() -> None:
     assert "rule.rule_label || rule.event_type" in studio_js
     assert "data-role=\"min-price\"" in studio_js
     assert "data-role=\"max-price\"" in studio_js
+    assert 'const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_renew"]);' in studio_js
     assert "按价格升序整理" in studio_html
     assert "舰长弹幕" in studio_js
     assert "提督弹幕" in studio_js
     assert "总督弹幕" in studio_js
     assert "醒目留言" in studio_js
     assert "互动事件" in studio_js
+    assert 'class="tab-shell studio-tabs"' in studio_html
+    assert 'id="bluetooth-studio-tab-nav"' in studio_html
+    assert 'data-tab-target="waveform-library-panel"' in studio_html
+    assert 'data-tab-target="waveform-editor-panel"' in studio_html
+    assert 'data-tab-target="rule-groups-panel"' in studio_html
+    assert 'data-tab-panel="waveform-library-panel"' in studio_html
+    assert 'data-tab-panel="waveform-editor-panel"' in studio_html
+    assert 'data-tab-panel="rule-groups-panel"' in studio_html
+    assert "const bluetoothStudioTabStorageKey = \"biliLive.bluetoothStudioTab\";" in studio_js
+    assert "function activateBluetoothStudioTab(tabId)" in studio_js
 
 
 def test_frontend_contains_command_studio_entry_and_template() -> None:
@@ -233,6 +262,16 @@ def test_frontend_contains_command_studio_entry_and_template() -> None:
     assert "payload.danmaku_command_ids" in studio_js
     assert "danmaku_captain_trigger" in studio_js
     assert "弹幕指令固定，不支持在页面修改。" in studio_js
+    assert 'class="tab-shell studio-tabs"' in studio_html
+    assert 'id="command-studio-tab-nav"' in studio_html
+    assert 'data-tab-target="gift-rules-panel"' in studio_html
+    assert 'data-tab-target="like-command-panel"' in studio_html
+    assert 'data-tab-target="danmaku-command-panel"' in studio_html
+    assert 'data-tab-panel="gift-rules-panel"' in studio_html
+    assert 'data-tab-panel="like-command-panel"' in studio_html
+    assert 'data-tab-panel="danmaku-command-panel"' in studio_html
+    assert "const commandStudioTabStorageKey = \"biliLive.commandStudioTab\";" in studio_js
+    assert "function activateCommandStudioTab(tabId)" in studio_js
 
 
 def test_frontend_contains_single_column_command_studio_layout() -> None:
@@ -341,3 +380,20 @@ def test_frontend_uses_minimalist_visual_system() -> None:
     assert "--shadow: 0 10px 30px rgba(15, 23, 42, 0.04);" in style_css
     assert 'font-family: "Aptos", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;' in style_css
     assert "background: var(--bg);" in style_css
+
+
+def test_frontend_contains_shared_tab_styles() -> None:
+    style_css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert ".tab-shell" in style_css
+    assert ".tab-nav" in style_css
+    assert ".tab-button" in style_css
+    assert ".tab-button.is-active" in style_css
+    assert ".tab-panel" in style_css
+    assert ".tab-panel[hidden]" in style_css
+    assert "position: sticky;" in style_css
+    assert "top: 12px;" in style_css
+    assert "z-index: 30;" in style_css
+    assert "button:not(.secondary):not(.tab-button)" in style_css
+    assert ".tab-button:hover" in style_css
+    assert "color: var(--ink);" in style_css
