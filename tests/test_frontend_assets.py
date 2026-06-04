@@ -3,6 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def test_frontend_workspace_contains_vite_entrypoints() -> None:
+    base_dir = Path(__file__).resolve().parent.parent
+
+    assert (base_dir / "frontend" / "package.json").exists()
+    assert (base_dir / "frontend" / "vite.config.ts").exists()
+    assert (base_dir / "frontend" / "src" / "main.ts").exists()
+
+
 def test_command_form_uses_local_storage_keys() -> None:
     app_js = (Path(__file__).resolve().parent.parent / "app" / "static" / "app.js").read_text(encoding="utf-8")
 

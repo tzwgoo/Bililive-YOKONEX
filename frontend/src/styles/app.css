@@ -1,0 +1,59 @@
+body {
+  font-family: "Aptos", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  background: rgba(248, 246, 242, 0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(120, 113, 108, 0.18);
+}
+
+.brand {
+  color: var(--app-text);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.app-nav-link {
+  padding: 8px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #57534e;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(120, 113, 108, 0.18);
+  transition: all 0.2s ease;
+}
+
+.app-nav-link.router-link-active {
+  color: #fafaf9;
+  background: #1c1917;
+  border-color: #1c1917;
+}
+
+@media (max-width: 720px) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
