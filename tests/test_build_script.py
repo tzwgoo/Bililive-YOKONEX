@@ -17,3 +17,7 @@ def test_build_script_includes_bilibili_client_hidden_imports() -> None:
     assert "$pyInstallerExitCode = $pyInstallerProcess.ExitCode" in script
     assert 'throw "PyInstaller build failed with exit code: $pyInstallerExitCode"' in script
     assert 'Copy-Item "config/bluetooth_settings.json"' in script
+    assert 'Push-Location (Join-Path $projectRoot "frontend")' in script
+    assert '& $npmCommand ci' in script
+    assert '& $npmCommand run build' in script
+    assert '--add-data", "frontend/dist;frontend/dist"' in script

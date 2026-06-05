@@ -23,6 +23,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
       - name: 安装依赖
         shell: powershell
         run: |
@@ -37,6 +44,9 @@ jobs:
           pip --version
           Get-Command python
           Get-Command pip
+          node --version
+          npm --version
+          Get-Command npm
           python -m pip show pyinstaller
           Get-ChildItem -Path .
 
@@ -46,6 +56,21 @@ jobs:
           pytest tests/test_frontend_assets.py -v
           pytest tests/test_build_script.py -v
           pytest tests/test_release_workflow.py -v
+
+      - name: 构建前端产物
+        shell: powershell
+        run: |
+          Push-Location frontend
+          try {
+            npm ci
+            npm run build
+          } finally {
+            Pop-Location
+          }
+
+          if (-not (Test-Path "frontend/dist/index.html")) {
+            throw "Missing frontend dist output: frontend/dist/index.html"
+          }
 
       - name: 构建 EXE
         shell: powershell
@@ -83,6 +108,7 @@ jobs:
             "--hidden-import", "bilibili_api.clients.CurlCFFIClient",
             "--add-data", "app/templates;app/templates",
             "--add-data", "app/static;app/static",
+            "--add-data", "frontend/dist;frontend/dist",
             "run_app.py"
           )
 
@@ -117,6 +143,7 @@ jobs:
           Copy-Item ".env.example" (Join-Path $packageRoot ".env.example") -Force
           Copy-Item "config/gift_command_mappings.json" (Join-Path $packageRoot "config/gift_command_mappings.json") -Force
           Copy-Item "config/gift_command_mappings.example.json" (Join-Path $packageRoot "config/gift_command_mappings.example.json") -Force
+          Copy-Item "config/bluetooth_settings.json" (Join-Path $packageRoot "config/bluetooth_settings.json") -Force
           Copy-Item (Join-Path $PWD "docs\*.md") (Join-Path $packageRoot "docs") -Force
 
           $exePath = Join-Path $packageRoot "BiliLive-YOKONEX.exe"

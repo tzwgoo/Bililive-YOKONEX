@@ -20,6 +20,9 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "Compress-Archive" in workflow
     assert "python --version" in workflow
     assert "Get-Command python" in workflow
+    assert "Get-Command npm" in workflow
+    assert "npm ci" in workflow
+    assert "npm run build" in workflow
     assert "upload-artifact" in workflow
     assert "if: failure()" in workflow
     assert '"release", "create"' in workflow
@@ -27,6 +30,7 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert '-FilePath "gh"' in workflow
     assert "BiliLive-YOKONEX.exe" in workflow
     assert "Bililive-YOKONEX-" in workflow
+    assert '--add-data", "frontend/dist;frontend/dist"' in workflow
 
 
 def test_release_workflow_powershell_run_blocks_use_ascii_error_messages() -> None:

@@ -15,6 +15,21 @@ if (-not (Test-Path $buildPython)) {
 & $buildPython -m pip install pyinstaller
 & $buildPython -m pip install -r requirements.txt
 
+$npmCommand = (Get-Command npm.cmd -ErrorAction Stop).Source
+
+Push-Location (Join-Path $projectRoot "frontend")
+try {
+    & $npmCommand ci
+    & $npmCommand run build
+} finally {
+    Pop-Location
+}
+
+$frontendDistIndex = Join-Path $projectRoot "frontend/dist/index.html"
+if (-not (Test-Path $frontendDistIndex)) {
+    throw "Missing frontend dist output: $frontendDistIndex"
+}
+
 $distRoot = Join-Path $projectRoot "dist"
 $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
 $buildLogDir = Join-Path $projectRoot "build_logs"
@@ -57,6 +72,7 @@ $pyInstallerArgs = @(
     "--hidden-import", "bilibili_api.clients.AioHTTPClient",
     "--add-data", "app/templates;app/templates",
     "--add-data", "app/static;app/static",
+    "--add-data", "frontend/dist;frontend/dist",
     "run_app.py"
 )
 
