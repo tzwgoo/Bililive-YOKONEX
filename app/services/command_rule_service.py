@@ -8,6 +8,7 @@ from app.command_gateway.mapping import ALLOWED_COMMAND_SLOTS
 from app.command_gateway.mapping import GiftCommandMapper
 from app.models import is_danmaku_event_type, resolve_danmaku_event_type
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_IDS
+from app.services.danmaku_settings import FIXED_INTERACT_COMMAND_ID
 from app.services.danmaku_settings import FIXED_LIKE_COMMAND_ID
 
 
@@ -65,6 +66,7 @@ class CommandRuleService:
             "rules": [dict(item) for item in self._payload["rules"]],
             "like_rules": [],
             "like_command_id": FIXED_LIKE_COMMAND_ID,
+            "interact_command_id": FIXED_INTERACT_COMMAND_ID,
             "danmaku_slot_rules": [],
             "danmaku_command_ids": dict(FIXED_DANMAKU_COMMAND_IDS),
             "command_slots": sorted(ALLOWED_COMMAND_SLOTS),

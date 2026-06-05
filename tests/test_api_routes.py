@@ -8,6 +8,7 @@ import app.api.routes as api_routes
 from app.services.event_hub import EventHub
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_ID
 from app.services.danmaku_settings import FIXED_DANMAKU_COMMAND_IDS
+from app.services.danmaku_settings import FIXED_INTERACT_COMMAND_ID
 from app.services.danmaku_settings import FIXED_LIKE_COMMAND_ID
 
 
@@ -166,6 +167,7 @@ class FakeCommandRuleService:
             ],
             "like_rules": [],
             "like_command_id": FIXED_LIKE_COMMAND_ID,
+            "interact_command_id": FIXED_INTERACT_COMMAND_ID,
             "danmaku_slot_rules": [],
             "danmaku_command_ids": {
                 "danmaku": "danmaku_trigger",
@@ -356,6 +358,7 @@ def test_command_studio_endpoint_returns_rule_payload() -> None:
     assert response.json()["rules"][0]["event_type"] == "gift"
     assert response.json()["like_rules"] == []
     assert response.json()["like_command_id"] == FIXED_LIKE_COMMAND_ID
+    assert response.json()["interact_command_id"] == FIXED_INTERACT_COMMAND_ID
     assert response.json()["danmaku_slot_rules"] == []
     assert response.json()["danmaku_command_ids"]["danmaku_governor"] == "danmaku_governor_trigger"
 

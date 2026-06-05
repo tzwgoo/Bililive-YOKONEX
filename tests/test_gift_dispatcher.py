@@ -243,6 +243,30 @@ async def test_dispatcher_uses_like_delta_to_avoid_zero_count_gaps() -> None:
 
 
 @pytest.mark.anyio
+async def test_dispatcher_triggers_interact_command() -> None:
+    command_session = FakeCommandSession()
+    dispatcher = GiftCommandDispatcher(
+        mapper=GiftCommandMapper([]),
+        command_session=command_session,
+    )
+
+    result = await dispatcher.dispatch_interact_event(
+        {
+            "event_type": "interact",
+            "payload": {
+                "interact_type": "follow",
+                "interact_label": "关注",
+            },
+        }
+    )
+
+    assert result["success"] is True
+    assert result["command_id"] == "interact_trigger"
+    assert result["trigger_count"] == 1
+    assert command_session.called_with == ["interact_trigger"]
+
+
+@pytest.mark.anyio
 async def test_dispatcher_ignores_zero_like_count_updates_without_resetting_progress() -> None:
     command_session = FakeCommandSession()
     dispatcher = GiftCommandDispatcher(

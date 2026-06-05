@@ -307,6 +307,60 @@ async def test_third_party_session_consumes_like_and_dispatches_command() -> Non
 
 
 @pytest.mark.anyio
+async def test_third_party_session_consumes_interact_and_dispatches_command() -> None:
+    class FakeInteractDispatcher(FakeGiftDispatcher):
+        async def dispatch_interact_event(self, event: dict) -> dict:
+            self.called_with = event
+            return {
+                "matched": True,
+                "command_id": "interact_trigger",
+                "success": True,
+                "message": "互动指令发送成功",
+                "trigger_count": 1,
+                "sent_count": 1,
+            }
+
+        def reset_runtime_state(self) -> None:
+            return None
+
+    event_hub = EventHub()
+    gift_dispatcher = FakeInteractDispatcher()
+    ws_client = FakeThirdPartyWsClient(
+        messages=[
+            {
+                "cmd": "INTERACT_WORD_V2",
+                "data": {
+                    "pb_decoded": {
+                        "uid": 1001,
+                        "uname": "互动用户",
+                        "msg_type": 2,
+                        "trigger_time": 1714113037,
+                    }
+                },
+            }
+        ]
+    )
+    service = ThirdPartyLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=gift_dispatcher,
+        ws_client=ws_client,
+        room_info_fetcher=fake_room_info_fetcher,
+    )
+
+    await service.start(value="123456")
+    await asyncio.sleep(0.05)
+
+    events = event_hub.snapshot()
+
+    assert gift_dispatcher.called_with is not None
+    assert events[-1]["event_type"] == "interact"
+    assert events[-1]["payload"]["interact_type"] == "follow"
+    assert events[-1]["command_dispatch"]["command_id"] == "interact_trigger"
+
+    await service.stop()
+
+
+@pytest.mark.anyio
 async def test_third_party_session_consumes_danmaku_and_dispatches_command() -> None:
     class FakeDanmakuDispatcher(FakeGiftDispatcher):
         async def dispatch(self, event: dict) -> dict:

@@ -24,6 +24,7 @@ describe("EventConfigPage", () => {
         },
       ],
       like_command_id: "like_trigger",
+      interact_command_id: "interact_trigger",
       danmaku_command_ids: {
         danmaku: "danmaku_trigger",
       },
@@ -84,6 +85,8 @@ describe("EventConfigPage", () => {
     expect(wrapper.text()).toContain("IM");
     expect(wrapper.text()).toContain("蓝牙");
     expect(wrapper.text()).toContain("固定点赞指令 ID");
+    expect(wrapper.text()).toContain("固定互动指令 ID");
+    expect(wrapper.text()).toContain("互动事件");
     expect(wrapper.text()).toContain("礼物");
     expect(wrapper.findComponent({ name: "PageHeaderBar" }).exists()).toBe(false);
     expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("事件配置");
@@ -104,6 +107,7 @@ describe("EventConfigPage", () => {
     vi.spyOn(commandService, "fetchCommandStudio").mockResolvedValue({
       rules: [],
       like_command_id: "like_trigger",
+      interact_command_id: "interact_trigger",
       danmaku_command_ids: {
         danmaku: "danmaku_trigger",
       },

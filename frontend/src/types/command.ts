@@ -21,6 +21,7 @@ export interface CommandStatusModel {
 export interface CommandStudioResponse {
   rules: CommandStudioRule[];
   like_command_id: string;
+  interact_command_id: string;
   danmaku_command_ids: Record<string, string>;
   command_slots: string[];
   event_types?: CommandEventTypeOption[];

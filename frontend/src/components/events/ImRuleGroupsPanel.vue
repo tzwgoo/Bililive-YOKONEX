@@ -55,7 +55,7 @@
     </ACard>
 
     <ARow :gutter="[18, 18]">
-      <ACol :xs="24" :xl="12">
+      <ACol :xs="24" :xl="8">
         <ACard title="固定点赞指令 ID" :bordered="false">
           <div class="fixed-list">
             <article class="fixed-item">
@@ -65,7 +65,17 @@
           </div>
         </ACard>
       </ACol>
-      <ACol :xs="24" :xl="12">
+      <ACol :xs="24" :xl="8">
+        <ACard title="固定互动指令 ID" :bordered="false">
+          <div class="fixed-list">
+            <article class="fixed-item">
+              <strong>互动事件</strong>
+              <code>{{ studio?.interact_command_id || "-" }}</code>
+            </article>
+          </div>
+        </ACard>
+      </ACol>
+      <ACol :xs="24" :xl="8">
         <ACard title="固定弹幕指令 ID" :bordered="false">
           <div class="fixed-list">
             <article

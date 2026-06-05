@@ -6,6 +6,7 @@ from app.models import resolve_danmaku_event_type
 
 FIXED_DANMAKU_COMMAND_ID = "danmaku_trigger"
 FIXED_LIKE_COMMAND_ID = "like_trigger"
+FIXED_INTERACT_COMMAND_ID = "interact_trigger"
 FIXED_DANMAKU_COMMAND_IDS = {
     "danmaku": FIXED_DANMAKU_COMMAND_ID,
     "danmaku_captain": "danmaku_captain_trigger",

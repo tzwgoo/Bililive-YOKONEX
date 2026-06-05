@@ -158,3 +158,21 @@ def test_service_exposes_fixed_like_command_id_without_editable_rules(tmp_path) 
 
     assert payload["like_rules"] == []
     assert payload["like_command_id"] == "like_trigger"
+
+
+def test_service_exposes_fixed_interact_command_id_without_editable_rules(tmp_path) -> None:
+    service = CommandRuleService(
+        config_path=tmp_path / "gift_command_mappings.json",
+        mapper=GiftCommandMapper([]),
+        danmaku_dispatcher=FakeDanmakuDispatcher(),
+    )
+
+    payload = service.save_rules(
+        {
+            "rules": [],
+            "like_rules": [],
+            "danmaku_slot_rules": [],
+        }
+    )
+
+    assert payload["interact_command_id"] == "interact_trigger"

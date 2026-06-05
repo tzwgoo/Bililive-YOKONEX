@@ -23,6 +23,7 @@ describe("CommandStudioPage", () => {
         },
       ],
       like_command_id: "like_trigger",
+      interact_command_id: "interact_trigger",
       danmaku_command_ids: {
         danmaku: "danmaku_trigger",
       },
@@ -33,6 +34,7 @@ describe("CommandStudioPage", () => {
     const saveStudioSpy = vi.spyOn(commandService, "saveCommandStudio").mockResolvedValue({
       rules: [],
       like_command_id: "like_trigger",
+      interact_command_id: "interact_trigger",
       danmaku_command_ids: {
         danmaku: "danmaku_trigger",
       },
@@ -52,6 +54,7 @@ describe("CommandStudioPage", () => {
     expect(wrapper.text()).toContain("事件配置");
     expect(wrapper.text()).toContain("IM");
     expect(wrapper.text()).toContain("固定点赞指令 ID");
+    expect(wrapper.text()).toContain("固定互动指令 ID");
 
     await wrapper.get('[data-testid="command-min-price-gift-rule-1"] input').setValue("200");
     await wrapper.get('[data-testid="command-save"]').trigger("click");

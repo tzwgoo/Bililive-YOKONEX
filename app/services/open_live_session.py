@@ -247,6 +247,11 @@ class OpenLiveSessionService:
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
+        elif self.output_mode == "im" and event.get("event_type") == "interact" and self.gift_dispatcher is not None:
+            dispatch_result = await self.gift_dispatcher.dispatch_interact_event(event)
+            self.last_command_id = dispatch_result.get("command_id", "")
+            self.last_command_message = dispatch_result.get("message", "")
+            event["command_dispatch"] = dispatch_result
         elif (
             self.output_mode == "im"
             and is_danmaku_event_type(str(event.get("event_type", "") or ""))

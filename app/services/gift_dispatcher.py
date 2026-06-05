@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from app.command_gateway.mapping import GiftCommandMapper
+from app.services.danmaku_settings import FIXED_INTERACT_COMMAND_ID
 from app.services.danmaku_settings import FIXED_LIKE_COMMAND_ID
 
 
@@ -157,6 +158,40 @@ class GiftCommandDispatcher:
         except Exception as exc:  # pragma: no cover - 真实网络路径
             message = f"指令发送失败: {exc}"
             LOGGER.exception("点赞指令发送异常 command_id=%s", command_id)
+            return {
+                "matched": True,
+                "command_id": command_id,
+                "success": False,
+                "message": message,
+                "trigger_count": trigger_count,
+                "sent_count": 0,
+            }
+
+    async def dispatch_interact_event(self, event: dict[str, Any]) -> dict[str, Any]:
+        command_id = FIXED_INTERACT_COMMAND_ID
+        trigger_count = 1
+
+        if not self.is_enabled or self.command_session is None:
+            LOGGER.warning("互动事件已命中映射，但下游指令通道未登录 command_id=%s", command_id)
+            return {
+                "matched": True,
+                "command_id": command_id,
+                "success": False,
+                "message": "下游指令通道未登录",
+                "trigger_count": trigger_count,
+                "sent_count": 0,
+            }
+
+        try:
+            result = await self._send_command_repeatedly(command_id=command_id, trigger_count=trigger_count)
+            if result["success"]:
+                LOGGER.info("互动指令发送成功 command_id=%s", command_id)
+            else:
+                LOGGER.warning("互动指令发送失败 command_id=%s message=%s", command_id, result["message"])
+            return result
+        except Exception as exc:  # pragma: no cover - 真实网络路径
+            message = f"指令发送失败: {exc}"
+            LOGGER.exception("互动指令发送异常 command_id=%s", command_id)
             return {
                 "matched": True,
                 "command_id": command_id,

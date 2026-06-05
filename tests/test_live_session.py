@@ -211,6 +211,48 @@ async def test_handle_like_event_dispatches_command(fake_dependencies: dict) -> 
 
 
 @pytest.mark.anyio
+async def test_handle_interact_event_dispatches_command(fake_dependencies: dict) -> None:
+    class FakeInteractDispatcher(FakeGiftDispatcher):
+        async def dispatch_interact_event(self, event: dict) -> dict:
+            self.called_with = event
+            return {
+                "matched": True,
+                "command_id": "interact_trigger",
+                "success": True,
+                "message": "互动指令发送成功",
+                "trigger_count": 1,
+                "sent_count": 1,
+            }
+
+        def reset_runtime_state(self) -> None:
+            return None
+
+    fake_dependencies["gift_dispatcher"] = FakeInteractDispatcher()
+    service = LiveSessionService(**fake_dependencies)
+
+    event = {
+        "event_type": "interact",
+        "cmd": "INTERACT_WORD_V2",
+        "room_id": 1,
+        "open_id": "user-open-id",
+        "uname": "互动用户",
+        "timestamp": 1714113037,
+        "payload": {
+            "uid": 1001,
+            "msg_type": 2,
+            "interact_type": "follow",
+            "interact_label": "关注",
+        },
+    }
+
+    await service._handle_event(event)
+
+    assert service.gift_dispatcher.called_with == event
+    assert service.last_command_id == "interact_trigger"
+    assert service.last_command_message == "互动指令发送成功"
+
+
+@pytest.mark.anyio
 async def test_handle_danmaku_event_dispatches_command(fake_dependencies: dict) -> None:
     class FakeDanmakuDispatcher(FakeGiftDispatcher):
         async def dispatch(self, event: dict) -> dict:
