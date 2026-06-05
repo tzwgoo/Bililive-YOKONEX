@@ -1,5 +1,5 @@
 <template>
-  <ACard title="波形编辑器" :bordered="false">
+  <ACard title="波形编辑器" :bordered="false" class="waveform-editor-panel" :style="DESKTOP_PANEL_STYLE">
     <template #extra>
       <div class="studio-card-actions">
         <Button size="small" @click="emit('duplicate-waveform')">复制为自定义</Button>
@@ -7,182 +7,175 @@
         <Button data-testid="save-waveform" size="small" type="primary" :loading="savingWaveform" @click="emit('save-waveform')">保存波形</Button>
       </div>
     </template>
-
-    <AEmpty v-if="!waveform" description="暂无波形" />
-    <template v-else>
-      <div class="editor-meta">
-        <label class="field">
-          <span>波形名称</span>
-          <div data-testid="waveform-name-input">
-            <Input
-              :value="waveform.name"
-              :disabled="waveform.builtin"
-              @update:value="emit('update-waveform-name', String($event ?? ''))"
-            />
+    <div
+      data-testid="waveform-editor-scroll"
+      class="waveform-editor-scroll"
+      :style="SCROLL_CONTAINER_STYLE"
+    >
+      <AEmpty v-if="!waveform" description="暂无波形" />
+      <template v-else>
+        <div class="editor-meta">
+          <label class="field">
+            <span>波形名称</span>
+            <div data-testid="waveform-name-input">
+              <Input
+                :value="waveform.name"
+                :disabled="waveform.builtin"
+                @update:value="emit('update-waveform-name', String($event ?? ''))"
+              />
+            </div>
+          </label>
+          <div class="stats-grid">
+            <article>
+              <span>分段数</span>
+              <strong>{{ waveform.steps.length }}</strong>
+            </article>
+            <article>
+              <span>总时长</span>
+              <strong>{{ resolveTotalDuration(waveform) }} ms</strong>
+            </article>
+            <article>
+              <span>最大强度</span>
+              <strong>{{ resolveMaxStrength(waveform) }}</strong>
+            </article>
           </div>
-        </label>
-        <div class="stats-grid">
-          <article>
-            <span>分段数</span>
-            <strong>{{ waveform.steps.length }}</strong>
-          </article>
-          <article>
-            <span>总时长</span>
-            <strong>{{ resolveTotalDuration(waveform) }} ms</strong>
-          </article>
-          <article>
-            <span>最大强度</span>
-            <strong>{{ resolveMaxStrength(waveform) }}</strong>
-          </article>
         </div>
-      </div>
 
-      <div class="waveform-timeline">
-        <div
-          data-testid="waveform-drag-track"
-          class="waveform-track"
-          :class="{ 'is-dragging': activeSegmentIndex !== null }"
-        >
-          <article
-            v-for="(step, index) in waveform.steps"
-            :key="`${waveform.id}-drag-${index}`"
-            class="timeline-segment"
-            :data-testid="`timeline-segment-${index}`"
-            :class="{ 'is-active': activeSegmentIndex === index }"
-            :style="{ flexGrow: Math.max(1, resolveStepDuration(step, index)) }"
+        <div class="waveform-timeline">
+          <div
+            data-testid="waveform-drag-track"
+            class="waveform-track"
+            :class="{ 'is-dragging': activeSegmentIndex !== null }"
           >
-            <div
-              :data-testid="`waveform-drag-surface-${index}`"
-              class="timeline-surface"
+            <article
+              v-for="(step, index) in waveform.steps"
+              :key="`${waveform.id}-drag-${index}`"
+              class="timeline-segment"
+              :data-testid="`timeline-segment-${index}`"
+              :class="{ 'is-active': activeSegmentIndex === index }"
+              :style="{ flexGrow: Math.max(1, resolveStepDuration(step, index)) }"
             >
-              <span class="timeline-grid"></span>
-              <span
-                v-if="activeSegmentIndex === index"
-                :data-testid="`timeline-guide-line-${index}`"
-                class="timeline-guide-line"
-                :style="{ bottom: `${resolveGuideLineBottom(step, index)}%` }"
-              ></span>
-              <span class="timeline-axis-label is-a">A</span>
-              <span class="timeline-axis-label is-b">B</span>
-              <span
-                class="timeline-bar is-a"
-                :style="{ height: `${(resolveStepStrength(step, index, 'channel_a') / 180) * 100}%` }"
-              ></span>
-              <span
-                class="timeline-bar is-b"
-                :style="{ height: `${(resolveStepStrength(step, index, 'channel_b') / 180) * 100}%` }"
-              ></span>
-              <button
-                :data-testid="`waveform-handle-channel-a-${index}`"
-                type="button"
-                class="timeline-handle is-a"
-                :class="{
-                  'is-disabled': waveform.builtin,
-                  'is-active': activeSegmentIndex === index && dragField === 'channel_a',
-                }"
-                :style="{ bottom: `${(resolveStepStrength(step, index, 'channel_a') / 180) * 100}%` }"
-                :disabled="waveform.builtin"
-                @mousedown="startDrag(index, 'channel_a', $event)"
+              <div
+                :data-testid="`waveform-drag-surface-${index}`"
+                class="timeline-surface"
               >
-                {{ resolveHandleLabel(step, index, "channel_a") }}
-              </button>
-              <button
-                :data-testid="`waveform-handle-channel-b-${index}`"
-                type="button"
-                class="timeline-handle is-b"
-                :class="{
-                  'is-disabled': waveform.builtin,
-                  'is-active': activeSegmentIndex === index && dragField === 'channel_b',
-                }"
-                :style="{ bottom: `${(resolveStepStrength(step, index, 'channel_b') / 180) * 100}%` }"
-                :disabled="waveform.builtin"
-                @mousedown="startDrag(index, 'channel_b', $event)"
+                <span class="timeline-grid"></span>
+                <span
+                  v-if="activeSegmentIndex === index"
+                  :data-testid="`timeline-guide-line-${index}`"
+                  class="timeline-guide-line"
+                  :style="{ bottom: `${resolveGuideLineBottom(step, index)}%` }"
+                ></span>
+                <span class="timeline-axis-label is-a">A</span>
+                <span class="timeline-axis-label is-b">B</span>
+                <button
+                  :data-testid="`waveform-bar-channel-a-${index}`"
+                  type="button"
+                  class="timeline-bar is-a"
+                  :class="{
+                    'is-disabled': waveform.builtin,
+                    'is-active': activeSegmentIndex === index && dragField === 'channel_a',
+                  }"
+                  :style="{ height: `${(resolveStepStrength(step, index, 'channel_a') / 180) * 100}%` }"
+                  :disabled="waveform.builtin"
+                  @mousedown="startDrag(index, 'channel_a', $event)"
+                ></button>
+                <button
+                  :data-testid="`waveform-bar-channel-b-${index}`"
+                  type="button"
+                  class="timeline-bar is-b"
+                  :class="{
+                    'is-disabled': waveform.builtin,
+                    'is-active': activeSegmentIndex === index && dragField === 'channel_b',
+                  }"
+                  :style="{ height: `${(resolveStepStrength(step, index, 'channel_b') / 180) * 100}%` }"
+                  :disabled="waveform.builtin"
+                  @mousedown="startDrag(index, 'channel_b', $event)"
+                ></button>
+                <button
+                  :data-testid="`waveform-handle-duration-${index}`"
+                  type="button"
+                  class="timeline-duration-handle"
+                  :class="{
+                    'is-disabled': waveform.builtin,
+                    'is-active': activeSegmentIndex === index && dragField === 'duration_ms',
+                  }"
+                  :disabled="waveform.builtin"
+                  @mousedown="startDrag(index, 'duration_ms', $event)"
+                >
+                  {{ resolveHandleLabel(step, index, "duration_ms") }}
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="step-toolbar">
+          <Button data-testid="toggle-step-list" size="small" @click="toggleStepList">
+            {{ isStepListExpanded ? "收起分段配置" : "展开分段配置" }}
+          </Button>
+          <Button size="small" :disabled="waveform.builtin" @click="emit('add-step')">新增分段</Button>
+        </div>
+
+        <div v-if="isStepListExpanded" data-testid="step-list" class="step-list">
+          <article v-for="(step, index) in waveform.steps" :key="`${waveform.id}-step-${index}`" class="step-row">
+            <strong>{{ index + 1 }}</strong>
+            <label class="field">
+              <span>时长</span>
+              <div :data-testid="`step-duration-${index}`">
+                <InputNumber
+                  :value="step.duration_ms"
+                  :disabled="waveform.builtin"
+                  :min="1"
+                  :step="1"
+                  class="field-number"
+                  @update:value="emit('update-step', index, 'duration_ms', Number($event ?? 0))"
+                />
+              </div>
+            </label>
+            <label class="field">
+              <span>A 通道</span>
+              <div :data-testid="`step-channel-a-${index}`">
+                <InputNumber
+                  :value="step.channel_a"
+                  :disabled="waveform.builtin"
+                  :min="0"
+                  :max="180"
+                  :step="1"
+                  class="field-number"
+                  @update:value="emit('update-step', index, 'channel_a', Number($event ?? 0))"
+                />
+              </div>
+            </label>
+            <label class="field">
+              <span>B 通道</span>
+              <div :data-testid="`step-channel-b-${index}`">
+                <InputNumber
+                  :value="step.channel_b"
+                  :disabled="waveform.builtin"
+                  :min="0"
+                  :max="180"
+                  :step="1"
+                  class="field-number"
+                  @update:value="emit('update-step', index, 'channel_b', Number($event ?? 0))"
+                />
+              </div>
+            </label>
+            <div class="step-actions">
+              <Button size="small" :disabled="waveform.builtin" @click="emit('duplicate-step', index)">复制</Button>
+              <Button
+                size="small"
+                danger
+                :disabled="waveform.builtin || waveform.steps.length === 1"
+                @click="emit('remove-step', index)"
               >
-                {{ resolveHandleLabel(step, index, "channel_b") }}
-              </button>
-              <button
-                :data-testid="`waveform-handle-duration-${index}`"
-                type="button"
-                class="timeline-duration-handle"
-                :class="{
-                  'is-disabled': waveform.builtin,
-                  'is-active': activeSegmentIndex === index && dragField === 'duration_ms',
-                }"
-                :disabled="waveform.builtin"
-                @mousedown="startDrag(index, 'duration_ms', $event)"
-              >
-                {{ resolveHandleLabel(step, index, "duration_ms") }}
-              </button>
+                删除
+              </Button>
             </div>
           </article>
         </div>
-      </div>
-
-      <div class="step-toolbar">
-        <Button data-testid="toggle-step-list" size="small" @click="toggleStepList">
-          {{ isStepListExpanded ? "收起分段配置" : "展开分段配置" }}
-        </Button>
-        <Button size="small" :disabled="waveform.builtin" @click="emit('add-step')">新增分段</Button>
-      </div>
-
-      <div v-if="isStepListExpanded" data-testid="step-list" class="step-list">
-        <article v-for="(step, index) in waveform.steps" :key="`${waveform.id}-step-${index}`" class="step-row">
-          <strong>{{ index + 1 }}</strong>
-          <label class="field">
-            <span>时长</span>
-            <div :data-testid="`step-duration-${index}`">
-              <InputNumber
-                :value="step.duration_ms"
-                :disabled="waveform.builtin"
-                :min="1"
-                :step="1"
-                class="field-number"
-                @update:value="emit('update-step', index, 'duration_ms', Number($event ?? 0))"
-              />
-            </div>
-          </label>
-          <label class="field">
-            <span>A 通道</span>
-            <div :data-testid="`step-channel-a-${index}`">
-              <InputNumber
-                :value="step.channel_a"
-                :disabled="waveform.builtin"
-                :min="0"
-                :max="180"
-                :step="1"
-                class="field-number"
-                @update:value="emit('update-step', index, 'channel_a', Number($event ?? 0))"
-              />
-            </div>
-          </label>
-          <label class="field">
-            <span>B 通道</span>
-            <div :data-testid="`step-channel-b-${index}`">
-              <InputNumber
-                :value="step.channel_b"
-                :disabled="waveform.builtin"
-                :min="0"
-                :max="180"
-                :step="1"
-                class="field-number"
-                @update:value="emit('update-step', index, 'channel_b', Number($event ?? 0))"
-              />
-            </div>
-          </label>
-          <div class="step-actions">
-            <Button size="small" :disabled="waveform.builtin" @click="emit('duplicate-step', index)">复制</Button>
-            <Button
-              size="small"
-              danger
-              :disabled="waveform.builtin || waveform.steps.length === 1"
-              @click="emit('remove-step', index)"
-            >
-              删除
-            </Button>
-          </div>
-        </article>
-      </div>
-    </template>
+      </template>
+    </div>
   </ACard>
 </template>
 
@@ -222,6 +215,12 @@ const dragField = ref<DragField | null>(null);
 const isStepListExpanded = ref(false);
 
 const DURATION_DRAG_FACTOR = 3.2;
+const DESKTOP_PANEL_STYLE = {
+  height: "clamp(560px, calc(100vh - 220px), 820px)",
+};
+const SCROLL_CONTAINER_STYLE = {
+  overflowY: "auto",
+};
 
 function normalizeDuration(value: number) {
   return Math.max(1, Math.round(Number(value || 0)));
@@ -258,12 +257,10 @@ function resolveStepDuration(step: BluetoothWaveformStep, index: number) {
 }
 
 function resolveHandleLabel(step: BluetoothWaveformStep, index: number, field: DragField) {
-  if (field === "duration_ms") {
-    return `${resolveStepDuration(step, index)} ms`;
+  if (field !== "duration_ms") {
+    return "";
   }
-  const prefix = field === "channel_a" ? "A" : "B";
-  const value = resolveStepStrength(step, index, field);
-  return activeSegmentIndex.value === index && dragField.value === field ? `${prefix} ${value}` : prefix;
+  return `${resolveStepDuration(step, index)} ms`;
 }
 
 function resolveGuideLineBottom(step: BluetoothWaveformStep, index: number) {
@@ -336,6 +333,28 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.waveform-editor-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.waveform-editor-panel :deep(.ant-card-body) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 0;
+}
+
+.waveform-editor-scroll {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 18px;
+  align-content: start;
+  padding-top: 18px;
+  padding-right: 6px;
+}
+
 .editor-meta,
 .step-list {
   display: grid;
@@ -409,17 +428,20 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 18px;
   z-index: 1;
+  width: calc(50% - 22px);
   font-size: 11px;
   font-weight: 700;
+  text-align: center;
   color: rgba(68, 64, 60, 0.72);
+  pointer-events: none;
 }
 
 .timeline-axis-label.is-a {
-  left: 20px;
+  left: 14px;
 }
 
 .timeline-axis-label.is-b {
-  right: 20px;
+  right: 14px;
 }
 
 .timeline-bar {
@@ -427,8 +449,12 @@ onBeforeUnmount(() => {
   bottom: 48px;
   width: calc(50% - 22px);
   min-height: 8px;
+  border: 0;
   border-radius: 16px 16px 10px 10px;
   box-shadow: 0 12px 20px rgba(28, 25, 23, 0.08);
+  cursor: ns-resize;
+  user-select: none;
+  transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
 }
 
 .timeline-bar.is-a {
@@ -441,38 +467,11 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, #60a5fa, #2563eb);
 }
 
-.timeline-handle,
 .timeline-duration-handle {
   position: absolute;
   border: 0;
   cursor: grab;
   user-select: none;
-}
-
-.timeline-handle {
-  z-index: 1;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 10px;
-  height: 28px;
-  border-radius: 999px;
-  color: #fafaf9;
-  font-size: 11px;
-  font-weight: 700;
-  box-shadow: 0 10px 18px rgba(28, 25, 23, 0.16);
-  transform: translateY(50%);
-  transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
-  white-space: nowrap;
-}
-
-.timeline-handle.is-a {
-  left: 24px;
-  background: #ea580c;
-}
-
-.timeline-handle.is-b {
-  right: 24px;
-  background: #1d4ed8;
 }
 
 .timeline-duration-handle {
@@ -490,19 +489,19 @@ onBeforeUnmount(() => {
   transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
 }
 
-.timeline-handle.is-disabled,
+.timeline-bar.is-disabled,
 .timeline-duration-handle.is-disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-.timeline-handle.is-active,
+.timeline-bar.is-active,
 .timeline-duration-handle.is-active {
   box-shadow: 0 14px 28px rgba(28, 25, 23, 0.22);
 }
 
-.timeline-handle.is-active {
-  transform: translateY(50%) scale(1.04);
+.timeline-bar.is-active {
+  transform: scale(1.02);
 }
 
 .timeline-duration-handle.is-active {
@@ -564,6 +563,19 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
+  .waveform-editor-panel {
+    height: auto !important;
+  }
+
+  .waveform-editor-panel :deep(.ant-card-body) {
+    padding-top: 0;
+  }
+
+  .waveform-editor-scroll {
+    overflow-y: visible !important;
+    padding-right: 0;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
   }

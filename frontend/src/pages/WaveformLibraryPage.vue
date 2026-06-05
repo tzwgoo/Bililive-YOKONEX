@@ -1,36 +1,29 @@
 <template>
   <main class="studio-page">
-    <PageHeaderBar
-      kicker="Waveform Assets"
-      title="波形库"
-      description="集中管理蓝牙波形资产，在同一页完成选择、预览、编辑、复制和保存。"
-    >
-      <template #actions>
-        <StatusPill :state="bluetoothStore.status.connected ? 'connected' : 'idle'" />
-        <Button @click="handleCreateWaveform">新建空白波形</Button>
-      </template>
-    </PageHeaderBar>
-
-    <ACard :bordered="false">
-      <div class="workspace-overview">
-        <div>
-          <p class="studio-kicker">Waveform Workspace</p>
-          <h2>让波形资产和事件规则彻底分离</h2>
-          <p class="studio-subtitle">这里专注波形本身的增删改查，事件触发映射统一收口到“事件配置”页面。</p>
+    <ACard :bordered="false" data-testid="workspace-summary-card">
+      <div class="workspace-summary">
+        <div class="workspace-summary-header">
+          <h1>波形库</h1>
+          <div class="workspace-summary-actions">
+            <StatusPill :state="bluetoothStore.status.connected ? 'connected' : 'idle'" />
+            <Button @click="handleCreateWaveform">新建空白波形</Button>
+          </div>
         </div>
-        <div class="hero-metrics">
-          <article class="hero-metric">
-            <strong>{{ draftWaveforms.length }}</strong>
-            <span>波形总数</span>
-          </article>
-          <article class="hero-metric">
-            <strong>{{ editableWaveformCount }}</strong>
-            <span>可编辑</span>
-          </article>
-          <article class="hero-metric">
-            <strong>{{ selectedWaveform?.steps.length || 0 }}</strong>
-            <span>当前步数</span>
-          </article>
+        <div class="workspace-overview workspace-overview-metrics-only">
+          <div class="hero-metrics">
+            <article class="hero-metric">
+              <strong>{{ draftWaveforms.length }}</strong>
+              <span>波形总数</span>
+            </article>
+            <article class="hero-metric">
+              <strong>{{ editableWaveformCount }}</strong>
+              <span>可编辑</span>
+            </article>
+            <article class="hero-metric">
+              <strong>{{ selectedWaveform?.steps.length || 0 }}</strong>
+              <span>当前步数</span>
+            </article>
+          </div>
         </div>
       </div>
     </ACard>
@@ -67,7 +60,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { Alert as AAlert, Button, Card as ACard, Col as ACol, Row as ARow } from "ant-design-vue";
-import PageHeaderBar from "@/components/layout/PageHeaderBar.vue";
 import StatusPill from "@/components/shared/StatusPill.vue";
 import WaveformEditorPanel from "@/components/waveforms/WaveformEditorPanel.vue";
 import WaveformListPanel from "@/components/waveforms/WaveformListPanel.vue";
@@ -290,17 +282,40 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.workspace-summary {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace-summary-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.workspace-summary-header h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.workspace-summary-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .workspace-overview {
   display: flex;
   justify-content: space-between;
   gap: 20px;
 }
 
-.workspace-overview h2 {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+.workspace-overview-metrics-only {
+  justify-content: flex-end;
 }
 
 .hero-metrics {
@@ -331,6 +346,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
+  .workspace-summary-header {
+    flex-direction: column;
+  }
+
+  .workspace-summary-actions {
+    justify-content: flex-start;
+  }
+
   .workspace-overview {
     flex-direction: column;
   }

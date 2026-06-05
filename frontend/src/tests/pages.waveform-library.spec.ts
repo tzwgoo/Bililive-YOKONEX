@@ -56,6 +56,9 @@ describe("WaveformLibraryPage", () => {
     expect(wrapper.text()).not.toContain("礼物事件");
     expect(wrapper.text()).not.toContain("绑定波形");
     expect(wrapper.text()).not.toContain("蓝牙 Studio");
+    expect(wrapper.findComponent({ name: "PageHeaderBar" }).exists()).toBe(false);
+    expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("波形库");
+    expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("新建空白波形");
   });
 
   it("renders waveform card previews in the library list", async () => {

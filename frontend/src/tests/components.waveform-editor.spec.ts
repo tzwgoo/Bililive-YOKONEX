@@ -19,7 +19,7 @@ describe("WaveformEditorPanel", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders one continuous drag track with proportional segments and handles", () => {
+  it("renders one continuous drag track with proportional segments and draggable bars", () => {
     const wrapper = mount(WaveformEditorPanel, {
       props: {
         waveform,
@@ -34,12 +34,15 @@ describe("WaveformEditorPanel", () => {
     expect(wrapper.findAll(".timeline-segment")[1].attributes("style")).toContain("flex-grow: 400");
     expect(wrapper.find('[data-testid="waveform-drag-surface-0"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="waveform-drag-surface-1"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="waveform-handle-channel-a-0"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="waveform-handle-channel-b-0"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="waveform-bar-channel-a-0"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="waveform-bar-channel-b-0"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="waveform-handle-channel-a-0"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="waveform-handle-channel-b-0"]').exists()).toBe(false);
+    expect(wrapper.findAll(".timeline-axis-label").map((item) => item.text())).toEqual(["A", "B", "A", "B"]);
     expect(wrapper.find('[data-testid="waveform-handle-duration-0"]').exists()).toBe(true);
   });
 
-  it("emits channel strength updates while dragging a strength handle", async () => {
+  it("emits channel strength updates while dragging a waveform bar", async () => {
     const wrapper = mount(WaveformEditorPanel, {
       props: {
         waveform,
@@ -61,7 +64,7 @@ describe("WaveformEditorPanel", () => {
       toJSON: () => ({}),
     });
 
-    await wrapper.get('[data-testid="waveform-handle-channel-a-0"]').trigger("mousedown", {
+    await wrapper.get('[data-testid="waveform-bar-channel-a-0"]').trigger("mousedown", {
       button: 0,
       clientX: 60,
       clientY: 160,
@@ -150,7 +153,7 @@ describe("WaveformEditorPanel", () => {
       toJSON: () => ({}),
     });
 
-    await wrapper.get('[data-testid="waveform-handle-channel-a-0"]').trigger("mousedown", {
+    await wrapper.get('[data-testid="waveform-bar-channel-a-0"]').trigger("mousedown", {
       button: 0,
       clientX: 60,
       clientY: 160,
@@ -196,5 +199,28 @@ describe("WaveformEditorPanel", () => {
     expect(wrapper.get('[data-testid="waveform-handle-duration-0"]').text()).toContain("360 ms");
 
     window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+
+  it("keeps the editor panel at a fixed desktop height and scrolls inside the content area", () => {
+    const wrapper = mount(WaveformEditorPanel, {
+      props: {
+        waveform: {
+          ...waveform,
+          steps: Array.from({ length: 8 }, (_, index) => ({
+            duration_ms: 160 + index * 20,
+            channel_a: 20 + index * 10,
+            channel_b: 30 + index * 10,
+          })),
+        },
+        savingWaveform: false,
+      },
+      attachTo: document.body,
+    });
+
+    const panel = wrapper.get(".waveform-editor-panel");
+    const scrollContainer = wrapper.get('[data-testid="waveform-editor-scroll"]').element as HTMLElement;
+
+    expect(panel.attributes("style")).toContain("height:");
+    expect(scrollContainer.style.overflowY).toBe("auto");
   });
 });

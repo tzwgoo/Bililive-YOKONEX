@@ -1,17 +1,25 @@
 <template>
-  <ACard title="波形库" :bordered="false">
+  <ACard title="波形库" :bordered="false" class="waveform-library-panel" :style="DESKTOP_PANEL_STYLE">
     <template #extra>
       <span class="section-count">{{ waveforms.length }} 个</span>
     </template>
-    <div class="waveform-library">
-      <Button
+    <div
+      data-testid="waveform-library-scroll"
+      class="waveform-library"
+      :style="SCROLL_CONTAINER_STYLE"
+    >
+      <div
         v-for="waveform in waveforms"
         :key="waveform.id"
         :data-testid="`waveform-card-${waveform.id}`"
-        block
         class="waveform-card"
         :class="{ 'is-active': waveform.id === selectedWaveformId }"
+        role="button"
+        tabindex="0"
+        :aria-pressed="waveform.id === selectedWaveformId ? 'true' : 'false'"
         @click="emit('select', waveform.id)"
+        @keydown.enter.prevent="emit('select', waveform.id)"
+        @keydown.space.prevent="emit('select', waveform.id)"
       >
         <span class="waveform-card-copy">
           <strong>{{ waveform.name }}</strong>
@@ -25,19 +33,19 @@
             class="waveform-preview-step"
             :style="{ flexGrow: normalizeDuration(step.duration_ms) }"
           >
-            <span class="waveform-preview-bars">
-              <span class="waveform-preview-bar is-a" :style="{ height: `${resolveHeightRatio(step.channel_a)}%` }"></span>
-              <span class="waveform-preview-bar is-b" :style="{ height: `${resolveHeightRatio(step.channel_b)}%` }"></span>
+            <span class="waveform-preview-bars" :style="{ height: `${PREVIEW_HEIGHT_PX}px` }">
+              <span class="waveform-preview-bar is-a" :style="{ height: `${resolvePreviewBarHeight(waveform, step.channel_a)}px` }"></span>
+              <span class="waveform-preview-bar is-b" :style="{ height: `${resolvePreviewBarHeight(waveform, step.channel_b)}px` }"></span>
             </span>
           </span>
         </span>
-      </Button>
+      </div>
     </div>
   </ACard>
 </template>
 
 <script setup lang="ts">
-import { Button, Card as ACard } from "ant-design-vue";
+import { Card as ACard } from "ant-design-vue";
 import type { BluetoothWaveform } from "@/types/bluetooth";
 
 defineProps<{
@@ -48,6 +56,14 @@ defineProps<{
 const emit = defineEmits<{
   select: [waveformId: string];
 }>();
+
+const PREVIEW_HEIGHT_PX = 52;
+const DESKTOP_PANEL_STYLE = {
+  height: "clamp(560px, calc(100vh - 220px), 820px)",
+};
+const SCROLL_CONTAINER_STYLE = {
+  overflowY: "auto",
+};
 
 function normalizeStrength(value: number) {
   return Math.max(0, Math.min(180, Math.round(Number(value || 0))));
@@ -64,22 +80,50 @@ function resolveMaxStrength(waveform: BluetoothWaveform) {
   );
 }
 
-function resolveHeightRatio(value: number) {
-  return (normalizeStrength(value) / 180) * 100;
+function resolvePreviewBarHeight(waveform: BluetoothWaveform, value: number) {
+  const waveformMaxStrength = Math.max(1, resolveMaxStrength(waveform));
+  return Math.round((normalizeStrength(value) / waveformMaxStrength) * PREVIEW_HEIGHT_PX);
 }
 </script>
 
 <style scoped>
+.waveform-library-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.waveform-library-panel :deep(.ant-card-body) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 0;
+}
+
 .waveform-library {
   display: grid;
+  flex: 1 1 auto;
   gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
+  padding-top: 12px;
+  padding-right: 6px;
 }
 
 .waveform-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
   height: auto;
   padding: 0;
+  border: 1px solid rgba(120, 113, 108, 0.16);
   border-radius: 18px;
-  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 248, 244, 0.98));
+  box-shadow: 0 10px 24px rgba(28, 25, 23, 0.04);
+  cursor: pointer;
+  appearance: none;
+  text-align: left;
 }
 
 .waveform-card.is-active {
@@ -93,10 +137,6 @@ function resolveHeightRatio(value: number) {
   width: 100%;
   padding: 14px 16px;
   text-align: left;
-}
-
-.waveform-card :deep(.ant-btn-icon) {
-  display: none;
 }
 
 .waveform-card-preview {
@@ -124,12 +164,12 @@ function resolveHeightRatio(value: number) {
   align-items: flex-end;
   gap: 4px;
   width: 100%;
+  height: 52px;
   min-height: 52px;
 }
 
 .waveform-preview-bar {
   flex: 1 1 0;
-  min-height: 4px;
   border-radius: 999px;
 }
 
@@ -155,5 +195,20 @@ function resolveHeightRatio(value: number) {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(120, 113, 108, 0.12);
+}
+
+@media (max-width: 1279px) {
+  .waveform-library-panel {
+    height: auto !important;
+  }
+
+  .waveform-library-panel :deep(.ant-card-body) {
+    padding-top: 0;
+  }
+
+  .waveform-library {
+    overflow-y: visible;
+    padding-right: 0;
+  }
 }
 </style>
