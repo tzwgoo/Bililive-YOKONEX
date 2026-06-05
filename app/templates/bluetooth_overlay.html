@@ -12,7 +12,7 @@
         --overlay-line: rgba(255, 255, 255, 0.18);
         --channel-a: #ff8a4c;
         --channel-b: #51a8ff;
-        --panel-bg: rgba(18, 12, 10, 0.14);
+        --panel-bg: rgba(18, 12, 10, 0.16);
       }
 
       * {
@@ -40,13 +40,27 @@
         width: 100%;
         height: 100%;
         display: grid;
-        grid-template-columns: minmax(150px, 0.7fr) minmax(170px, 0.84fr) minmax(200px, 1fr) minmax(210px, 1fr);
-        align-items: center;
         gap: 14px;
         padding: 12px 16px;
         color: var(--overlay-white);
         text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+      }
+
+      .overlay-root[data-style="panel"] {
+        grid-template-columns: minmax(150px, 0.7fr) minmax(170px, 0.84fr) minmax(200px, 1fr) minmax(210px, 1fr);
+        align-items: center;
         background: linear-gradient(90deg, rgba(16, 10, 8, 0.12), rgba(16, 10, 8, 0));
+      }
+
+      .overlay-root[data-style="event"] {
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+        grid-template-areas:
+          "highlight highlight"
+          ". side";
+        align-items: stretch;
+        background:
+          radial-gradient(circle at left center, rgba(255, 120, 82, 0.22), rgba(255, 120, 82, 0) 36%),
+          linear-gradient(120deg, rgba(30, 8, 8, 0.22), rgba(66, 10, 22, 0.12) 52%, rgba(10, 12, 22, 0.12));
       }
 
       .overlay-root[data-connected="false"] .overlay-dot {
@@ -54,9 +68,125 @@
         box-shadow: 0 0 0 8px rgba(255, 145, 145, 0.16);
       }
 
+      .overlay-surface {
+        border: 1px solid var(--overlay-line);
+        background: var(--panel-bg);
+        backdrop-filter: blur(10px);
+      }
+
+      .overlay-highlight {
+        display: none;
+      }
+
+      .overlay-root[data-style="event"] .overlay-highlight {
+        grid-area: highlight;
+        display: grid;
+        gap: 10px;
+        align-content: stretch;
+        min-width: 0;
+        padding: 16px 18px;
+        border-radius: 24px;
+        background:
+          linear-gradient(135deg, rgba(255, 122, 90, 0.22), rgba(255, 255, 255, 0.06)),
+          rgba(24, 11, 10, 0.26);
+      }
+
+      .overlay-highlight-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: end;
+      }
+
+      .overlay-highlight-copy {
+        min-width: 0;
+      }
+
+      .overlay-highlight-device {
+        display: none;
+      }
+
+      .overlay-root[data-style="event"] .overlay-highlight-device {
+        display: grid;
+        gap: 10px;
+        min-width: 210px;
+        justify-items: end;
+        align-content: start;
+      }
+
+      .overlay-highlight-kicker {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        color: rgba(255, 240, 236, 0.72);
+        text-transform: uppercase;
+      }
+
+      .overlay-highlight-label {
+        font-size: clamp(24px, 3vw, 34px);
+        font-weight: 800;
+        line-height: 1.04;
+      }
+
+      .overlay-highlight-user {
+        display: block;
+        font-size: 15px;
+        font-weight: 700;
+        color: rgba(255, 243, 236, 0.92);
+      }
+
+      .overlay-highlight-message {
+        display: block;
+        margin-top: 6px;
+        color: var(--overlay-soft);
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      .overlay-highlight-device-name {
+        font-size: 14px;
+        font-weight: 700;
+        color: rgba(255, 243, 236, 0.92);
+      }
+
+      .overlay-highlight-device-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .overlay-highlight-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .overlay-tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid var(--overlay-line);
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
       .overlay-meta {
         display: grid;
         gap: 8px;
+      }
+
+      .overlay-root[data-style="panel"] .overlay-meta {
+        align-content: center;
+      }
+
+      .overlay-root[data-style="event"] .overlay-meta {
+        display: none;
       }
 
       .overlay-status {
@@ -81,6 +211,10 @@
         font-size: clamp(20px, 3vw, 34px);
         font-weight: 700;
         line-height: 1.05;
+      }
+
+      .overlay-root[data-style="event"] .overlay-waveform-name {
+        font-size: 20px;
       }
 
       .overlay-device-name {
@@ -115,6 +249,14 @@
         gap: 10px;
       }
 
+      .overlay-root[data-style="panel"] .overlay-channels {
+        align-content: center;
+      }
+
+      .overlay-root[data-style="event"] .overlay-channels {
+        align-content: stretch;
+      }
+
       .overlay-channel {
         display: grid;
         gap: 6px;
@@ -138,6 +280,10 @@
         backdrop-filter: blur(8px);
       }
 
+      .overlay-root[data-style="event"] .overlay-bar-track {
+        height: 12px;
+      }
+
       .overlay-bar-fill {
         height: 100%;
         width: 0%;
@@ -158,10 +304,16 @@
       .overlay-canvas-wrap {
         height: 84px;
         border-radius: 18px;
-        border: 1px solid var(--overlay-line);
-        background: rgba(20, 14, 12, 0.18);
-        backdrop-filter: blur(8px);
         overflow: hidden;
+      }
+
+      .overlay-root[data-style="panel"] .overlay-canvas-wrap {
+        align-self: center;
+      }
+
+      .overlay-root[data-style="event"] .overlay-canvas-wrap {
+        height: auto;
+        min-height: 92px;
       }
 
       .overlay-waveform-canvas {
@@ -174,6 +326,55 @@
         min-width: 0;
         display: grid;
         gap: 8px;
+      }
+
+      .overlay-root[data-style="panel"] .overlay-recent {
+        align-content: center;
+      }
+
+      .overlay-root[data-style="event"] .overlay-recent {
+        align-content: stretch;
+      }
+
+      .overlay-event-side {
+        display: none;
+      }
+
+      .overlay-root[data-style="event"] .overlay-event-side {
+        grid-area: side;
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+
+      .overlay-telemetry {
+        display: grid;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 20px;
+      }
+
+      .overlay-root[data-style="panel"] .overlay-event-side,
+      .overlay-root[data-style="panel"] .overlay-telemetry {
+        display: contents;
+      }
+
+      .overlay-root[data-style="panel"] .overlay-highlight-copy {
+        display: none;
+      }
+
+      .overlay-root[data-style="panel"] .overlay-highlight-device {
+        display: none;
+      }
+
+      .overlay-event-waveform-name {
+        font-size: 18px;
+        font-weight: 800;
+        line-height: 1.1;
+      }
+
+      .overlay-root[data-style="panel"] .overlay-event-waveform-name {
+        display: none;
       }
 
       .overlay-recent-title {
@@ -191,6 +392,11 @@
         overflow: hidden;
       }
 
+      .overlay-root[data-style="event"] .overlay-danmaku-list {
+        max-height: none;
+        align-content: start;
+      }
+
       .overlay-danmaku-item {
         min-width: 0;
         padding: 7px 9px;
@@ -198,6 +404,11 @@
         border: 1px solid var(--overlay-line);
         background: rgba(20, 14, 12, 0.2);
         backdrop-filter: blur(8px);
+      }
+
+      .overlay-root[data-style="event"] .overlay-danmaku-item:first-child {
+        border-color: rgba(255, 142, 101, 0.26);
+        background: rgba(255, 118, 86, 0.08);
       }
 
       .overlay-danmaku-item strong,
@@ -218,11 +429,47 @@
         font-size: 12px;
       }
 
+      @media (max-width: 1100px) {
+        .overlay-root[data-style="event"] {
+          grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
+          grid-template-areas:
+            "highlight highlight"
+            ". side";
+        }
+      }
+
       @media (max-width: 860px) {
-        .overlay-root {
+        .overlay-root,
+        .overlay-root[data-style="panel"],
+        .overlay-root[data-style="event"] {
           grid-template-columns: 1fr;
+          grid-template-areas:
+            "highlight"
+            "side";
           gap: 12px;
           padding: 10px 12px;
+        }
+
+        .overlay-highlight {
+          display: grid;
+        }
+
+        .overlay-root[data-style="panel"] .overlay-highlight {
+          display: none;
+        }
+
+        .overlay-highlight-head {
+          grid-template-columns: 1fr;
+          align-items: start;
+        }
+
+        .overlay-root[data-style="event"] .overlay-highlight-device {
+          justify-items: start;
+          min-width: 0;
+        }
+
+        .overlay-highlight-device-meta {
+          justify-content: flex-start;
         }
 
         .overlay-waveform-name {
@@ -232,7 +479,37 @@
     </style>
   </head>
   <body>
-    <main class="overlay-root" id="overlay-root" data-connected="false">
+    <main class="overlay-root" id="overlay-root" data-connected="false" data-style="{{ overlay_style }}">
+      <section class="overlay-highlight overlay-surface">
+        <div class="overlay-highlight-head">
+          <div class="overlay-highlight-copy">
+            <p class="overlay-highlight-kicker">Live Trigger</p>
+            <div class="overlay-highlight-label" id="overlay-highlight-label">等待触发</div>
+            <div>
+              <strong class="overlay-highlight-user" id="overlay-highlight-user">直播事件发生后显示</strong>
+              <span class="overlay-highlight-message" id="overlay-highlight-message">当前还没有新的弹幕、SC、上舰或点赞触发。</span>
+            </div>
+          </div>
+          <div class="overlay-highlight-device">
+            <div class="overlay-status">
+              <span class="overlay-dot"></span>
+              <span id="overlay-highlight-connection-text">蓝牙未连接</span>
+            </div>
+            <div class="overlay-highlight-device-meta">
+              <div class="overlay-highlight-device-name" id="overlay-highlight-device-name">未连接设备</div>
+              <div class="overlay-battery-chip">
+                <span>电量</span>
+                <strong id="overlay-highlight-battery-value">--</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="overlay-highlight-tags">
+          <span class="overlay-tag" id="overlay-highlight-guard">等待身份</span>
+          <span class="overlay-tag" id="overlay-highlight-waveform">待机波形</span>
+        </div>
+      </section>
+
       <section class="overlay-meta">
         <div class="overlay-status">
           <span class="overlay-dot"></span>
@@ -248,34 +525,39 @@
         </div>
       </section>
 
-      <section class="overlay-channels">
-        <article class="overlay-channel">
-          <div class="overlay-channel-head">
-            <span>A 通道</span>
-            <strong id="overlay-channel-a-value">0</strong>
-          </div>
-          <div class="overlay-bar-track">
-            <div class="overlay-bar-fill overlay-bar-fill-a" id="overlay-channel-a-bar"></div>
-          </div>
-        </article>
-        <article class="overlay-channel">
-          <div class="overlay-channel-head">
-            <span>B 通道</span>
-            <strong id="overlay-channel-b-value">0</strong>
-          </div>
-          <div class="overlay-bar-track">
-            <div class="overlay-bar-fill overlay-bar-fill-b" id="overlay-channel-b-bar"></div>
-          </div>
-        </article>
-      </section>
+      <section class="overlay-event-side" id="overlay-event-side">
+        <section class="overlay-recent overlay-surface">
+          <p class="overlay-recent-title">最近触发</p>
+          <div class="overlay-danmaku-list" id="overlay-danmaku-list"></div>
+        </section>
 
-      <section class="overlay-canvas-wrap" aria-label="蓝牙实时叠加窗">
-        <canvas class="overlay-waveform-canvas" id="overlay-waveform-canvas"></canvas>
-      </section>
+        <section class="overlay-telemetry overlay-surface">
+          <div class="overlay-event-waveform-name" id="overlay-event-waveform-name">待机中</div>
+          <section class="overlay-channels">
+            <article class="overlay-channel">
+              <div class="overlay-channel-head">
+                <span>A 通道</span>
+                <strong id="overlay-channel-a-value">0</strong>
+              </div>
+              <div class="overlay-bar-track">
+                <div class="overlay-bar-fill overlay-bar-fill-a" id="overlay-channel-a-bar"></div>
+              </div>
+            </article>
+            <article class="overlay-channel">
+              <div class="overlay-channel-head">
+                <span>B 通道</span>
+                <strong id="overlay-channel-b-value">0</strong>
+              </div>
+              <div class="overlay-bar-track">
+                <div class="overlay-bar-fill overlay-bar-fill-b" id="overlay-channel-b-bar"></div>
+              </div>
+            </article>
+          </section>
 
-      <section class="overlay-recent">
-        <p class="overlay-recent-title">最近触发</p>
-        <div class="overlay-danmaku-list" id="overlay-danmaku-list"></div>
+          <section class="overlay-canvas-wrap" aria-label="蓝牙实时叠加窗">
+            <canvas class="overlay-waveform-canvas" id="overlay-waveform-canvas"></canvas>
+          </section>
+        </section>
       </section>
     </main>
 

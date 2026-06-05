@@ -303,6 +303,16 @@ def test_bluetooth_overlay_page_is_available() -> None:
     assert response.status_code == 200
     assert "蓝牙实时叠加窗" in response.text
     assert "overlay-root" in response.text
+    assert 'data-style="event"' in response.text
+
+
+def test_bluetooth_overlay_page_accepts_panel_style() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/bluetooth/overlay?style=panel")
+
+    assert response.status_code == 200
+    assert 'data-style="panel"' in response.text
 
 
 def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:

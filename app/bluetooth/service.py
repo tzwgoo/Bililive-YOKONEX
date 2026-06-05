@@ -492,6 +492,7 @@ def _summarize_overlay_event(event: dict[str, Any]) -> dict[str, Any]:
         "msg": _resolve_overlay_event_message(event_type, payload),
         "guard_label": str(payload.get("guard_label", "") or ""),
         "waveform_id": str(bluetooth_dispatch.get("waveform_id", "") or ""),
+        "waveform_name": str(bluetooth_dispatch.get("waveform_name", "") or ""),
         "success": bool(bluetooth_dispatch.get("success", False)),
     }
 

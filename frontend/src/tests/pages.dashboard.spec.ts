@@ -111,7 +111,7 @@ describe("DashboardPage", () => {
     expect(wrapper.text()).not.toContain("连接方式");
   });
 
-  it("renders an explicit OBS overlay entry in the bluetooth panel", async () => {
+  it("renders explicit OBS overlay entries for both supported styles", async () => {
     vi.spyOn(sessionService, "fetchSessionStatus").mockResolvedValue({
       status: "idle",
       can_start: true,
@@ -131,10 +131,14 @@ describe("DashboardPage", () => {
     const wrapper = mount(DashboardPage);
     await flushPromises();
 
-    const overlayLink = wrapper.get('[data-testid="open-bluetooth-overlay"]');
-    expect(overlayLink.attributes("href")).toBe("/bluetooth/overlay");
-    expect(overlayLink.attributes("target")).toBe("_blank");
-    expect(overlayLink.text()).toContain("OBS 小窗");
+    const eventOverlayLink = wrapper.get('[data-testid="open-bluetooth-overlay-event"]');
+    const panelOverlayLink = wrapper.get('[data-testid="open-bluetooth-overlay-panel"]');
+    expect(eventOverlayLink.attributes("href")).toBe("/bluetooth/overlay?style=event");
+    expect(panelOverlayLink.attributes("href")).toBe("/bluetooth/overlay?style=panel");
+    expect(eventOverlayLink.attributes("target")).toBe("_blank");
+    expect(panelOverlayLink.attributes("target")).toBe("_blank");
+    expect(eventOverlayLink.text()).toContain("弹幕演出");
+    expect(panelOverlayLink.text()).toContain("仪表盘");
   });
 
   it("submits command connect payload from dashboard form", async () => {
@@ -212,12 +216,12 @@ describe("DashboardPage", () => {
     await flushPromises();
 
     expect(openSpy).toHaveBeenCalledWith(
-      "/bluetooth/overlay",
+      "/bluetooth/overlay?style=event",
       "biliLiveBluetoothOverlay",
       "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no",
     );
     expect(connectBluetoothSpy).toHaveBeenCalledWith("device-01");
-    expect(overlayWindow.location.replace).toHaveBeenCalledWith("/bluetooth/overlay");
+    expect(overlayWindow.location.replace).toHaveBeenCalledWith("/bluetooth/overlay?style=event");
     expect(overlayWindow.focus).toHaveBeenCalled();
   });
 });

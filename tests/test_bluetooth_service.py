@@ -129,6 +129,11 @@ def test_service_overlay_payload_includes_recent_live_events(
                 "msg": "开火",
                 "guard_label": "舰长",
             },
+            "bluetooth_dispatch": {
+                "waveform_id": "ems-preset-04",
+                "waveform_name": "EMS 预设 04 - 快速按捏",
+                "success": True,
+            },
         }
     )
     monkeypatch.setattr(
@@ -142,6 +147,7 @@ def test_service_overlay_payload_includes_recent_live_events(
     assert overlay["recent_events"][0]["msg"] == "开火"
     assert overlay["recent_events"][0]["event_label"] == "弹幕"
     assert overlay["recent_events"][0]["guard_label"] == "舰长"
+    assert overlay["recent_events"][0]["waveform_name"] == "EMS 预设 04 - 快速按捏"
 
 
 def test_service_overlay_payload_includes_recent_like_event(

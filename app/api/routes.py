@@ -174,10 +174,12 @@ async def waveforms_page(request: Request) -> HTMLResponse:
 
 @router.get("/bluetooth/overlay", response_class=HTMLResponse)
 async def bluetooth_overlay(request: Request) -> HTMLResponse:
+    requested_style = str(request.query_params.get("style", "event") or "event").lower()
+    overlay_style = requested_style if requested_style in {"event", "panel"} else "event"
     return templates.TemplateResponse(
         request=request,
         name="bluetooth_overlay.html",
-        context={},
+        context={"overlay_style": overlay_style},
     )
 
 

@@ -180,9 +180,9 @@ async function refreshDashboard() {
 
 const polling = usePolling(refreshDashboard, 5000);
 
-function openBluetoothOverlayWindow() {
+function openBluetoothOverlayWindow(style: "event" | "panel" = "event") {
   return window.open(
-    "/bluetooth/overlay",
+    `/bluetooth/overlay?style=${style}`,
     "biliLiveBluetoothOverlay",
     "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no",
   );
@@ -262,11 +262,11 @@ async function handleScanBluetooth() {
 
 async function handleConnectBluetooth(deviceId: string) {
   scanningBluetooth.value = true;
-  const overlayWindow = openBluetoothOverlayWindow();
+  const overlayWindow = openBluetoothOverlayWindow("event");
   try {
     await bluetoothStore.connectDevice(deviceId);
     if (overlayWindow && !overlayWindow.closed) {
-      overlayWindow.location.replace("/bluetooth/overlay");
+      overlayWindow.location.replace("/bluetooth/overlay?style=event");
       overlayWindow.focus();
     }
     bluetoothMessage.value = "蓝牙连接成功";

@@ -9,6 +9,15 @@ const overlayChannelABar = document.getElementById("overlay-channel-a-bar");
 const overlayChannelBBar = document.getElementById("overlay-channel-b-bar");
 const overlayWaveformCanvas = document.getElementById("overlay-waveform-canvas");
 const overlayDanmakuList = document.getElementById("overlay-danmaku-list");
+const overlayHighlightLabel = document.getElementById("overlay-highlight-label");
+const overlayHighlightUser = document.getElementById("overlay-highlight-user");
+const overlayHighlightMessage = document.getElementById("overlay-highlight-message");
+const overlayHighlightGuard = document.getElementById("overlay-highlight-guard");
+const overlayHighlightWaveform = document.getElementById("overlay-highlight-waveform");
+const overlayHighlightConnectionText = document.getElementById("overlay-highlight-connection-text");
+const overlayHighlightDeviceName = document.getElementById("overlay-highlight-device-name");
+const overlayHighlightBatteryValue = document.getElementById("overlay-highlight-battery-value");
+const overlayEventWaveformName = document.getElementById("overlay-event-waveform-name");
 
 let overlayState = {
   connected: false,
@@ -103,7 +112,8 @@ function renderOverlayDanmaku(recentEvents) {
   overlayDanmakuList.innerHTML = items
     .map((item) => {
       const guardLabel = item.guard_label ? ` · ${item.guard_label}` : "";
-      const waveformText = item.waveform_id ? ` · ${item.waveform_id}` : "";
+      const waveformLabel = item.waveform_name || item.waveform_id || "";
+      const waveformText = waveformLabel ? ` · ${waveformLabel}` : "";
       return `
         <article class="overlay-danmaku-item">
           <strong>${escapeOverlayHtml(item.event_label || "事件")}${escapeOverlayHtml(guardLabel)} · ${escapeOverlayHtml(item.uname || "匿名用户")}</strong>
@@ -114,6 +124,26 @@ function renderOverlayDanmaku(recentEvents) {
     .join("");
 }
 
+function renderOverlayHighlight(recentEvents) {
+  const latestEvent = Array.isArray(recentEvents) && recentEvents.length ? recentEvents[0] : null;
+  if (!latestEvent) {
+    overlayHighlightLabel.textContent = "等待触发";
+    overlayHighlightUser.textContent = "直播事件发生后显示";
+    overlayHighlightMessage.textContent = "当前还没有新的弹幕、SC、上舰或点赞触发。";
+    overlayHighlightGuard.textContent = "等待身份";
+    overlayHighlightWaveform.textContent = overlayState.waveform_name ? `波形 ${overlayState.waveform_name}` : "待机波形";
+    return;
+  }
+
+  const guardText = latestEvent.guard_label || "普通观众";
+  const waveformText = latestEvent.waveform_name || latestEvent.waveform_id || overlayState.waveform_name || "待机中";
+  overlayHighlightLabel.textContent = latestEvent.event_label || "事件触发";
+  overlayHighlightUser.textContent = latestEvent.uname || "匿名用户";
+  overlayHighlightMessage.textContent = latestEvent.msg || "已触发蓝牙演出";
+  overlayHighlightGuard.textContent = guardText;
+  overlayHighlightWaveform.textContent = `波形 ${waveformText}`;
+}
+
 function renderOverlay(payload) {
   overlayState = {
     ...overlayState,
@@ -121,14 +151,19 @@ function renderOverlay(payload) {
   };
   overlayRoot.dataset.connected = String(Boolean(overlayState.connected));
   overlayConnectionText.textContent = overlayState.connected ? "蓝牙已连接" : "蓝牙未连接";
+  overlayHighlightConnectionText.textContent = overlayConnectionText.textContent;
   overlayWaveformName.textContent = overlayState.waveform_name || "待机中";
+  overlayEventWaveformName.textContent = overlayWaveformName.textContent;
   overlayDeviceName.textContent = overlayState.device_name || "未连接设备";
+  overlayHighlightDeviceName.textContent = overlayDeviceName.textContent;
   overlayBatteryValue.textContent = formatBatteryLevel(overlayState.battery_level);
+  overlayHighlightBatteryValue.textContent = overlayBatteryValue.textContent;
   overlayChannelAValue.textContent = String(clampStrength(overlayState.channel_a));
   overlayChannelBValue.textContent = String(clampStrength(overlayState.channel_b));
   overlayChannelABar.style.width = resolveStrengthWidth(overlayState.channel_a);
   overlayChannelBBar.style.width = resolveStrengthWidth(overlayState.channel_b);
   drawOverlayHistory(overlayState.history || []);
+  renderOverlayHighlight(overlayState.recent_events || []);
   renderOverlayDanmaku(overlayState.recent_events || []);
 }
 
