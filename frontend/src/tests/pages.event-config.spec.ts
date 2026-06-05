@@ -85,6 +85,9 @@ describe("EventConfigPage", () => {
     expect(wrapper.text()).toContain("蓝牙");
     expect(wrapper.text()).toContain("固定点赞指令 ID");
     expect(wrapper.text()).toContain("礼物");
+    expect(wrapper.findComponent({ name: "PageHeaderBar" }).exists()).toBe(false);
+    expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("事件配置");
+    expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("保存 IM 规则");
 
     await wrapper.get('[data-testid="event-tab-bluetooth"]').trigger("click");
     await flushPromises();

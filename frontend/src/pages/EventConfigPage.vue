@@ -1,57 +1,45 @@
 <template>
   <main class="studio-page">
-    <PageHeaderBar
-      kicker="Event Workspace"
-      title="事件配置"
-      description="统一管理 IM 价格档位与蓝牙事件触发规则，让规则配置按任务收口到同一页。"
-    >
-      <template #actions>
-        <Button
-          v-if="activeTab === 'im'"
-          data-testid="command-save"
-          type="primary"
-          :loading="savingCommandRules"
-          @click="handleSaveImRules"
-        >
-          保存 IM 规则
-        </Button>
-        <Button
-          v-else
-          data-testid="save-rules"
-          type="primary"
-          :loading="savingBluetoothRules"
-          @click="handleSaveBluetoothRules"
-        >
-          保存蓝牙规则
-        </Button>
-      </template>
-    </PageHeaderBar>
-
-    <ACard :bordered="false">
-      <div class="workspace-overview">
-        <div>
-          <p class="studio-kicker">Workspace Focus</p>
-          <h2>{{ activeTab === "im" ? "IM 档位与固定指令" : "蓝牙事件与波形绑定" }}</h2>
-          <p class="studio-subtitle">
-            {{ activeTab === "im"
-              ? "编辑礼物、醒目留言、上舰和续费的价格档位，并保留点赞和弹幕的固定指令槽位。"
-              : "管理礼物、互动等事件对应的蓝牙规则，让每一种触发都能快速绑定到目标波形。"
-            }}
-          </p>
+    <ACard :bordered="false" data-testid="workspace-summary-card">
+      <div class="workspace-summary">
+        <div class="workspace-summary-header">
+          <h1>事件配置</h1>
+          <div class="workspace-summary-actions">
+            <Button
+              v-if="activeTab === 'im'"
+              data-testid="command-save"
+              type="primary"
+              :loading="savingCommandRules"
+              @click="handleSaveImRules"
+            >
+              保存 IM 规则
+            </Button>
+            <Button
+              v-else
+              data-testid="save-rules"
+              type="primary"
+              :loading="savingBluetoothRules"
+              @click="handleSaveBluetoothRules"
+            >
+              保存蓝牙规则
+            </Button>
+          </div>
         </div>
-        <div class="hero-metrics">
-          <article class="hero-metric">
-            <strong>{{ commandRuleCount }}</strong>
-            <span>IM 档位</span>
-          </article>
-          <article class="hero-metric">
-            <strong>{{ bluetoothRuleCount }}</strong>
-            <span>蓝牙规则</span>
-          </article>
-          <article class="hero-metric">
-            <strong>{{ waveformCount }}</strong>
-            <span>可选波形</span>
-          </article>
+        <div class="workspace-overview workspace-overview-metrics-only">
+          <div class="hero-metrics">
+            <article class="hero-metric">
+              <strong>{{ commandRuleCount }}</strong>
+              <span>IM 档位</span>
+            </article>
+            <article class="hero-metric">
+              <strong>{{ bluetoothRuleCount }}</strong>
+              <span>蓝牙规则</span>
+            </article>
+            <article class="hero-metric">
+              <strong>{{ waveformCount }}</strong>
+              <span>可选波形</span>
+            </article>
+          </div>
         </div>
       </div>
     </ACard>
@@ -84,7 +72,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { Alert as AAlert, Button, Card as ACard } from "ant-design-vue";
-import PageHeaderBar from "@/components/layout/PageHeaderBar.vue";
 import BluetoothEventRulePanel from "@/components/events/BluetoothEventRulePanel.vue";
 import EventConfigTabs from "@/components/events/EventConfigTabs.vue";
 import ImRuleGroupsPanel from "@/components/events/ImRuleGroupsPanel.vue";
@@ -288,17 +275,40 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.workspace-summary {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace-summary-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.workspace-summary-header h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.workspace-summary-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .workspace-overview {
   display: flex;
   justify-content: space-between;
   gap: 20px;
 }
 
-.workspace-overview h2 {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+.workspace-overview-metrics-only {
+  justify-content: flex-end;
 }
 
 .hero-metrics {
@@ -329,6 +339,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
+  .workspace-summary-header {
+    flex-direction: column;
+  }
+
+  .workspace-summary-actions {
+    justify-content: flex-start;
+  }
+
   .workspace-overview {
     flex-direction: column;
   }
