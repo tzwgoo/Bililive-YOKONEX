@@ -66,8 +66,6 @@ class FakeSessionManager:
             "message": "",
             "mode": "open_live",
             "mode_label": "官方 open-live",
-            "connection_mode": "im",
-            "connection_mode_label": "IM 指令",
             "output_mode": "im",
             "trigger_mode": "by_quantity",
             "like_multiple": 100,
@@ -103,7 +101,7 @@ class FakeSessionManager:
         mode: str,
         value: str,
         trigger_mode: str,
-        output_mode: str = "im",
+        output_mode: str = "",
         like_multiple: int = 100,
         danmaku_enabled: bool = False,
         danmaku_keywords: str = "",
@@ -200,7 +198,6 @@ def test_status_endpoint_returns_idle_state() -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "idle"
     assert response.json()["mode"] == "open_live"
-    assert response.json()["connection_mode"] == "im"
     assert response.json()["output_mode"] == "im"
     assert response.json()["trigger_mode"] == "by_quantity"
     assert response.json()["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
@@ -309,7 +306,6 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
             "mode": "third_party",
             "value": "123456",
             "trigger_mode": "single",
-            "connection_mode": "bluetooth",
             "like_multiple": 200,
             "danmaku_enabled": True,
             "danmaku_keywords": "开火,冲冲冲",
@@ -325,7 +321,7 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
         "mode": "third_party",
         "value": "123456",
         "trigger_mode": "single",
-        "output_mode": "bluetooth",
+        "output_mode": "",
         "like_multiple": 200,
         "danmaku_enabled": True,
         "danmaku_keywords": "开火,冲冲冲",

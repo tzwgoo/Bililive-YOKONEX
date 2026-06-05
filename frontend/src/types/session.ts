@@ -42,8 +42,6 @@ export interface SessionStatusModel {
 export interface SessionStartPayload {
   mode: string;
   value: string;
-  connection_mode: string;
-  output_mode: string;
   trigger_mode: string;
   like_multiple: number;
   danmaku_enabled: boolean;

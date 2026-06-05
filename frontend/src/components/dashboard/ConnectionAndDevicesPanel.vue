@@ -42,6 +42,14 @@
           <div class="button-row compact-row">
             <Button type="primary" :loading="scanningBluetooth" @click="$emit('scan-bluetooth')">扫描设备</Button>
             <Button :disabled="scanningBluetooth" @click="$emit('disconnect-bluetooth')">断开设备</Button>
+            <Button
+              data-testid="open-bluetooth-overlay"
+              href="/bluetooth/overlay"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              OBS 小窗
+            </Button>
           </div>
           <ACollapse class="bluetooth-collapse" :bordered="false">
             <ACollapsePanel key="devices" header="设备列表">

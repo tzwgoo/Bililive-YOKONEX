@@ -10,7 +10,6 @@
     <ADescriptions :column="2" size="small" bordered>
       <ADescriptionsItem label="房间号">{{ session.roomId }}</ADescriptionsItem>
       <ADescriptionsItem label="主播昵称">{{ session.anchorName || "-" }}</ADescriptionsItem>
-      <ADescriptionsItem label="连接方式">{{ session.connectionMode }}</ADescriptionsItem>
       <ADescriptionsItem label="IM 状态">{{ commandStatus }}</ADescriptionsItem>
       <ADescriptionsItem label="蓝牙状态">{{ bluetoothStatus }}</ADescriptionsItem>
       <ADescriptionsItem label="最近事件">{{ formatTimestamp(session.lastEventAt) }}</ADescriptionsItem>

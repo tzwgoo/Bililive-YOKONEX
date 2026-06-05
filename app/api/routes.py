@@ -29,8 +29,8 @@ def _spa_index_response() -> FileResponse | None:
 class StartSessionRequest(BaseModel):
     mode: str
     value: str
-    connection_mode: str = "im"
-    output_mode: str = "im"
+    connection_mode: str | None = None
+    output_mode: str | None = None
     trigger_mode: str = "by_quantity"
     like_multiple: int = 100
     danmaku_enabled: bool = False
@@ -356,7 +356,7 @@ async def bluetooth_overlay_stream(request: Request, once: bool = False) -> Stre
 @router.post("/api/session/start")
 async def start_session(request: Request, payload: StartSessionRequest) -> dict:
     try:
-        normalized_connection_mode = payload.connection_mode or payload.output_mode
+        normalized_connection_mode = payload.connection_mode or payload.output_mode or ""
         await request.app.state.session_service.start(
             mode=payload.mode,
             value=payload.value,

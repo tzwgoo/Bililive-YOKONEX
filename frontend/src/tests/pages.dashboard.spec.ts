@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/pages/DashboardPage.vue";
+import PageHeaderBar from "@/components/layout/PageHeaderBar.vue";
 import * as sessionService from "@/services/session";
 import * as commandService from "@/services/command";
 import * as bluetoothService from "@/services/bluetooth";
@@ -45,6 +46,9 @@ describe("DashboardPage", () => {
     expect(wrapper.text()).toContain("监听主参数");
     expect(wrapper.text()).toContain("蓝牙设备");
     expect(wrapper.text()).toContain("实时日志");
+    expect(wrapper.text()).not.toContain("集中查看当前运行状态、保留高频监听参数和连接操作，并在首页持续查看实时日志。");
+    expect(wrapper.getComponent(PageHeaderBar).props("kicker")).toBeUndefined();
+    expect(wrapper.getComponent(PageHeaderBar).props("description")).toBeUndefined();
     expect(wrapper.text()).toContain("123");
     expect(wrapper.text()).toContain("主播A");
   });
@@ -74,8 +78,6 @@ describe("DashboardPage", () => {
     expect(startSessionSpy).toHaveBeenCalledWith({
       mode: "open_live",
       value: "主播身份码123",
-      connection_mode: "im",
-      output_mode: "im",
       trigger_mode: "by_quantity",
       like_multiple: 100,
       danmaku_enabled: false,
@@ -85,6 +87,54 @@ describe("DashboardPage", () => {
       danmaku_user_limit_max_triggers: 0,
       danmaku_min_guard_level: 0,
     });
+  });
+
+  it("does not render the old connection mode selector in the trigger card", async () => {
+    vi.spyOn(sessionService, "fetchSessionStatus").mockResolvedValue({
+      status: "idle",
+      can_start: true,
+      can_stop: false,
+    });
+    vi.spyOn(commandService, "fetchCommandStatus").mockResolvedValue({
+      status: "idle",
+      can_connect: true,
+      can_disconnect: false,
+    });
+    vi.spyOn(bluetoothService, "fetchBluetoothStatus").mockResolvedValue({
+      connected: false,
+    });
+
+    const wrapper = mount(DashboardPage);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("礼物触发模式");
+    expect(wrapper.text()).not.toContain("连接方式");
+  });
+
+  it("renders an explicit OBS overlay entry in the bluetooth panel", async () => {
+    vi.spyOn(sessionService, "fetchSessionStatus").mockResolvedValue({
+      status: "idle",
+      can_start: true,
+      can_stop: false,
+    });
+    vi.spyOn(commandService, "fetchCommandStatus").mockResolvedValue({
+      status: "idle",
+      can_connect: true,
+      can_disconnect: false,
+    });
+    vi.spyOn(bluetoothService, "fetchBluetoothStatus").mockResolvedValue({
+      connected: false,
+      devices: [],
+      rules: [],
+    });
+
+    const wrapper = mount(DashboardPage);
+    await flushPromises();
+
+    const overlayLink = wrapper.get('[data-testid="open-bluetooth-overlay"]');
+    expect(overlayLink.attributes("href")).toBe("/bluetooth/overlay");
+    expect(overlayLink.attributes("target")).toBe("_blank");
+    expect(overlayLink.text()).toContain("OBS 小窗");
   });
 
   it("submits command connect payload from dashboard form", async () => {

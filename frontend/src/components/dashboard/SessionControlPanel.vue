@@ -29,10 +29,6 @@
         <ACard title="礼物 / 点赞触发" :bordered="false">
           <div class="form-grid">
             <label class="field">
-              <span>连接方式</span>
-              <Select v-model:value="sessionForm.connection_mode" :options="connectionModeOptions" />
-            </label>
-            <label class="field">
               <span>礼物触发模式</span>
               <Select v-model:value="sessionForm.trigger_mode" :options="triggerModeOptions" />
             </label>
@@ -109,10 +105,6 @@ defineEmits<{
 const sessionModeSelectOptions = [
   { label: "官方 open-live", value: "open_live" },
   { label: "第三方房间消息流", value: "third_party" },
-];
-const connectionModeOptions = [
-  { label: "IM 指令", value: "im" },
-  { label: "蓝牙", value: "bluetooth" },
 ];
 const triggerModeOptions = [
   { label: "按礼物数量触发", value: "by_quantity" },

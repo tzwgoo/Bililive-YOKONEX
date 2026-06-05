@@ -1,10 +1,6 @@
 <template>
   <main class="dashboard-page">
-    <PageHeaderBar
-      kicker="Control Deck"
-      title="直播互动监听控制台"
-      description="集中查看当前运行状态、保留高频监听参数和连接操作，并在首页持续查看实时日志。"
-    >
+    <PageHeaderBar title="直播互动监听控制台">
       <template #actions>
         <StatusPill :state="sessionStore.status.status" />
       </template>
@@ -87,8 +83,6 @@ const bluetoothStore = useBluetoothStore();
 const sessionStorage = useLocalDraft<SessionStartPayload>("biliLive.sessionDraft", {
   mode: "open_live",
   value: "",
-  connection_mode: "im",
-  output_mode: "im",
   trigger_mode: "by_quantity",
   like_multiple: 100,
   danmaku_enabled: false,
@@ -129,7 +123,6 @@ const eventErrorMessage = computed(() => liveEventStream.errorMessage.value || c
 watch(
   sessionForm,
   (value) => {
-    value.output_mode = value.connection_mode;
     sessionStorage.save({ ...value });
   },
   { deep: true },
@@ -147,8 +140,6 @@ watch(
     sessionMessage.value = status.message || (status.canStop ? "监听运行中" : "等待启动");
     if (status.canStop) {
       sessionForm.mode = status.mode;
-      sessionForm.connection_mode = status.connectionMode;
-      sessionForm.output_mode = status.connectionMode;
       sessionForm.trigger_mode = status.triggerMode;
       sessionForm.like_multiple = status.likeMultiple;
       sessionForm.danmaku_enabled = status.danmakuEnabled;

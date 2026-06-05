@@ -91,6 +91,8 @@ def create_app() -> FastAPI:
     session_service = LiveSessionManager(
         open_live_session=open_live_session,
         third_party_session=third_party_session,
+        command_session=command_session,
+        bluetooth_service=bluetooth_service,
     )
 
     app.state.event_hub = event_hub

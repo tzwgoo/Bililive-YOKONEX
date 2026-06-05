@@ -23,9 +23,18 @@ class LiveSessionManager:
         OUTPUT_MODE_BLUETOOTH: "蓝牙",
     }
 
-    def __init__(self, *, open_live_session: Any, third_party_session: Any) -> None:
+    def __init__(
+        self,
+        *,
+        open_live_session: Any,
+        third_party_session: Any,
+        command_session: Any | None = None,
+        bluetooth_service: Any | None = None,
+    ) -> None:
         self.open_live_session = open_live_session
         self.third_party_session = third_party_session
+        self.command_session = command_session
+        self.bluetooth_service = bluetooth_service
         self.mode = self.MODE_OPEN_LIVE
         self._active_mode: str | None = None
         self.output_mode = self.OUTPUT_MODE_IM
@@ -44,7 +53,7 @@ class LiveSessionManager:
         *,
         mode: str,
         value: str,
-        output_mode: str = OUTPUT_MODE_IM,
+        output_mode: str = "",
         trigger_mode: str = "by_quantity",
         like_multiple: int = 100,
         danmaku_enabled: bool = False,
@@ -57,7 +66,7 @@ class LiveSessionManager:
     ) -> None:
         normalized_mode = self._normalize_mode(mode)
         normalized_value = value.strip()
-        normalized_output_mode = self._normalize_output_mode(output_mode)
+        normalized_output_mode = self._resolve_output_mode(output_mode)
         normalized_trigger_mode = normalize_trigger_mode(trigger_mode)
         normalized_like_multiple = max(1, int(like_multiple))
         normalized_danmaku_enabled = bool(danmaku_enabled)
@@ -112,8 +121,6 @@ class LiveSessionManager:
         payload = dict(self._get_service(service_mode).get_status_payload())
         payload["mode"] = self.mode
         payload["mode_label"] = self.MODE_LABELS[self.mode]
-        payload["connection_mode"] = self.output_mode
-        payload["connection_mode_label"] = self.OUTPUT_MODE_LABELS[self.output_mode]
         payload["output_mode"] = self.output_mode
         payload["output_mode_label"] = self.OUTPUT_MODE_LABELS[self.output_mode]
         payload["trigger_mode"] = self.trigger_mode
@@ -142,7 +149,31 @@ class LiveSessionManager:
         return normalized_mode
 
     def _normalize_output_mode(self, output_mode: str) -> str:
-        normalized_output_mode = str(output_mode or "").strip() or self.OUTPUT_MODE_IM
+        normalized_output_mode = str(output_mode or "").strip()
         if normalized_output_mode not in self.OUTPUT_MODE_LABELS:
             raise ValueError("不支持的输出方式")
         return normalized_output_mode
+
+    def _resolve_output_mode(self, output_mode: str) -> str:
+        normalized_output_mode = str(output_mode or "").strip()
+        if normalized_output_mode:
+            return self._normalize_output_mode(normalized_output_mode)
+        if self._is_bluetooth_connected():
+            return self.OUTPUT_MODE_BLUETOOTH
+        if self._is_command_connected():
+            return self.OUTPUT_MODE_IM
+        return self.OUTPUT_MODE_IM
+
+    def _is_command_connected(self) -> bool:
+        return bool(getattr(self.command_session, "is_connected", False))
+
+    def _is_bluetooth_connected(self) -> bool:
+        if self.bluetooth_service is None or not hasattr(self.bluetooth_service, "get_status_payload"):
+            return False
+        try:
+            payload = self.bluetooth_service.get_status_payload()
+        except Exception:
+            return False
+        if not isinstance(payload, dict):
+            return False
+        return bool(payload.get("connected"))
