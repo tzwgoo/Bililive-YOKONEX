@@ -53,14 +53,40 @@
       }
 
       .overlay-root[data-style="event"] {
-        grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+        grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
         grid-template-areas:
           "highlight highlight"
-          ". side";
+          "left side";
+        grid-template-rows: auto minmax(0, 1fr);
         align-items: stretch;
         background:
           radial-gradient(circle at left center, rgba(255, 120, 82, 0.22), rgba(255, 120, 82, 0) 36%),
           linear-gradient(120deg, rgba(30, 8, 8, 0.22), rgba(66, 10, 22, 0.12) 52%, rgba(10, 12, 22, 0.12));
+      }
+
+      .overlay-root[data-style="event"][data-layout="compact"] {
+        gap: 10px;
+        padding: 10px 12px;
+        grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+      }
+
+      .overlay-root[data-style="event"][data-layout="cinema"] {
+        gap: 10px;
+        padding: 10px 12px;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+        grid-template-areas:
+          "highlight side"
+          "left side";
+      }
+
+      .overlay-root[data-style="event"][data-layout="stack"] {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "highlight"
+          "left"
+          "side";
+        gap: 12px;
+        padding: 10px 12px;
       }
 
       .overlay-root[data-connected="false"] .overlay-dot {
@@ -185,7 +211,41 @@
         align-content: center;
       }
 
+      .overlay-event-left {
+        display: contents;
+      }
+
+      .overlay-root[data-style="event"] .overlay-event-left {
+        grid-area: left;
+        display: grid;
+        gap: 14px;
+        align-content: start;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-event-left,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-event-left {
+        gap: 10px;
+      }
+
       .overlay-root[data-style="event"] .overlay-meta {
+        display: grid;
+        gap: 10px;
+        padding: 14px 16px;
+        border: 1px solid var(--overlay-line);
+        border-radius: 22px;
+        background: rgba(22, 14, 12, 0.26);
+        backdrop-filter: blur(10px);
+      }
+
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-meta,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-meta {
+        gap: 8px;
+        padding: 12px 14px;
+      }
+
+      .overlay-root[data-style="event"] .overlay-waveform-name {
         display: none;
       }
 
@@ -284,6 +344,11 @@
         height: 12px;
       }
 
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-bar-track,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-bar-track {
+        height: 10px;
+      }
+
       .overlay-bar-fill {
         height: 100%;
         width: 0%;
@@ -316,6 +381,14 @@
         min-height: 92px;
       }
 
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-canvas-wrap {
+        min-height: 74px;
+      }
+
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-canvas-wrap {
+        min-height: 64px;
+      }
+
       .overlay-waveform-canvas {
         width: 100%;
         height: 100%;
@@ -345,6 +418,30 @@
         display: grid;
         gap: 14px;
         align-content: start;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-event-side,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-event-side {
+        gap: 10px;
+      }
+
+      .overlay-event-current {
+        display: none;
+      }
+
+      .overlay-root[data-style="event"] .overlay-event-current {
+        display: grid;
+        gap: 10px;
+        padding: 14px 16px;
+        border-radius: 22px;
+      }
+
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-event-current,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-event-current {
+        gap: 8px;
+        padding: 12px 14px;
       }
 
       .overlay-telemetry {
@@ -354,7 +451,14 @@
         border-radius: 20px;
       }
 
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-telemetry,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-telemetry {
+        gap: 10px;
+        padding: 10px 12px;
+      }
+
       .overlay-root[data-style="panel"] .overlay-event-side,
+      .overlay-root[data-style="panel"] .overlay-event-left,
       .overlay-root[data-style="panel"] .overlay-telemetry {
         display: contents;
       }
@@ -397,6 +501,11 @@
         align-content: start;
       }
 
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-danmaku-list,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-danmaku-list {
+        gap: 5px;
+      }
+
       .overlay-danmaku-item {
         min-width: 0;
         padding: 7px 9px;
@@ -409,6 +518,11 @@
       .overlay-root[data-style="event"] .overlay-danmaku-item:first-child {
         border-color: rgba(255, 142, 101, 0.26);
         background: rgba(255, 118, 86, 0.08);
+      }
+
+      .overlay-root[data-style="event"][data-layout="compact"] .overlay-danmaku-item,
+      .overlay-root[data-style="event"][data-layout="cinema"] .overlay-danmaku-item {
+        padding: 6px 8px;
       }
 
       .overlay-danmaku-item strong,
@@ -429,12 +543,9 @@
         font-size: 12px;
       }
 
-      @media (max-width: 1100px) {
+      @media (max-width: 1280px) {
         .overlay-root[data-style="event"] {
           grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
-          grid-template-areas:
-            "highlight highlight"
-            ". side";
         }
       }
 
@@ -443,9 +554,6 @@
         .overlay-root[data-style="panel"],
         .overlay-root[data-style="event"] {
           grid-template-columns: 1fr;
-          grid-template-areas:
-            "highlight"
-            "side";
           gap: 12px;
           padding: 10px 12px;
         }
@@ -479,7 +587,7 @@
     </style>
   </head>
   <body>
-    <main class="overlay-root" id="overlay-root" data-connected="false" data-style="{{ overlay_style }}">
+    <main class="overlay-root" id="overlay-root" data-connected="false" data-style="{{ overlay_style }}" data-layout="wide">
       <section class="overlay-highlight overlay-surface">
         <div class="overlay-highlight-head">
           <div class="overlay-highlight-copy">
@@ -510,29 +618,23 @@
         </div>
       </section>
 
-      <section class="overlay-meta">
-        <div class="overlay-status">
-          <span class="overlay-dot"></span>
-          <span id="overlay-connection-text">蓝牙未连接</span>
-        </div>
-        <div class="overlay-waveform-name" id="overlay-waveform-name">待机中</div>
-        <div class="overlay-device-meta">
-          <div class="overlay-device-name" id="overlay-device-name">未连接设备</div>
-          <div class="overlay-battery-chip">
-            <span>电量</span>
-            <strong id="overlay-battery-value">--</strong>
+      <section class="overlay-event-left">
+        <section class="overlay-meta">
+          <div class="overlay-status">
+            <span class="overlay-dot"></span>
+            <span id="overlay-connection-text">蓝牙未连接</span>
           </div>
-        </div>
-      </section>
-
-      <section class="overlay-event-side" id="overlay-event-side">
-        <section class="overlay-recent overlay-surface">
-          <p class="overlay-recent-title">最近触发</p>
-          <div class="overlay-danmaku-list" id="overlay-danmaku-list"></div>
+          <div class="overlay-waveform-name" id="overlay-waveform-name">待机中</div>
+          <div class="overlay-device-meta">
+            <div class="overlay-device-name" id="overlay-device-name">未连接设备</div>
+            <div class="overlay-battery-chip">
+              <span>电量</span>
+              <strong id="overlay-battery-value">--</strong>
+            </div>
+          </div>
         </section>
 
         <section class="overlay-telemetry overlay-surface">
-          <div class="overlay-event-waveform-name" id="overlay-event-waveform-name">待机中</div>
           <section class="overlay-channels">
             <article class="overlay-channel">
               <div class="overlay-channel-head">
@@ -557,6 +659,18 @@
           <section class="overlay-canvas-wrap" aria-label="蓝牙实时叠加窗">
             <canvas class="overlay-waveform-canvas" id="overlay-waveform-canvas"></canvas>
           </section>
+        </section>
+      </section>
+
+      <section class="overlay-event-side" id="overlay-event-side">
+        <section class="overlay-event-current overlay-surface">
+          <p class="overlay-recent-title">当前波形</p>
+          <div class="overlay-event-waveform-name" id="overlay-event-waveform-name">待机中</div>
+        </section>
+
+        <section class="overlay-recent overlay-surface">
+          <p class="overlay-recent-title">最近触发</p>
+          <div class="overlay-danmaku-list" id="overlay-danmaku-list"></div>
         </section>
       </section>
     </main>

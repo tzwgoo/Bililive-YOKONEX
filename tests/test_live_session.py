@@ -319,6 +319,46 @@ async def test_handle_gift_event_dispatches_bluetooth_waveform(fake_dependencies
 
 
 @pytest.mark.anyio
+async def test_handle_bluetooth_unmatched_event_publishes_control_diagnostic(fake_dependencies: dict) -> None:
+    class FakeBlockedBluetoothDispatcher:
+        def __init__(self) -> None:
+            self.called_with: dict | None = None
+
+        async def dispatch(self, event: dict) -> dict:
+            self.called_with = event
+            return {
+                "matched": False,
+                "success": False,
+                "message": "弹幕关键词触发未开启",
+            }
+
+    fake_dependencies["bluetooth_dispatcher"] = FakeBlockedBluetoothDispatcher()
+    service = LiveSessionService(**fake_dependencies)
+    service.output_mode = "bluetooth"
+
+    event = {
+        "event_type": "danmaku",
+        "cmd": "LIVE_OPEN_PLATFORM_DM",
+        "room_id": 1,
+        "open_id": "user-open-id",
+        "uname": "测试用户",
+        "timestamp": 1714113037,
+        "payload": {
+            "msg": "大家准备开火",
+        },
+    }
+
+    await service._handle_event(event)
+
+    control_events = service.event_hub.control_snapshot()
+
+    assert event["bluetooth_dispatch"]["matched"] is False
+    assert len(control_events) == 1
+    assert control_events[0]["type"] == "bluetooth_trigger"
+    assert control_events[0]["payload"]["message"] == "弹幕关键词触发未开启"
+
+
+@pytest.mark.anyio
 async def test_handle_gift_event_does_not_dispatch_bluetooth_in_im_mode(fake_dependencies: dict) -> None:
     service = LiveSessionService(**fake_dependencies)
     service.output_mode = "im"

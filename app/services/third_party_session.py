@@ -211,7 +211,9 @@ class ThirdPartyLiveSessionService:
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
         if self.output_mode == "bluetooth" and self.bluetooth_dispatcher is not None:
-            event["bluetooth_dispatch"] = await self.bluetooth_dispatcher.dispatch(event)
+            dispatch_result = await self.bluetooth_dispatcher.dispatch(event)
+            event["bluetooth_dispatch"] = dispatch_result
+            self._publish_bluetooth_dispatch_diagnostic(dispatch_result)
         self.event_hub.publish(event)
 
     async def _hydrate_room_profile(self) -> None:
@@ -239,3 +241,17 @@ class ThirdPartyLiveSessionService:
             if candidate:
                 return str(candidate)
         return ""
+
+    def _publish_bluetooth_dispatch_diagnostic(self, dispatch_result: Any) -> None:
+        """为未命中的蓝牙派发补充控制日志，方便定位规则或会话配置问题。"""
+        if not isinstance(dispatch_result, dict):
+            return
+        if dispatch_result.get("matched", False):
+            return
+        self.event_hub.publish_control(
+            {
+                "type": "bluetooth_trigger",
+                "timestamp": int(time.time()),
+                "payload": dispatch_result,
+            }
+        )

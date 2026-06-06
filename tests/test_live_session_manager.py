@@ -181,6 +181,18 @@ async def test_manager_uses_im_output_when_only_im_is_connected() -> None:
 
 
 @pytest.mark.anyio
+async def test_manager_switches_running_session_to_bluetooth_after_device_connects() -> None:
+    manager, open_live, _ = create_manager(command_connected=True, bluetooth_connected=False)
+
+    await manager.start(mode="open_live", value="code-demo", output_mode="im")
+
+    manager.handle_bluetooth_connected()
+
+    assert manager.output_mode == "bluetooth"
+    assert open_live.output_mode == "bluetooth"
+
+
+@pytest.mark.anyio
 async def test_manager_stop_only_calls_active_mode() -> None:
     manager, open_live, third_party = create_manager()
 

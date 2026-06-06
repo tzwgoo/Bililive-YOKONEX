@@ -31,6 +31,49 @@ let overlayState = {
   revision: 0,
 };
 
+function resolveOverlayLayout() {
+  const width = Math.max(window.innerWidth || 0, 1);
+  const height = Math.max(window.innerHeight || 0, 1);
+  const ratio = width / height;
+
+  if (width <= 860) {
+    return "stack";
+  }
+  if (height <= 430 && width >= 1080) {
+    return "cinema";
+  }
+  if (height <= 620 || ratio >= 3) {
+    return "compact";
+  }
+  return "wide";
+}
+
+function resolveRecentEventLimit() {
+  const width = Math.max(window.innerWidth || 0, 1);
+  const height = Math.max(window.innerHeight || 0, 1);
+
+  if (width <= 860) {
+    return height <= 620 ? 2 : 3;
+  }
+  if (height <= 360) {
+    return 1;
+  }
+  if (height <= 500) {
+    return 2;
+  }
+  if (height <= 660) {
+    return 3;
+  }
+  return 4;
+}
+
+function applyOverlayViewportMode() {
+  if (!overlayRoot) {
+    return;
+  }
+  overlayRoot.dataset.layout = overlayRoot.dataset.style === "event" ? resolveOverlayLayout() : "panel";
+}
+
 function clampStrength(value) {
   return Math.max(0, Math.min(180, Number(value || 0)));
 }
@@ -104,7 +147,7 @@ function escapeOverlayHtml(value) {
 }
 
 function renderOverlayDanmaku(recentEvents) {
-  const items = Array.isArray(recentEvents) ? recentEvents.slice(0, 4) : [];
+  const items = Array.isArray(recentEvents) ? recentEvents.slice(0, resolveRecentEventLimit()) : [];
   if (!items.length) {
     overlayDanmakuList.innerHTML = '<article class="overlay-danmaku-item"><strong>等待事件</strong><span>直播触发后显示</span></article>';
     return;
@@ -185,10 +228,13 @@ function connectOverlayStream() {
 }
 
 window.addEventListener("resize", () => {
+  applyOverlayViewportMode();
   resizeOverlayCanvas();
   drawOverlayHistory(overlayState.history || []);
+  renderOverlayDanmaku(overlayState.recent_events || []);
 });
 
+applyOverlayViewportMode();
 resizeOverlayCanvas();
 refreshOverlayStatus();
 connectOverlayStream();

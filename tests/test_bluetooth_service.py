@@ -25,6 +25,53 @@ async def test_service_can_scan_connect_and_disconnect(tmp_path, monkeypatch: py
 
 
 @pytest.mark.anyio
+async def test_service_connect_success_publishes_control_log(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    scanned = await service.scan()
+    await service.connect(scanned[0].device_id)
+
+    control_event = event_hub.control_snapshot()[-1]
+
+    assert control_event["type"] == "bluetooth_connect"
+    assert control_event["payload"]["success"] is True
+    assert control_event["payload"]["device_id"] == scanned[0].device_id
+    assert control_event["payload"]["device_name"] == scanned[0].name
+
+
+@pytest.mark.anyio
+async def test_service_connect_failure_publishes_control_log(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    await service.scan()
+    with pytest.raises(ValueError, match="未找到指定蓝牙设备"):
+        await service.connect("missing-device")
+
+    control_event = event_hub.control_snapshot()[-1]
+
+    assert control_event["type"] == "bluetooth_connect"
+    assert control_event["payload"]["success"] is False
+    assert control_event["payload"]["device_id"] == "missing-device"
+    assert control_event["payload"]["message"] == "未找到指定蓝牙设备"
+
+
+@pytest.mark.anyio
 async def test_service_status_payload_includes_runtime_details(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -113,6 +160,28 @@ async def test_service_waveform_trigger_publishes_control_log(
     assert event_hub.control_snapshot()[-1]["type"] == "bluetooth_trigger"
     assert event_hub.control_snapshot()[-1]["payload"]["waveform_id"] == "ems-preset-01"
     assert event_hub.control_snapshot()[-1]["payload"]["max_strength"] > 0
+
+
+@pytest.mark.anyio
+async def test_service_preview_waveform_publishes_control_log(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_hub = EventHub()
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+
+    result = await service.preview_waveform("ems-preset-01")
+
+    assert result["success"] is True
+    assert result["event_type"] == "waveform_preview"
+    assert "测试播放" in result["message"]
+    assert event_hub.control_snapshot()[-1]["type"] == "bluetooth_trigger"
+    assert event_hub.control_snapshot()[-1]["payload"]["event_type"] == "waveform_preview"
+    assert event_hub.control_snapshot()[-1]["payload"]["waveform_id"] == "ems-preset-01"
 
 
 def test_service_overlay_payload_includes_recent_live_events(

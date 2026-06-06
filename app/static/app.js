@@ -421,6 +421,7 @@ function renderControlEvent(event) {
     command_send: "IM 指令",
     command_connect: "IM 登录",
     command_disconnect: "IM 断开",
+    bluetooth_connect: "蓝牙连接",
     bluetooth_trigger: "蓝牙触发",
   };
   const typeLabel = typeLabels[event.type] || event.type || "控制事件";

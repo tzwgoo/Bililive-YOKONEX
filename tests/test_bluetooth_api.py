@@ -27,6 +27,7 @@ class FakeBluetoothService:
         self.updated_waveform_id = ""
         self.updated_waveform_payload: dict | None = None
         self.deleted_waveform_id = ""
+        self.previewed_waveform_id = ""
         self.overlay_payload = {
             "connected": False,
             "device_name": "YYC-DJ-DEMO",
@@ -198,6 +199,24 @@ class FakeBluetoothService:
             "waveforms": [],
         }
 
+    async def preview_waveform(self, waveform_id: str) -> dict:
+        self.previewed_waveform_id = waveform_id
+        return {
+            "success": True,
+            "event_type": "waveform_preview",
+            "waveform_id": waveform_id,
+            "waveform_name": "EMS 预设 01 - 呼吸",
+            "message": "已测试播放波形 EMS 预设 01 - 呼吸",
+        }
+
+
+class FakeSessionManager:
+    def __init__(self) -> None:
+        self.bluetooth_connected_handled = False
+
+    def handle_bluetooth_connected(self) -> None:
+        self.bluetooth_connected_handled = True
+
 
 def test_bluetooth_status_endpoint_returns_payload() -> None:
     app = create_app()
@@ -251,6 +270,21 @@ def test_bluetooth_connect_endpoint_validates_device_id() -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"] == "未找到指定蓝牙设备"
+
+
+def test_bluetooth_connect_endpoint_switches_running_session_to_bluetooth_output() -> None:
+    app = create_app()
+    fake_service = FakeBluetoothService()
+    fake_session_manager = FakeSessionManager()
+    app.state.bluetooth_service = fake_service
+    app.state.session_service = fake_session_manager
+    client = TestClient(app)
+
+    response = client.post("/api/bluetooth/connect", json={"device_id": "ems-demo-001"})
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert fake_session_manager.bluetooth_connected_handled is True
 
 
 def test_bluetooth_connect_endpoint_returns_runtime_errors() -> None:
@@ -448,6 +482,20 @@ def test_bluetooth_waveform_duplicate_endpoint_returns_custom_copy() -> None:
     assert response.status_code == 200
     assert response.json()["waveform"]["id"] == "custom-wave-duplicated"
     assert fake_service.duplicated_waveform_id == "ems-preset-01"
+
+
+def test_bluetooth_waveform_preview_endpoint_plays_waveform() -> None:
+    app = create_app()
+    fake_service = FakeBluetoothService()
+    app.state.bluetooth_service = fake_service
+    client = TestClient(app)
+
+    response = client.post("/api/bluetooth/waveforms/ems-preset-01/play")
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["event_type"] == "waveform_preview"
+    assert fake_service.previewed_waveform_id == "ems-preset-01"
 
 
 def test_bluetooth_waveform_update_endpoint_saves_steps() -> None:

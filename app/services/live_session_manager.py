@@ -116,6 +116,11 @@ class LiveSessionManager:
         await self._get_service(self._active_mode).stop()
         self._active_mode = None
 
+    def handle_bluetooth_connected(self) -> None:
+        if self._active_mode is None:
+            return
+        self._set_output_mode(self.OUTPUT_MODE_BLUETOOTH)
+
     def get_status_payload(self) -> dict[str, Any]:
         service_mode = self._active_mode or self.mode
         payload = dict(self._get_service(service_mode).get_status_payload())
@@ -153,6 +158,15 @@ class LiveSessionManager:
         if normalized_output_mode not in self.OUTPUT_MODE_LABELS:
             raise ValueError("不支持的输出方式")
         return normalized_output_mode
+
+    def _set_output_mode(self, output_mode: str) -> None:
+        normalized_output_mode = self._normalize_output_mode(output_mode)
+        self.output_mode = normalized_output_mode
+        if self._active_mode is None:
+            return
+        active_service = self._get_service(self._active_mode)
+        if hasattr(active_service, "output_mode"):
+            active_service.output_mode = normalized_output_mode
 
     def _resolve_output_mode(self, output_mode: str) -> str:
         normalized_output_mode = str(output_mode or "").strip()

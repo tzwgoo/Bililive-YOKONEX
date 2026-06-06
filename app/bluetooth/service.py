@@ -87,12 +87,27 @@ class BluetoothService:
         return devices
 
     async def connect(self, device_id: str) -> BluetoothConnectionStatus:
-        status = await self.runtime.connect(device_id)
+        try:
+            status = await self.runtime.connect(device_id)
+        except Exception as exc:
+            self._publish_bluetooth_connection_control(
+                success=False,
+                device_id=device_id,
+                device_name="",
+                message=str(exc) or "蓝牙连接失败",
+            )
+            raise
         if status.device is not None:
             self.payload.bluetooth_settings.last_connected_device_id = status.device.device_id
             self.payload.bluetooth_settings.last_connected_device_name = status.device.name
             self.payload.bluetooth_settings.default_target_device_id = status.device.device_id
             self.store.save(self.payload)
+        self._publish_bluetooth_connection_control(
+            success=True,
+            device_id="" if status.device is None else status.device.device_id,
+            device_name="" if status.device is None else status.device.name,
+            message=status.message,
+        )
         return status
 
     async def disconnect(self) -> BluetoothConnectionStatus:
@@ -132,6 +147,44 @@ class BluetoothService:
             "max_strength": _resolve_waveform_max_strength(waveform),
             "success": True,
             "message": f"{event_type} 已触发波形 {waveform.name}",
+        }
+        self._publish_bluetooth_control(result)
+        return result
+
+    async def preview_waveform(self, waveform_id: str) -> dict:
+        waveform = next((item for item in self.payload.ems_waveforms if item.id == waveform_id), None)
+        if waveform is None:
+            result = {
+                "matched": True,
+                "event_type": "waveform_preview",
+                "waveform_id": waveform_id,
+                "success": False,
+                "message": "目标波形不存在",
+            }
+            self._publish_bluetooth_control(result)
+            return result
+        try:
+            await self.runtime.play_waveform(waveform)
+        except Exception as exc:
+            result = {
+                "matched": True,
+                "event_type": "waveform_preview",
+                "waveform_id": waveform_id,
+                "waveform_name": waveform.name,
+                "max_strength": _resolve_waveform_max_strength(waveform),
+                "success": False,
+                "message": f"测试播放失败: {exc}",
+            }
+            self._publish_bluetooth_control(result)
+            return result
+        result = {
+            "matched": True,
+            "event_type": "waveform_preview",
+            "waveform_id": waveform_id,
+            "waveform_name": waveform.name,
+            "max_strength": _resolve_waveform_max_strength(waveform),
+            "success": True,
+            "message": f"已测试播放波形 {waveform.name}",
         }
         self._publish_bluetooth_control(result)
         return result
@@ -353,6 +406,30 @@ class BluetoothService:
                 "type": "bluetooth_trigger",
                 "timestamp": int(time.time()),
                 "payload": payload,
+            }
+        )
+
+    def _publish_bluetooth_connection_control(
+        self,
+        *,
+        success: bool,
+        device_id: str,
+        device_name: str,
+        message: str,
+    ) -> None:
+        """写入蓝牙连接控制日志，便于定位设备连接成功或失败。"""
+        if self.event_hub is None or not hasattr(self.event_hub, "publish_control"):
+            return
+        self.event_hub.publish_control(
+            {
+                "type": "bluetooth_connect",
+                "timestamp": int(time.time()),
+                "payload": {
+                    "success": bool(success),
+                    "device_id": str(device_id or ""),
+                    "device_name": str(device_name or ""),
+                    "message": str(message or ("蓝牙连接成功" if success else "蓝牙连接失败")),
+                },
             }
         )
 

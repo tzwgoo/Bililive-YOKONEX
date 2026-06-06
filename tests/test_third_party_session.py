@@ -490,6 +490,55 @@ async def test_third_party_session_dispatches_bluetooth_waveform() -> None:
 
 
 @pytest.mark.anyio
+async def test_third_party_session_publishes_bluetooth_unmatched_diagnostic() -> None:
+    class FakeBlockedBluetoothDispatcher(FakeBluetoothDispatcher):
+        async def dispatch(self, event: dict) -> dict:
+            self.called_with = event
+            return {
+                "matched": False,
+                "success": False,
+                "message": "未命中蓝牙规则",
+            }
+
+    event_hub = EventHub()
+    bluetooth_dispatcher = FakeBlockedBluetoothDispatcher()
+    ws_client = FakeThirdPartyWsClient(
+        messages=[
+            {
+                "cmd": "SEND_GIFT",
+                "data": {
+                    "giftId": 1001,
+                    "giftName": "小花花",
+                    "num": 1,
+                    "uname": "测试用户",
+                    "price": 1000,
+                    "timestamp": 1714113037,
+                },
+            }
+        ]
+    )
+    service = ThirdPartyLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=FakeGiftDispatcher(),
+        bluetooth_dispatcher=bluetooth_dispatcher,
+        ws_client=ws_client,
+        room_info_fetcher=fake_room_info_fetcher,
+    )
+
+    await service.start(value="123456", output_mode="bluetooth")
+    await asyncio.sleep(0.05)
+
+    control_events = event_hub.control_snapshot()
+
+    assert bluetooth_dispatcher.called_with is not None
+    assert len(control_events) == 1
+    assert control_events[0]["type"] == "bluetooth_trigger"
+    assert control_events[0]["payload"]["message"] == "未命中蓝牙规则"
+
+    await service.stop()
+
+
+@pytest.mark.anyio
 async def test_third_party_session_configures_bluetooth_danmaku_keywords() -> None:
     event_hub = EventHub()
     bluetooth_dispatcher = FakeBluetoothDispatcher()

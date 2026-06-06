@@ -241,6 +241,13 @@ async def connect_bluetooth_device(request: Request, payload: ConnectBluetoothRe
         status = await request.app.state.bluetooth_service.connect(payload.device_id)
     except (ValueError, RuntimeError, TimeoutError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    handle_bluetooth_connected = getattr(
+        request.app.state.session_service,
+        "handle_bluetooth_connected",
+        None,
+    )
+    if callable(handle_bluetooth_connected):
+        handle_bluetooth_connected()
     return {
         "success": True,
         "connected": status.connected,
@@ -305,6 +312,17 @@ async def duplicate_bluetooth_waveform(
             name=payload.name,
         )
     except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/bluetooth/waveforms/{waveform_id}/play")
+async def preview_bluetooth_waveform(
+    request: Request,
+    waveform_id: str,
+) -> dict:
+    try:
+        return await request.app.state.bluetooth_service.preview_waveform(waveform_id)
+    except (ValueError, RuntimeError, TimeoutError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

@@ -1,4 +1,5 @@
 const waveformLibrary = document.getElementById("studio-waveform-library");
+const libraryMessageText = document.getElementById("studio-library-message-text");
 const ruleGroupsContainer = document.getElementById("studio-rule-groups");
 const saveButton = document.getElementById("studio-save-btn");
 const studioMessageText = document.getElementById("studio-message-text");
@@ -241,6 +242,7 @@ function renderWaveformLibrary(waveforms) {
           ${buildWaveformPreviewSvg(waveform)}
           <div class="studio-waveform-actions">
             <button class="secondary" data-action="edit" data-waveform-id="${escapeHtml(waveform.id)}">查看 / 编辑</button>
+            <button class="secondary" data-action="preview" data-waveform-id="${escapeHtml(waveform.id)}">测试播放</button>
             <button class="secondary" data-action="duplicate" data-waveform-id="${escapeHtml(waveform.id)}">复制为自定义</button>
             ${waveform.builtin ? "" : `<button class="secondary" data-action="delete" data-waveform-id="${escapeHtml(waveform.id)}">删除</button>`}
           </div>
@@ -622,6 +624,25 @@ async function duplicateSelectedWaveform() {
   updateSelectedWaveform(payload.waveform?.id || "", { force: true });
 }
 
+async function previewWaveform(waveform) {
+  if (!waveform) {
+    return;
+  }
+  const response = await fetch(`/api/bluetooth/waveforms/${encodeURIComponent(waveform.id)}/play`, {
+    method: "POST",
+  });
+  const payload = await response.json().catch(() => ({}));
+  const message = response.ok
+    ? payload.message || `已测试播放波形 ${waveform.name}`
+    : payload.detail || "测试播放失败";
+  if (libraryMessageText) {
+    libraryMessageText.textContent = message;
+  }
+  if (waveformMessageText) {
+    waveformMessageText.textContent = message;
+  }
+}
+
 async function saveSelectedWaveform() {
   const waveform = ensureDraftWaveform();
   if (!waveform || !isSelectedWaveformEditable()) {
@@ -693,6 +714,11 @@ waveformLibrary.addEventListener("click", async (event) => {
   }
   if (action === "edit") {
     updateSelectedWaveform(waveformId);
+    return;
+  }
+  if (action === "preview") {
+    const waveform = findWaveformById(waveformId);
+    await previewWaveform(waveform);
     return;
   }
   if (action === "duplicate") {

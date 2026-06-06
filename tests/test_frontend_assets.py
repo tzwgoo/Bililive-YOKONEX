@@ -213,6 +213,7 @@ def test_frontend_contains_bluetooth_studio_entry_and_template() -> None:
     assert 'fetch("/api/bluetooth/studio")' in studio_js
     assert 'fetch("/api/bluetooth/rules"' in studio_js
     assert 'fetch("/api/bluetooth/waveforms"' in studio_js
+    assert 'fetch(`/api/bluetooth/waveforms/${encodeURIComponent(waveform.id)}/play`' in studio_js
     assert "function buildWaveformPreviewSvg(" in studio_js
     assert "function resolveWaveformMaxStrength(" in studio_js
     assert "function renderWaveformEditorCanvas(" in studio_js
@@ -230,6 +231,8 @@ def test_frontend_contains_bluetooth_studio_entry_and_template() -> None:
     assert "总督弹幕" in studio_js
     assert "醒目留言" in studio_js
     assert "互动事件" in studio_js
+    assert "测试播放" in studio_html
+    assert 'data-action="preview"' in studio_js
     assert 'class="tab-shell studio-tabs"' in studio_html
     assert 'id="bluetooth-studio-tab-nav"' in studio_html
     assert 'data-tab-target="waveform-library-panel"' in studio_html
@@ -310,6 +313,7 @@ def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
 
     assert 'id="overlay-root"' in overlay_html
     assert 'data-style="{{ overlay_style }}"' in overlay_html
+    assert 'data-layout="wide"' in overlay_html
     assert 'id="overlay-waveform-name"' in overlay_html
     assert 'id="overlay-battery-value"' in overlay_html
     assert 'id="overlay-channel-a-bar"' in overlay_html
@@ -326,6 +330,9 @@ def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
     assert 'overlayState.battery_level' in overlay_js
     assert "recent_events" in overlay_js
     assert "function renderOverlayDanmaku" in overlay_js
+    assert "function resolveOverlayLayout()" in overlay_js
+    assert "function resolveRecentEventLimit()" in overlay_js
+    assert 'overlayRoot.dataset.layout = overlayRoot.dataset.style === "event" ? resolveOverlayLayout() : "panel"' in overlay_js
     assert "function renderOverlayHighlight" in overlay_js
     assert 'item.waveform_name || item.waveform_id || ""' in overlay_js
     assert 'latestEvent.waveform_name || latestEvent.waveform_id || overlayState.waveform_name || "待机中"' in overlay_js
@@ -341,6 +348,7 @@ def test_frontend_contains_control_log_panel_and_stream() -> None:
     assert 'new EventSource("/api/events/stream")' in app_js
     assert 'new EventSource("/api/control/stream")' in app_js
     assert "function renderControlEvent(event)" in app_js
+    assert 'bluetooth_connect: "蓝牙连接"' in app_js
 
 
 def test_frontend_renders_interact_events() -> None:
