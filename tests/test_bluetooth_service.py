@@ -89,7 +89,8 @@ async def test_service_status_payload_includes_runtime_details(
     assert status["connected"] is False
     assert status["runtime_backend"] == "memory"
     assert isinstance(status["devices"], list)
-    assert isinstance(status["waveforms"], list)
+    assert isinstance(status["ems_waveforms"], list)
+    assert isinstance(status["toy_waveforms"], list)
     assert isinstance(status["rules"], list)
     rule_map = {
         item["id"]: item
@@ -292,7 +293,7 @@ def test_service_can_create_blank_custom_waveform(tmp_path, monkeypatch: pytest.
     assert result["waveform"]["steps"][0]["duration_ms"] == 200
     assert result["waveform"]["steps"][0]["channel_a"] == 0
     assert result["waveform"]["steps"][0]["channel_b"] == 0
-    assert result["waveforms"][0]["id"] == result["waveform"]["id"]
+    assert result["ems_waveforms"][0]["id"] == result["waveform"]["id"]
     assert service.payload.ems_waveforms[0].id == result["waveform"]["id"]
 
 
@@ -311,7 +312,7 @@ def test_service_can_duplicate_builtin_waveform(tmp_path, monkeypatch: pytest.Mo
     assert result["waveform"]["builtin"] is False
     assert result["waveform"]["name"] == "EMS 预设 01 - 呼吸 - 副本"
     assert len(result["waveform"]["steps"]) == len(source_waveform.steps)
-    assert result["waveforms"][0]["id"] == result["waveform"]["id"]
+    assert result["ems_waveforms"][0]["id"] == result["waveform"]["id"]
     assert service.payload.ems_waveforms[0].id == result["waveform"]["id"]
 
 

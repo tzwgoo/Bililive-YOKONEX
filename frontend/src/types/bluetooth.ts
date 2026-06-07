@@ -6,7 +6,8 @@ export interface BluetoothStatusResponse {
 }
 
 export interface BluetoothStudioResponse {
-  waveforms: BluetoothWaveform[];
+  ems_waveforms: BluetoothWaveform[];
+  toy_waveforms: ToyWaveform[];
   rule_groups: BluetoothRuleGroup[];
 }
 
@@ -23,6 +24,7 @@ export interface BluetoothRuleResponse {
   id?: string;
   enabled?: boolean;
   waveform_id?: string;
+  toy_waveform_id?: string;
   waveform_name?: string;
   rule_label?: string;
   event_label?: string;
@@ -70,12 +72,29 @@ export interface BluetoothWaveform {
   steps: BluetoothWaveformStep[];
 }
 
+export interface ToyWaveformStep {
+  duration_ms: number;
+  motor_a: number;
+  motor_b: number;
+  motor_c: number;
+}
+
+export interface ToyWaveform {
+  id: string;
+  name: string;
+  builtin: boolean;
+  editable: boolean;
+  loop_count?: number;
+  steps: ToyWaveformStep[];
+}
+
 export interface BluetoothStudioRule {
   id: string;
   event_type: string;
   rule_label: string;
   enabled: boolean;
   waveform_id: string;
+  toy_waveform_id: string;
   waveform_name: string;
   cooldown_seconds?: number;
   filters?: Record<string, unknown>;
@@ -92,6 +111,7 @@ export interface SaveBluetoothRulesPayload {
     id: string;
     enabled: boolean;
     waveform_id: string;
+    toy_waveform_id?: string;
     min_price: number | null;
     max_price: number | null;
   }>;
@@ -105,11 +125,12 @@ export interface SaveBluetoothRulesResponse {
 
 export interface BluetoothWaveformMutationResponse {
   success: boolean;
-  waveform: BluetoothWaveform;
-  waveforms: BluetoothWaveform[];
+  waveform: BluetoothWaveform | ToyWaveform;
+  ems_waveforms: BluetoothWaveform[];
+  toy_waveforms: ToyWaveform[];
 }
 
 export interface UpdateBluetoothWaveformPayload {
   name: string;
-  steps: BluetoothWaveformStep[];
+  steps: BluetoothWaveformStep[] | ToyWaveformStep[];
 }

@@ -1,5 +1,5 @@
 <template>
-  <ACard title="波形库" :bordered="false" class="waveform-library-panel" :style="DESKTOP_PANEL_STYLE">
+  <ACard :bordered="false" class="waveform-library-panel" :style="DESKTOP_PANEL_STYLE">
     <template #extra>
       <span class="section-count">{{ waveforms.length }} 个</span>
     </template>
@@ -24,7 +24,8 @@
         <span class="waveform-card-copy">
           <strong>{{ waveform.name }}</strong>
           <small>{{ waveform.builtin ? "内置" : "自定义" }} · {{ waveform.steps.length }} 步</small>
-          <small>最大强度 {{ resolveMaxStrength(waveform) }}</small>
+          <small v-if="isToy">{{ resolveMaxToyStrength(waveform as ToyWaveform) }}</small>
+          <small v-else>最大强度 {{ resolveMaxEmsStrength(waveform as BluetoothWaveform) }}</small>
         </span>
         <span :data-testid="`waveform-preview-${waveform.id}`" class="waveform-card-preview">
           <span
@@ -34,8 +35,15 @@
             :style="{ flexGrow: normalizeDuration(step.duration_ms) }"
           >
             <span class="waveform-preview-bars" :style="{ height: `${PREVIEW_HEIGHT_PX}px` }">
-              <span class="waveform-preview-bar is-a" :style="{ height: `${resolvePreviewBarHeight(waveform, step.channel_a)}px` }"></span>
-              <span class="waveform-preview-bar is-b" :style="{ height: `${resolvePreviewBarHeight(waveform, step.channel_b)}px` }"></span>
+              <template v-if="isToy">
+                <span class="waveform-preview-bar is-a" :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_a)}px` }"></span>
+                <span class="waveform-preview-bar is-b" :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_b)}px` }"></span>
+                <span class="waveform-preview-bar is-c" :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_c)}px` }"></span>
+              </template>
+              <template v-else>
+                <span class="waveform-preview-bar is-a" :style="{ height: `${resolveEmsPreviewBarHeight(waveform as BluetoothWaveform, (step as BluetoothWaveformStep).channel_a)}px` }"></span>
+                <span class="waveform-preview-bar is-b" :style="{ height: `${resolveEmsPreviewBarHeight(waveform as BluetoothWaveform, (step as BluetoothWaveformStep).channel_b)}px` }"></span>
+              </template>
             </span>
           </span>
         </span>
@@ -45,17 +53,21 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { Card as ACard } from "ant-design-vue";
-import type { BluetoothWaveform } from "@/types/bluetooth";
+import type { BluetoothWaveform, BluetoothWaveformStep, ToyWaveform, ToyWaveformStep } from "@/types/bluetooth";
 
-defineProps<{
-  waveforms: BluetoothWaveform[];
+const props = defineProps<{
+  waveforms: (BluetoothWaveform | ToyWaveform)[];
   selectedWaveformId: string;
+  deviceType: "ems" | "toy";
 }>();
 
 const emit = defineEmits<{
   select: [waveformId: string];
 }>();
+
+const isToy = computed(() => props.deviceType === "toy");
 
 const PREVIEW_HEIGHT_PX = 52;
 const DESKTOP_PANEL_STYLE = {
@@ -69,20 +81,40 @@ function normalizeStrength(value: number) {
   return Math.max(0, Math.min(180, Math.round(Number(value || 0))));
 }
 
+function normalizeToySpeed(value: number) {
+  return Math.max(0, Math.min(20, Math.round(Number(value || 0))));
+}
+
 function normalizeDuration(value: number) {
   return Math.max(1, Math.round(Number(value || 0)));
 }
 
-function resolveMaxStrength(waveform: BluetoothWaveform) {
+function resolveMaxEmsStrength(waveform: BluetoothWaveform) {
   return waveform.steps.reduce(
     (maxValue, step) => Math.max(maxValue, normalizeStrength(step.channel_a), normalizeStrength(step.channel_b)),
     0,
   );
 }
 
-function resolvePreviewBarHeight(waveform: BluetoothWaveform, value: number) {
-  const waveformMaxStrength = Math.max(1, resolveMaxStrength(waveform));
+function resolveMaxToyStrength(waveform: ToyWaveform) {
+  const maxSpeed = waveform.steps.reduce(
+    (maxValue, step) => Math.max(maxValue, normalizeToySpeed(step.motor_a), normalizeToySpeed(step.motor_b), normalizeToySpeed(step.motor_c)),
+    0,
+  );
+  return `最大速度 ${maxSpeed}`;
+}
+
+function resolveEmsPreviewBarHeight(waveform: BluetoothWaveform, value: number) {
+  const waveformMaxStrength = Math.max(1, resolveMaxEmsStrength(waveform));
   return Math.round((normalizeStrength(value) / waveformMaxStrength) * PREVIEW_HEIGHT_PX);
+}
+
+function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
+  const maxSpeed = Math.max(1, waveform.steps.reduce(
+    (maxValue, step) => Math.max(maxValue, normalizeToySpeed(step.motor_a), normalizeToySpeed(step.motor_b), normalizeToySpeed(step.motor_c)),
+    0,
+  ));
+  return Math.round((normalizeToySpeed(value) / maxSpeed) * PREVIEW_HEIGHT_PX);
 }
 </script>
 
@@ -171,14 +203,20 @@ function resolvePreviewBarHeight(waveform: BluetoothWaveform, value: number) {
 .waveform-preview-bar {
   flex: 1 1 0;
   border-radius: 999px;
+  min-height: 6px;
+  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.10);
 }
 
 .waveform-preview-bar.is-a {
-  background: linear-gradient(180deg, #fb923c, #f97316);
+  background: linear-gradient(180deg, #fdba74 0%, #fb923c 35%, #ea580c 80%, #c2410c 100%);
 }
 
 .waveform-preview-bar.is-b {
-  background: linear-gradient(180deg, #60a5fa, #2563eb);
+  background: linear-gradient(180deg, #93c5fd 0%, #60a5fa 35%, #2563eb 80%, #1d4ed8 100%);
+}
+
+.waveform-preview-bar.is-c {
+  background: linear-gradient(180deg, #c4b5fd 0%, #a78bfa 35%, #7c3aed 80%, #6d28d9 100%);
 }
 
 .waveform-card-copy small,

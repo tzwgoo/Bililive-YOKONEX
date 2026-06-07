@@ -50,7 +50,8 @@ class FakeBluetoothService:
             "battery_level": 76 if self.connected else None,
             "device": self.devices[0] if self.connected else None,
             "devices": self.devices,
-            "waveforms": [],
+            "ems_waveforms": [],
+            "toy_waveforms": [],
             "rules": [
                 {
                     "id": "gift-tier-01",
@@ -82,7 +83,7 @@ class FakeBluetoothService:
 
     def get_studio_payload(self) -> dict:
         return {
-            "waveforms": [
+            "ems_waveforms": [
                 {
                     "id": "ems-preset-01",
                     "name": "EMS 预设 01 - 呼吸",
@@ -101,6 +102,7 @@ class FakeBluetoothService:
                     ],
                 }
             ],
+            "toy_waveforms": [],
             "rule_groups": [
                 {
                     "group_id": "gift",
@@ -142,7 +144,7 @@ class FakeBluetoothService:
     def get_overlay_payload(self) -> dict:
         return dict(self.overlay_payload)
 
-    def create_waveform(self, *, name: str) -> dict:
+    def create_waveform(self, *, name: str, device_type: str = "ems") -> dict:
         self.created_waveform_name = name
         return {
             "success": True,
@@ -155,7 +157,8 @@ class FakeBluetoothService:
                 "loop_count": 1,
                 "steps": [{"duration_ms": 200, "channel_a": 0, "channel_b": 0}],
             },
-            "waveforms": [],
+            "ems_waveforms": [],
+            "toy_waveforms": [],
         }
 
     def duplicate_waveform(self, *, source_waveform_id: str, name: str) -> dict:
@@ -171,7 +174,8 @@ class FakeBluetoothService:
                 "loop_count": 1,
                 "steps": [{"duration_ms": 120, "channel_a": 40, "channel_b": 40}],
             },
-            "waveforms": [],
+            "ems_waveforms": [],
+            "toy_waveforms": [],
         }
 
     def update_waveform(self, *, waveform_id: str, name: str, steps: list[dict]) -> dict:
@@ -188,7 +192,8 @@ class FakeBluetoothService:
                 "loop_count": 1,
                 "steps": steps,
             },
-            "waveforms": [],
+            "ems_waveforms": [],
+            "toy_waveforms": [],
         }
 
     def delete_waveform(self, waveform_id: str) -> dict:
@@ -196,7 +201,8 @@ class FakeBluetoothService:
         return {
             "success": True,
             "deleted_waveform_id": waveform_id,
-            "waveforms": [],
+            "ems_waveforms": [],
+            "toy_waveforms": [],
         }
 
     async def preview_waveform(self, waveform_id: str) -> dict:
@@ -324,7 +330,7 @@ def test_bluetooth_studio_endpoint_returns_waveforms_and_rule_groups() -> None:
     response = client.get("/api/bluetooth/studio")
 
     assert response.status_code == 200
-    assert response.json()["waveforms"][0]["id"] == "ems-preset-01"
+    assert response.json()["ems_waveforms"][0]["id"] == "ems-preset-01"
     assert response.json()["rule_groups"][0]["group_id"] == "gift"
     assert any(group["group_id"] == "danmaku_captain" for group in response.json()["rule_groups"])
 
@@ -521,8 +527,8 @@ def test_bluetooth_waveform_update_endpoint_saves_steps() -> None:
     assert fake_service.updated_waveform_payload == {
         "name": "编辑后的波形",
         "steps": [
-            {"duration_ms": 180, "channel_a": 120, "channel_b": 80},
-            {"duration_ms": 220, "channel_a": 0, "channel_b": 0},
+            {"duration_ms": 180, "channel_a": 120, "channel_b": 80, "motor_a": 0, "motor_b": 0, "motor_c": 0},
+            {"duration_ms": 220, "channel_a": 0, "channel_b": 0, "motor_a": 0, "motor_b": 0, "motor_c": 0},
         ],
     }
 

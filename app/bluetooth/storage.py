@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from app.bluetooth.ems_builtin_waveforms import is_preset_waveform_id
+from app.bluetooth.toy_builtin_waveforms import is_toy_preset_waveform_id
 from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
 from app.bluetooth.gift_tiers import build_default_gift_rules
 from app.bluetooth.models import BLUETOOTH_DANMAKU_RULE_DEFINITIONS
@@ -12,6 +13,8 @@ from app.bluetooth.models import BluetoothEventRule
 from app.bluetooth.models import BluetoothSettings
 from app.bluetooth.models import EmsWaveform
 from app.bluetooth.models import EmsWaveformStep
+from app.bluetooth.models import ToyWaveform
+from app.bluetooth.models import ToyWaveformStep
 from app.bluetooth.models import build_default_special_event_rules
 from app.bluetooth.models import build_default_payload
 from app.bluetooth.models import build_default_danmaku_rules
@@ -56,6 +59,20 @@ class BluetoothSettingsStore:
         else:
             waveforms = defaults.ems_waveforms
 
+        normalized_input_toy_waveforms = [
+            _normalize_toy_waveform(item)
+            for item in payload.get("toy_waveforms", [])
+            if isinstance(item, dict)
+        ]
+        if normalized_input_toy_waveforms:
+            custom_toy_waveforms = [
+                waveform for waveform in normalized_input_toy_waveforms
+                if not is_toy_preset_waveform_id(waveform.id)
+            ]
+            toy_waveforms = [*custom_toy_waveforms, *defaults.toy_waveforms]
+        else:
+            toy_waveforms = defaults.toy_waveforms
+
         rules = [
             _normalize_rule(item)
             for item in payload.get("bluetooth_event_rules", [])
@@ -69,6 +86,7 @@ class BluetoothSettingsStore:
         return BluetoothConfigPayload(
             bluetooth_settings=settings,
             ems_waveforms=waveforms,
+            toy_waveforms=toy_waveforms,
             bluetooth_event_rules=rules,
         )
 
@@ -110,6 +128,34 @@ def _normalize_waveform(item: dict) -> EmsWaveform:
     )
 
 
+def _normalize_toy_waveform(item: dict) -> ToyWaveform:
+    steps = item.get("steps", [])
+    normalized_steps = [
+        ToyWaveformStep(
+            duration_ms=max(1, int(step.get("duration_ms", 200))),
+            motor_a=_normalize_toy_speed(step.get("motor_a", 0)),
+            motor_b=_normalize_toy_speed(step.get("motor_b", 0)),
+            motor_c=_normalize_toy_speed(step.get("motor_c", 0)),
+        )
+        for step in steps
+        if isinstance(step, dict)
+    ]
+    if not normalized_steps:
+        normalized_steps = [ToyWaveformStep()]
+    return ToyWaveform(
+        id=str(item.get("id", "custom-toy-wave")),
+        name=str(item.get("name", "自定义波形")),
+        builtin=bool(item.get("builtin", False)),
+        editable=bool(item.get("editable", True)),
+        loop_count=max(1, int(item.get("loop_count", 1))),
+        steps=normalized_steps,
+    )
+
+
+def _normalize_toy_speed(value) -> int:
+    return max(0, min(int(value), 20))
+
+
 def _normalize_rule(item: dict) -> BluetoothEventRule:
     filters = item.get("filters", {})
     return BluetoothEventRule(
@@ -117,6 +163,7 @@ def _normalize_rule(item: dict) -> BluetoothEventRule:
         enabled=bool(item.get("enabled", False)),
         event_type=str(item.get("event_type", "gift")),
         waveform_id=str(item.get("waveform_id", "")),
+        toy_waveform_id=str(item.get("toy_waveform_id", "")),
         cooldown_seconds=max(0, int(item.get("cooldown_seconds", 0))),
         filters=filters if isinstance(filters, dict) else {},
     )
@@ -179,6 +226,7 @@ def _migrate_legacy_gift_default_rule(rules: list[BluetoothEventRule]) -> list[B
             enabled=bool(item["enabled"]),
             event_type=str(item["event_type"]),
             waveform_id=str(item["waveform_id"]),
+            toy_waveform_id=str(item.get("toy_waveform_id", "")),
             cooldown_seconds=int(item["cooldown_seconds"]),
             filters=dict(item["filters"]),
         )
@@ -270,6 +318,7 @@ def _migrate_single_special_price_rule(
                 enabled=bool(legacy_rule.enabled),
                 event_type=str(item["event_type"]),
                 waveform_id=legacy_rule.waveform_id or str(item["waveform_id"]) or default_waveform_id,
+                toy_waveform_id=str(item.get("toy_waveform_id", "")),
                 cooldown_seconds=max(0, int(legacy_rule.cooldown_seconds)),
                 filters=dict(item["filters"]),
             )

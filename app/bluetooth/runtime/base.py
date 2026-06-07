@@ -5,6 +5,7 @@ from typing import Protocol
 from app.bluetooth.models import BluetoothConnectionStatus
 from app.bluetooth.models import BluetoothDevice
 from app.bluetooth.models import EmsWaveform
+from app.bluetooth.models import ToyWaveform
 
 
 class BluetoothRuntime(Protocol):
@@ -28,5 +29,5 @@ class BluetoothRuntime(Protocol):
     def get_overlay_payload(self) -> dict:
         ...
 
-    async def play_waveform(self, waveform: EmsWaveform) -> None:
+    async def play_waveform(self, waveform: EmsWaveform | ToyWaveform) -> None:
         ...

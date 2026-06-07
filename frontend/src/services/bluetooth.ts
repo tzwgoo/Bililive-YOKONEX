@@ -44,11 +44,11 @@ export function saveBluetoothRules(payload: SaveBluetoothRulesPayload): Promise<
   });
 }
 
-export function createBluetoothWaveform(name: string): Promise<BluetoothWaveformMutationResponse> {
+export function createBluetoothWaveform(name: string, deviceType: string = "ems"): Promise<BluetoothWaveformMutationResponse> {
   return requestJson<BluetoothWaveformMutationResponse>("/api/bluetooth/waveforms", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, device_type: deviceType }),
   });
 }
 
@@ -71,8 +71,14 @@ export function updateBluetoothWaveform(
   });
 }
 
-export function deleteBluetoothWaveform(waveformId: string): Promise<{ success: boolean; deleted_waveform_id: string; waveforms: BluetoothStudioResponse["waveforms"] }> {
-  return requestJson<{ success: boolean; deleted_waveform_id: string; waveforms: BluetoothStudioResponse["waveforms"] }>(
+export function previewBluetoothWaveform(waveformId: string): Promise<{ success: boolean; message: string }> {
+  return requestJson<{ success: boolean; message: string }>(`/api/bluetooth/waveforms/${encodeURIComponent(waveformId)}/play`, {
+    method: "POST",
+  });
+}
+
+export function deleteBluetoothWaveform(waveformId: string): Promise<{ success: boolean; deleted_waveform_id: string; ems_waveforms: BluetoothStudioResponse["ems_waveforms"]; toy_waveforms: BluetoothStudioResponse["toy_waveforms"] }> {
+  return requestJson<{ success: boolean; deleted_waveform_id: string; ems_waveforms: BluetoothStudioResponse["ems_waveforms"]; toy_waveforms: BluetoothStudioResponse["toy_waveforms"] }>(
     `/api/bluetooth/waveforms/${encodeURIComponent(waveformId)}`,
     {
       method: "DELETE",

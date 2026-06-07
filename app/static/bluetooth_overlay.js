@@ -5,8 +5,16 @@ const overlayDeviceName = document.getElementById("overlay-device-name");
 const overlayBatteryValue = document.getElementById("overlay-battery-value");
 const overlayChannelAValue = document.getElementById("overlay-channel-a-value");
 const overlayChannelBValue = document.getElementById("overlay-channel-b-value");
+const overlayChannelCValue = document.getElementById("overlay-channel-c-value");
 const overlayChannelABar = document.getElementById("overlay-channel-a-bar");
 const overlayChannelBBar = document.getElementById("overlay-channel-b-bar");
+const overlayChannelCBar = document.getElementById("overlay-channel-c-bar");
+const overlayChannelAArticle = document.getElementById("overlay-channel-a-article");
+const overlayChannelBArticle = document.getElementById("overlay-channel-b-article");
+const overlayChannelCArticle = document.getElementById("overlay-channel-c-article");
+const overlayChannelALabel = document.getElementById("overlay-channel-a-label");
+const overlayChannelBLabel = document.getElementById("overlay-channel-b-label");
+const overlayChannelCLabel = document.getElementById("overlay-channel-c-label");
 const overlayWaveformCanvas = document.getElementById("overlay-waveform-canvas");
 const overlayDanmakuList = document.getElementById("overlay-danmaku-list");
 const overlayHighlightLabel = document.getElementById("overlay-highlight-label");
@@ -22,14 +30,22 @@ const overlayEventWaveformName = document.getElementById("overlay-event-waveform
 let overlayState = {
   connected: false,
   device_name: "",
+  device_type: "",
   waveform_name: "",
   battery_level: null,
   channel_a: 0,
   channel_b: 0,
+  motor_a: 0,
+  motor_b: 0,
+  motor_c: 0,
   history: [],
   recent_events: [],
   revision: 0,
 };
+
+function isToyDevice() {
+  return String(overlayState.device_type || "").toLowerCase() === "toy";
+}
 
 function resolveOverlayLayout() {
   const width = Math.max(window.innerWidth || 0, 1);
@@ -74,12 +90,14 @@ function applyOverlayViewportMode() {
   overlayRoot.dataset.layout = overlayRoot.dataset.style === "event" ? resolveOverlayLayout() : "panel";
 }
 
-function clampStrength(value) {
-  return Math.max(0, Math.min(180, Number(value || 0)));
+function clampStrength(value, max) {
+  max = max || 180;
+  return Math.max(0, Math.min(max, Number(value || 0)));
 }
 
-function resolveStrengthWidth(value) {
-  return `${(clampStrength(value) / 180) * 100}%`;
+function resolveStrengthWidth(value, max) {
+  max = max || 180;
+  return `${(clampStrength(value, max) / max) * 100}%`;
 }
 
 function formatBatteryLevel(value) {
@@ -113,13 +131,15 @@ function drawOverlayHistory(history) {
     return;
   }
 
+  const toy = isToyDevice();
+  const maxVal = toy ? 20 : 180;
   const padding = 8 * window.devicePixelRatio;
   const drawLine = (key, color) => {
     context.beginPath();
     items.forEach((item, index) => {
       const x = padding + (index / Math.max(1, items.length - 1)) * (width - padding * 2);
-      const strength = clampStrength(item[key]);
-      const y = height - padding - (strength / 180) * (height - padding * 2);
+      const strength = clampStrength(item[key], maxVal);
+      const y = height - padding - (strength / maxVal) * (height - padding * 2);
       if (index === 0) {
         context.moveTo(x, y);
       } else {
@@ -133,8 +153,14 @@ function drawOverlayHistory(history) {
     context.shadowBlur = 0;
   };
 
-  drawLine("channel_a", "#ff8a4c");
-  drawLine("channel_b", "#51a8ff");
+  if (toy) {
+    drawLine("motor_a", "#ff8a4c");
+    drawLine("motor_b", "#51a8ff");
+    drawLine("motor_c", "#a78bfa");
+  } else {
+    drawLine("channel_a", "#ff8a4c");
+    drawLine("channel_b", "#51a8ff");
+  }
 }
 
 function escapeOverlayHtml(value) {
@@ -187,11 +213,26 @@ function renderOverlayHighlight(recentEvents) {
   overlayHighlightWaveform.textContent = `波形 ${waveformText}`;
 }
 
+function renderDeviceTypeUI() {
+  const toy = isToyDevice();
+  if (toy) {
+    overlayChannelALabel.textContent = "旋转";
+    overlayChannelBLabel.textContent = "吮吸";
+    overlayChannelCArticle.classList.remove("is-hidden");
+  } else {
+    overlayChannelALabel.textContent = "A 通道";
+    overlayChannelBLabel.textContent = "B 通道";
+    overlayChannelCArticle.classList.add("is-hidden");
+  }
+}
+
 function renderOverlay(payload) {
   overlayState = {
     ...overlayState,
     ...payload,
   };
+  const toy = isToyDevice();
+  const maxVal = toy ? 20 : 180;
   overlayRoot.dataset.connected = String(Boolean(overlayState.connected));
   overlayConnectionText.textContent = overlayState.connected ? "蓝牙已连接" : "蓝牙未连接";
   overlayHighlightConnectionText.textContent = overlayConnectionText.textContent;
@@ -201,10 +242,23 @@ function renderOverlay(payload) {
   overlayHighlightDeviceName.textContent = overlayDeviceName.textContent;
   overlayBatteryValue.textContent = formatBatteryLevel(overlayState.battery_level);
   overlayHighlightBatteryValue.textContent = overlayBatteryValue.textContent;
-  overlayChannelAValue.textContent = String(clampStrength(overlayState.channel_a));
-  overlayChannelBValue.textContent = String(clampStrength(overlayState.channel_b));
-  overlayChannelABar.style.width = resolveStrengthWidth(overlayState.channel_a);
-  overlayChannelBBar.style.width = resolveStrengthWidth(overlayState.channel_b);
+
+  renderDeviceTypeUI();
+
+  if (toy) {
+    overlayChannelAValue.textContent = String(clampStrength(overlayState.motor_a, maxVal));
+    overlayChannelBValue.textContent = String(clampStrength(overlayState.motor_b, maxVal));
+    overlayChannelCValue.textContent = String(clampStrength(overlayState.motor_c, maxVal));
+    overlayChannelABar.style.width = resolveStrengthWidth(overlayState.motor_a, maxVal);
+    overlayChannelBBar.style.width = resolveStrengthWidth(overlayState.motor_b, maxVal);
+    overlayChannelCBar.style.width = resolveStrengthWidth(overlayState.motor_c, maxVal);
+  } else {
+    overlayChannelAValue.textContent = String(clampStrength(overlayState.channel_a, maxVal));
+    overlayChannelBValue.textContent = String(clampStrength(overlayState.channel_b, maxVal));
+    overlayChannelABar.style.width = resolveStrengthWidth(overlayState.channel_a, maxVal);
+    overlayChannelBBar.style.width = resolveStrengthWidth(overlayState.channel_b, maxVal);
+  }
+
   drawOverlayHistory(overlayState.history || []);
   renderOverlayHighlight(overlayState.recent_events || []);
   renderOverlayDanmaku(overlayState.recent_events || []);

@@ -7,6 +7,7 @@ import {
   duplicateBluetoothWaveform as duplicateBluetoothWaveformRequest,
   fetchBluetoothStatus,
   fetchBluetoothStudio,
+  previewBluetoothWaveform as previewBluetoothWaveformRequest,
   saveBluetoothRules as saveBluetoothRulesRequest,
   scanBluetoothDevices,
   updateBluetoothWaveform as updateBluetoothWaveformRequest,
@@ -45,12 +46,13 @@ export const useBluetoothStore = defineStore("bluetooth", {
       }
       return response;
     },
-    async createWaveform(name: string) {
-      const response = await createBluetoothWaveformRequest(name);
+    async createWaveform(name: string, deviceType: string = "ems") {
+      const response = await createBluetoothWaveformRequest(name, deviceType);
       if (this.studio) {
         this.studio = {
           ...this.studio,
-          waveforms: response.waveforms,
+          ems_waveforms: response.ems_waveforms,
+          toy_waveforms: response.toy_waveforms,
         };
       }
       return response;
@@ -60,7 +62,8 @@ export const useBluetoothStore = defineStore("bluetooth", {
       if (this.studio) {
         this.studio = {
           ...this.studio,
-          waveforms: response.waveforms,
+          ems_waveforms: response.ems_waveforms,
+          toy_waveforms: response.toy_waveforms,
         };
       }
       return response;
@@ -70,7 +73,8 @@ export const useBluetoothStore = defineStore("bluetooth", {
       if (this.studio) {
         this.studio = {
           ...this.studio,
-          waveforms: response.waveforms,
+          ems_waveforms: response.ems_waveforms,
+          toy_waveforms: response.toy_waveforms,
         };
       }
       return response;
@@ -80,10 +84,14 @@ export const useBluetoothStore = defineStore("bluetooth", {
       if (this.studio) {
         this.studio = {
           ...this.studio,
-          waveforms: response.waveforms,
+          ems_waveforms: response.ems_waveforms,
+          toy_waveforms: response.toy_waveforms,
         };
       }
       return response;
+    },
+    async previewWaveform(waveformId: string) {
+      return await previewBluetoothWaveformRequest(waveformId);
     },
     async scanDevices() {
       await scanBluetoothDevices();

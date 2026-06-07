@@ -65,6 +65,7 @@ class UpdateBluetoothRulesRequest(BaseModel):
 
 class CreateBluetoothWaveformRequest(BaseModel):
     name: str = ""
+    device_type: str = "ems"
 
 
 class DuplicateBluetoothWaveformRequest(BaseModel):
@@ -73,8 +74,11 @@ class DuplicateBluetoothWaveformRequest(BaseModel):
 
 class BluetoothWaveformStepPayload(BaseModel):
     duration_ms: int
-    channel_a: int
-    channel_b: int
+    channel_a: int = 0
+    channel_b: int = 0
+    motor_a: int = 0
+    motor_b: int = 0
+    motor_c: int = 0
 
 
 class UpdateBluetoothWaveformRequest(BaseModel):
@@ -295,7 +299,7 @@ async def update_command_studio(
 @router.post("/api/bluetooth/waveforms")
 async def create_bluetooth_waveform(request: Request, payload: CreateBluetoothWaveformRequest) -> dict:
     try:
-        return request.app.state.bluetooth_service.create_waveform(name=payload.name)
+        return request.app.state.bluetooth_service.create_waveform(name=payload.name, device_type=payload.device_type)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -13,6 +13,8 @@ from app.bluetooth.models import BluetoothConnectionStatus
 from app.bluetooth.models import BluetoothDevice
 from app.bluetooth.models import EmsWaveform
 from app.bluetooth.models import EmsWaveformStep
+from app.bluetooth.models import ToyWaveform
+from app.bluetooth.models import ToyWaveformStep
 
 try:
     from bleak import BleakClient
@@ -25,6 +27,14 @@ except ImportError:  # pragma: no cover - exercised through runtime fallback
 EMS_SERVICE_UUID = "0000ff30-0000-1000-8000-00805f9b34fb"
 EMS_WRITE_CHAR_UUID = "0000ff31-0000-1000-8000-00805f9b34fb"
 EMS_NOTIFY_CHAR_UUID = "0000ff32-0000-1000-8000-00805f9b34fb"
+
+TOY_SERVICE_UUID = "0000ff40-0000-1000-8000-00805f9b34fb"
+TOY_WRITE_CHAR_UUID = "0000ff41-0000-1000-8000-00805f9b34fb"
+TOY_NOTIFY_CHAR_UUID = "0000ff42-0000-1000-8000-00805f9b34fb"
+
+TOY_NAME_PREFIXES = ("YCY-FJB", "YCY-TDD")
+TOY_MOTOR_ALL = 0x07
+
 LOGGER = logging.getLogger("bili_live.bluetooth.runtime")
 
 
@@ -66,10 +76,14 @@ class BleakBluetoothRuntime:
         self._overlay_payload = {
             "connected": False,
             "device_name": "",
+            "device_type": "",
             "waveform_name": "",
             "battery_level": None,
             "channel_a": 0,
             "channel_b": 0,
+            "motor_a": 0,
+            "motor_b": 0,
+            "motor_c": 0,
             "step_index": 0,
             "step_count": 0,
             "updated_at": 0.0,
@@ -89,7 +103,7 @@ class BleakBluetoothRuntime:
         else:
             values = ((item, SimpleNamespace(service_uuids=[])) for item in discovered)
         for ble_device, advertisement in values:
-            mapped = classify_ems_device(ble_device=ble_device, advertisement=advertisement)
+            mapped = classify_device(ble_device=ble_device, advertisement=advertisement)
             if mapped is None:
                 continue
             devices.append(mapped)
@@ -124,6 +138,7 @@ class BleakBluetoothRuntime:
         self._set_overlay_payload(
             connected=True,
             device_name=device.name,
+            device_type=device.device_type,
             battery_level=self._battery_level,
         )
         return BluetoothConnectionStatus(
@@ -135,6 +150,7 @@ class BleakBluetoothRuntime:
 
     async def disconnect(self) -> BluetoothConnectionStatus:
         client = self._client
+        device = next((item for item in self._devices if item.connected), None)
         self._manual_disconnect_requested = True
         if self._reconnect_task is not None and not self._reconnect_task.done():
             self._reconnect_task.cancel()
@@ -145,8 +161,9 @@ class BleakBluetoothRuntime:
         if client is not None and getattr(client, "is_connected", False):
             stop_notify = getattr(client, "stop_notify", None)
             if callable(stop_notify):
+                notify_uuid = TOY_NOTIFY_CHAR_UUID if (device and device.device_type == "toy") else EMS_NOTIFY_CHAR_UUID
                 try:
-                    await stop_notify(EMS_NOTIFY_CHAR_UUID)
+                    await stop_notify(notify_uuid)
                 except Exception:
                     LOGGER.debug("停止蓝牙通知失败", exc_info=True)
             await client.disconnect()
@@ -156,10 +173,14 @@ class BleakBluetoothRuntime:
         self._set_overlay_payload(
             connected=False,
             device_name="",
+            device_type="",
             waveform_name="",
             battery_level=None,
             channel_a=0,
             channel_b=0,
+            motor_a=0,
+            motor_b=0,
+            motor_c=0,
             step_index=0,
             step_count=0,
             history=[],
@@ -189,48 +210,99 @@ class BleakBluetoothRuntime:
             "history": list(self._overlay_payload["history"]),
         }
 
-    async def play_waveform(self, waveform: EmsWaveform) -> None:
+    async def play_waveform(self, waveform: EmsWaveform | ToyWaveform) -> None:
         if self._client is None or not getattr(self._client, "is_connected", False):
             raise RuntimeError("当前没有已连接的蓝牙设备")
         device = next((item for item in self._devices if item.connected), None)
         if device is None:
             raise RuntimeError("未找到当前连接设备")
-        packets = create_waveform_packets(waveform=waveform, protocol=device.protocol)
+        is_toy_device = device.device_type == "toy"
+        write_uuid = TOY_WRITE_CHAR_UUID if is_toy_device else EMS_WRITE_CHAR_UUID
         history = list(self._overlay_payload["history"])
         try:
-            for index, ((packet, duration_seconds), step) in enumerate(zip(packets, waveform.steps, strict=False), start=1):
-                history.append(
-                    {
-                        "channel_a": step.channel_a,
-                        "channel_b": step.channel_b,
-                    }
-                )
-                history = history[-90:]
+            if is_toy_device:
+                for index, step in enumerate(waveform.steps, start=1):
+                    if isinstance(step, ToyWaveformStep):
+                        toy_step = step
+                    else:
+                        toy_step = _ems_step_to_toy(step)
+                    packet = create_toy_speed_packet(toy_step)
+                    history.append(
+                        {
+                            "motor_a": toy_step.motor_a,
+                            "motor_b": toy_step.motor_b,
+                            "motor_c": toy_step.motor_c,
+                        }
+                    )
+                    history = history[-90:]
+                    self._set_overlay_payload(
+                        connected=True,
+                        device_name=device.name,
+                        device_type=device.device_type,
+                        waveform_name=waveform.name,
+                        motor_a=toy_step.motor_a,
+                        motor_b=toy_step.motor_b,
+                        motor_c=toy_step.motor_c,
+                        step_index=index,
+                        step_count=len(waveform.steps),
+                        history=history,
+                    )
+                    await self._client.write_gatt_char(write_uuid, packet, response=False)
+                    await self._sleep(max(getattr(step, "duration_ms", 200), 0) / 1000)
+            else:
+                packets = create_waveform_packets(waveform=waveform, protocol=device.protocol)
+                for index, ((packet, duration_seconds), step) in enumerate(zip(packets, waveform.steps, strict=False), start=1):
+                    history.append(
+                        {
+                            "channel_a": getattr(step, "channel_a", 0),
+                            "channel_b": getattr(step, "channel_b", 0),
+                        }
+                    )
+                    history = history[-90:]
+                    self._set_overlay_payload(
+                        connected=True,
+                        device_name=device.name,
+                        device_type=device.device_type,
+                        waveform_name=waveform.name,
+                        channel_a=getattr(step, "channel_a", 0),
+                        channel_b=getattr(step, "channel_b", 0),
+                        step_index=index,
+                        step_count=len(waveform.steps),
+                        history=history,
+                    )
+                    await self._client.write_gatt_char(write_uuid, packet, response=False)
+                    await self._sleep(duration_seconds)
+        finally:
+            if is_toy_device:
+                stop_packet = create_toy_stop_packet()
+            else:
+                stop_packet = create_stop_packet(protocol=device.protocol)
+            await self._client.write_gatt_char(write_uuid, stop_packet, response=False)
+            if is_toy_device:
                 self._set_overlay_payload(
                     connected=True,
                     device_name=device.name,
-                    waveform_name=waveform.name,
-                    channel_a=step.channel_a,
-                    channel_b=step.channel_b,
-                    step_index=index,
-                    step_count=len(waveform.steps),
-                    history=history,
+                    device_type=device.device_type,
+                    waveform_name="",
+                    motor_a=0,
+                    motor_b=0,
+                    motor_c=0,
+                    step_index=0,
+                    step_count=0,
+                    history=[*history, {"motor_a": 0, "motor_b": 0, "motor_c": 0}][-90:],
                 )
-                await self._client.write_gatt_char(EMS_WRITE_CHAR_UUID, packet, response=False)
-                await self._sleep(duration_seconds)
-        finally:
-            stop_packet = create_stop_packet(protocol=device.protocol)
-            await self._client.write_gatt_char(EMS_WRITE_CHAR_UUID, stop_packet, response=False)
-            self._set_overlay_payload(
-                connected=True,
-                device_name=device.name,
-                waveform_name="",
-                channel_a=0,
-                channel_b=0,
-                step_index=0,
-                step_count=0,
-                history=[*history, {"channel_a": 0, "channel_b": 0}][-90:],
-            )
+            else:
+                self._set_overlay_payload(
+                    connected=True,
+                    device_name=device.name,
+                    device_type=device.device_type,
+                    waveform_name="",
+                    channel_a=0,
+                    channel_b=0,
+                    step_index=0,
+                    step_count=0,
+                    history=[*history, {"channel_a": 0, "channel_b": 0}][-90:],
+                )
 
     def _handle_disconnect(self, _client: Any) -> None:
         previous_device_id = self._connected_device_id
@@ -255,10 +327,14 @@ class BleakBluetoothRuntime:
         self._set_overlay_payload(
             connected=False,
             device_name="",
+            device_type="",
             waveform_name="",
             battery_level=None,
             channel_a=0,
             channel_b=0,
+            motor_a=0,
+            motor_b=0,
+            motor_c=0,
             step_index=0,
             step_count=0,
             history=[],
@@ -298,6 +374,7 @@ class BleakBluetoothRuntime:
             self._set_overlay_payload(
                 connected=True,
                 device_name=device.name,
+                device_type=device.device_type,
                 battery_level=self._battery_level,
             )
         except asyncio.CancelledError:
@@ -320,6 +397,16 @@ class BleakBluetoothRuntime:
         self._battery_level = None
         client = self._client
         if client is None or not getattr(client, "is_connected", False):
+            return
+        if device.device_type == "toy":
+            start_notify = getattr(client, "start_notify", None)
+            if callable(start_notify):
+                await start_notify(TOY_NOTIFY_CHAR_UUID, self._handle_toy_notify)
+            await client.write_gatt_char(
+                TOY_WRITE_CHAR_UUID,
+                _build_toy_device_info_query(),
+                response=False,
+            )
             return
         if device.protocol != "ems_v2":
             return
@@ -346,8 +433,28 @@ class BleakBluetoothRuntime:
                 battery_level=battery_level,
             )
 
+    async def _handle_toy_notify(self, _sender: Any, data: bytearray) -> None:
+        parsed = _try_parse_toy_notify(bytes(data))
+        if parsed is None:
+            return
+        if parsed.get("type") == "battery":
+            self._battery_level = parsed["level"]
+        if self._connected_device_id:
+            device = next((item for item in self._devices if item.device_id == self._connected_device_id), None)
+            self._set_overlay_payload(
+                connected=True,
+                device_name="" if device is None else device.name,
+                battery_level=self._battery_level,
+            )
+
 
 def classify_ems_device(*, ble_device: Any, advertisement: Any) -> BluetoothDevice | None:
+    """向后兼容别名，委托给 classify_device。"""
+    return classify_device(ble_device=ble_device, advertisement=advertisement)
+
+
+def classify_device(*, ble_device: Any, advertisement: Any) -> BluetoothDevice | None:
+    """分类蓝牙广播设备，返回 BluetoothDevice 或 None。"""
     service_uuids = _normalize_service_uuids(getattr(advertisement, "service_uuids", []))
     name = (
         getattr(advertisement, "local_name", None)
@@ -355,6 +462,19 @@ def classify_ems_device(*, ble_device: Any, advertisement: Any) -> BluetoothDevi
         or getattr(ble_device, "address", "")
     )
     name_upper = str(name).upper()
+
+    # Toy 设备优先匹配 (FF40 / YCY-FJB / YCY-TDD)
+    if TOY_SERVICE_UUID in service_uuids or any(name_upper.startswith(prefix) for prefix in TOY_NAME_PREFIXES):
+        return BluetoothDevice(
+            device_id=str(getattr(ble_device, "address", "")),
+            name=str(name),
+            device_type="toy",
+            protocol="toy",
+            rssi=int(getattr(ble_device, "rssi", getattr(advertisement, "rssi", -60)) or -60),
+            connected=False,
+        )
+
+    # EMS 设备 (FF30 / YYC-DJ)
     if EMS_SERVICE_UUID not in service_uuids and not name_upper.startswith("YYC-DJ"):
         return None
     protocol = "ems_v2"
@@ -511,3 +631,59 @@ def _try_parse_ems_battery_level(packet: bytes) -> int | None:
     if len(packet) < 4 or packet[0] != 0x35 or packet[1] != 0x71 or packet[2] != 0x04:
         return None
     return max(0, min(int(packet[3]), 100))
+
+
+# ── Toy 协议包构建与解析 ─────────────────────────────────────────────────
+
+def create_toy_speed_packet(step: ToyWaveformStep) -> bytes:
+    """构建 Toy 实时速率控制包: 35 12 motor_a motor_b motor_c checksum"""
+    values = [0x35, 0x12, _clamp_toy_speed(step.motor_a), _clamp_toy_speed(step.motor_b), _clamp_toy_speed(step.motor_c)]
+    values.append(_compute_checksum(values))
+    return bytes(values)
+
+
+def create_toy_stop_packet() -> bytes:
+    """构建 Toy 停止包: 所有马达速率归零。"""
+    return create_toy_speed_packet(ToyWaveformStep())
+
+
+def _build_toy_device_info_query() -> bytes:
+    """构建 Toy 设备信息查询包: 35 10 checksum"""
+    values = [0x35, 0x10]
+    values.append(_compute_checksum(values))
+    return bytes(values)
+
+
+def _clamp_toy_speed(value: int) -> int:
+    return max(0, min(int(value), 20))
+
+
+def _ems_step_to_toy(step: EmsWaveformStep) -> ToyWaveformStep:
+    """将 EMS 波形步骤转换为 Toy 马达步骤：强度 0-180 映射到速度 0-20。"""
+    motor_a = int(step.channel_a / 180 * 20)
+    motor_b = int(step.channel_b / 180 * 20)
+    return ToyWaveformStep(
+        duration_ms=max(1, step.duration_ms),
+        motor_a=motor_a,
+        motor_b=motor_b,
+        motor_c=0,
+    )
+
+
+def _try_parse_toy_notify(data: bytes) -> dict | None:
+    """解析 Toy 设备通知包。"""
+    if len(data) < 3 or data[0] != 0x35:
+        return None
+    cmd = data[1]
+    if cmd == 0x13 and len(data) >= 5 and data[2] == 0x01:
+        return {"type": "battery", "level": max(0, min(int(data[3]), 100))}
+    if cmd == 0x10 and len(data) >= 10:
+        return {
+            "type": "device_info",
+            "motor_a_modes": data[4],
+            "motor_b_modes": data[5],
+            "motor_c_modes": data[6],
+        }
+    if cmd == 0x14:
+        return {"type": "heartbeat"}
+    return None

@@ -13,6 +13,8 @@ from app.bluetooth.models import BluetoothDevice
 from app.bluetooth.models import BluetoothEventRule
 from app.bluetooth.models import EmsWaveform
 from app.bluetooth.models import EmsWaveformStep
+from app.bluetooth.models import ToyWaveform
+from app.bluetooth.models import ToyWaveformStep
 from app.bluetooth.models import payload_to_dict
 from app.bluetooth.price_tiers import PRICE_FILTER_EVENT_TYPES
 from app.bluetooth.price_tiers import SPECIAL_PRICE_TIER_BY_RULE_ID
@@ -114,7 +116,7 @@ class BluetoothService:
         return await self.runtime.disconnect()
 
     async def trigger_waveform(self, *, event_type: str, waveform_id: str) -> dict:
-        waveform = next((item for item in self.payload.ems_waveforms if item.id == waveform_id), None)
+        waveform = self._find_waveform_any(waveform_id)
         if waveform is None:
             result = {
                 "matched": True,
@@ -152,7 +154,7 @@ class BluetoothService:
         return result
 
     async def preview_waveform(self, waveform_id: str) -> dict:
-        waveform = next((item for item in self.payload.ems_waveforms if item.id == waveform_id), None)
+        waveform = self._find_waveform_any(waveform_id)
         if waveform is None:
             result = {
                 "matched": True,
@@ -195,6 +197,11 @@ class BluetoothService:
             item.id: item.name
             for item in self.payload.ems_waveforms
         }
+        waveform_name_map.update({
+            item.id: item.name
+            for item in self.payload.toy_waveforms
+        })
+        payload_dict = payload_to_dict(self.payload)
         return {
             "runtime_backend": getattr(self.runtime, "backend_name", "unknown"),
             "enabled": self.payload.bluetooth_settings.enabled,
@@ -219,7 +226,8 @@ class BluetoothService:
                 }
                 for item in self.runtime.get_devices()
             ],
-            "waveforms": payload_to_dict(self.payload)["ems_waveforms"],
+            "ems_waveforms": payload_dict["ems_waveforms"],
+            "toy_waveforms": payload_dict["toy_waveforms"],
             "rules": [
                 {
                     **item,
@@ -227,7 +235,7 @@ class BluetoothService:
                     "rule_label": _build_rule_label(item),
                     "waveform_name": waveform_name_map.get(str(item.get("waveform_id", "")), str(item.get("waveform_id", "-") or "-")),
                 }
-                for item in payload_to_dict(self.payload)["bluetooth_event_rules"]
+                for item in payload_dict["bluetooth_event_rules"]
             ],
         }
 
@@ -236,17 +244,25 @@ class BluetoothService:
         return {
             "connected": bool(payload.get("connected", False)),
             "device_name": str(payload.get("device_name", "") or ""),
+            "device_type": str(payload.get("device_type", "") or ""),
             "waveform_name": str(payload.get("waveform_name", "") or ""),
             "battery_level": _normalize_battery_level(payload.get("battery_level")),
             "channel_a": max(0, int(payload.get("channel_a", 0) or 0)),
             "channel_b": max(0, int(payload.get("channel_b", 0) or 0)),
+            "motor_a": max(0, int(payload.get("motor_a", 0) or 0)),
+            "motor_b": max(0, int(payload.get("motor_b", 0) or 0)),
+            "motor_c": max(0, int(payload.get("motor_c", 0) or 0)),
             "step_index": max(0, int(payload.get("step_index", 0) or 0)),
             "step_count": max(0, int(payload.get("step_count", 0) or 0)),
             "updated_at": float(payload.get("updated_at", 0) or 0),
             "history": [
                 {
+                    **item,
                     "channel_a": max(0, int(item.get("channel_a", 0) or 0)),
                     "channel_b": max(0, int(item.get("channel_b", 0) or 0)),
+                    "motor_a": max(0, int(item.get("motor_a", 0) or 0)),
+                    "motor_b": max(0, int(item.get("motor_b", 0) or 0)),
+                    "motor_c": max(0, int(item.get("motor_c", 0) or 0)),
                 }
                 for item in payload.get("history", [])
                 if isinstance(item, dict)
@@ -256,11 +272,15 @@ class BluetoothService:
         }
 
     def get_studio_payload(self) -> dict:
-        waveforms = payload_to_dict(self.payload)["ems_waveforms"]
+        payload_dict = payload_to_dict(self.payload)
         waveform_name_map = {
             item.id: item.name
             for item in self.payload.ems_waveforms
         }
+        waveform_name_map.update({
+            item.id: item.name
+            for item in self.payload.toy_waveforms
+        })
         grouped_rules: list[dict] = []
         for event_type, label in RULE_GROUP_LABELS.items():
             rules = [
@@ -291,27 +311,33 @@ class BluetoothService:
                 }
             )
         return {
-            "waveforms": waveforms,
+            "ems_waveforms": payload_dict["ems_waveforms"],
+            "toy_waveforms": payload_dict["toy_waveforms"],
             "rule_groups": grouped_rules,
         }
 
     def save_rules(self, rules: list[dict]) -> dict:
-        waveform_ids = {item.id for item in self.payload.ems_waveforms}
+        waveform_ids = {item.id for item in self.payload.ems_waveforms} | {item.id for item in self.payload.toy_waveforms}
         rule_map = {item.id: item for item in self.payload.bluetooth_event_rules}
         next_enabled_by_rule_id: dict[str, bool] = {}
         next_waveform_id_by_rule_id: dict[str, str] = {}
+        next_toy_waveform_id_by_rule_id: dict[str, str] = {}
         next_filters_by_rule_id: dict[str, dict[str, Any]] = {}
         updated_count = 0
         for item in rules:
             rule_id = str(item.get("id", "") or "")
             waveform_id = str(item.get("waveform_id", "") or "")
+            toy_waveform_id = str(item.get("toy_waveform_id", "") or "")
             if rule_id not in rule_map:
                 raise ValueError(f"未找到规则: {rule_id}")
-            if waveform_id not in waveform_ids:
+            if waveform_id and waveform_id not in waveform_ids:
                 raise ValueError(f"未找到波形: {waveform_id}")
+            if toy_waveform_id and toy_waveform_id not in waveform_ids:
+                raise ValueError(f"未找到 Toy 波形: {toy_waveform_id}")
             current = rule_map[rule_id]
             next_enabled_by_rule_id[rule_id] = bool(item.get("enabled", current.enabled))
-            next_waveform_id_by_rule_id[rule_id] = waveform_id
+            next_waveform_id_by_rule_id[rule_id] = waveform_id or current.waveform_id
+            next_toy_waveform_id_by_rule_id[rule_id] = toy_waveform_id or current.toy_waveform_id
             next_filters_by_rule_id[rule_id] = _resolve_updated_filters(current=current, incoming=item)
             updated_count += 1
 
@@ -325,6 +351,7 @@ class BluetoothService:
             current = rule_map[rule_id]
             current.enabled = next_enabled_by_rule_id[rule_id]
             current.waveform_id = next_waveform_id_by_rule_id[rule_id]
+            current.toy_waveform_id = next_toy_waveform_id_by_rule_id.get(rule_id, current.toy_waveform_id)
             current.filters = filters
 
         self.payload.bluetooth_event_rules = _sort_event_rules(self.payload.bluetooth_event_rules)
@@ -335,60 +362,90 @@ class BluetoothService:
             "rule_groups": self.get_studio_payload()["rule_groups"],
         }
 
-    def create_waveform(self, *, name: str) -> dict:
-        waveform = EmsWaveform(
-            id=_generate_custom_waveform_id(self.payload),
-            name=str(name or "").strip() or "自定义波形",
-            builtin=False,
-            editable=True,
-            execution_mode="fixed",
-            loop_count=1,
-            steps=[EmsWaveformStep(duration_ms=200, channel_a=0, channel_b=0)],
-        )
-        self.payload.ems_waveforms.insert(0, waveform)
+    def create_waveform(self, *, name: str, device_type: str = "ems") -> dict:
+        if device_type == "toy":
+            waveform = ToyWaveform(
+                id=_generate_custom_waveform_id(self.payload),
+                name=str(name or "").strip() or "自定义波形",
+                builtin=False,
+                editable=True,
+                loop_count=1,
+                steps=[ToyWaveformStep(duration_ms=200, motor_a=0, motor_b=0, motor_c=0)],
+            )
+            self.payload.toy_waveforms.insert(0, waveform)
+        else:
+            waveform = EmsWaveform(
+                id=_generate_custom_waveform_id(self.payload),
+                name=str(name or "").strip() or "自定义波形",
+                builtin=False,
+                editable=True,
+                execution_mode="fixed",
+                loop_count=1,
+                steps=[EmsWaveformStep(duration_ms=200, channel_a=0, channel_b=0)],
+            )
+            self.payload.ems_waveforms.insert(0, waveform)
         self.store.save(self.payload)
         return _build_waveform_mutation_response(self.payload, waveform)
 
     def duplicate_waveform(self, *, source_waveform_id: str, name: str) -> dict:
-        source = self._find_waveform(source_waveform_id)
-        duplicated = EmsWaveform(
-            id=_generate_custom_waveform_id(self.payload),
-            name=str(name or "").strip() or f"{source.name} - 副本",
-            builtin=False,
-            editable=True,
-            execution_mode=source.execution_mode,
-            loop_count=source.loop_count,
-            steps=[_clone_waveform_step(step) for step in source.steps],
-        )
-        self.payload.ems_waveforms.insert(0, duplicated)
+        source = self._find_waveform_any(source_waveform_id)
+        if isinstance(source, ToyWaveform):
+            duplicated = ToyWaveform(
+                id=_generate_custom_waveform_id(self.payload),
+                name=str(name or "").strip() or f"{source.name} - 副本",
+                builtin=False,
+                editable=True,
+                loop_count=source.loop_count,
+                steps=[_clone_toy_waveform_step(step) for step in source.steps],
+            )
+            self.payload.toy_waveforms.insert(0, duplicated)
+        else:
+            duplicated = EmsWaveform(
+                id=_generate_custom_waveform_id(self.payload),
+                name=str(name or "").strip() or f"{source.name} - 副本",
+                builtin=False,
+                editable=True,
+                execution_mode=source.execution_mode,
+                loop_count=source.loop_count,
+                steps=[_clone_waveform_step(step) for step in source.steps],
+            )
+            self.payload.ems_waveforms.insert(0, duplicated)
         self.store.save(self.payload)
         return _build_waveform_mutation_response(self.payload, duplicated)
 
     def update_waveform(self, *, waveform_id: str, name: str, steps: list[dict]) -> dict:
-        waveform = self._find_waveform(waveform_id)
+        waveform = self._find_waveform_any(waveform_id)
         if waveform.builtin:
             raise ValueError("内置波形不支持直接编辑")
         normalized_name = str(name or "").strip()
         if not normalized_name:
             raise ValueError("波形名称不能为空")
-        normalized_steps = _merge_editable_steps(existing_steps=waveform.steps, incoming_steps=steps)
+        if isinstance(waveform, ToyWaveform):
+            normalized_steps = _merge_toy_editable_steps(existing_steps=waveform.steps, incoming_steps=steps)
+        else:
+            normalized_steps = _merge_editable_steps(existing_steps=waveform.steps, incoming_steps=steps)
         waveform.name = normalized_name
         waveform.steps = normalized_steps
         self.store.save(self.payload)
         return _build_waveform_mutation_response(self.payload, waveform)
 
     def delete_waveform(self, waveform_id: str) -> dict:
-        waveform = self._find_waveform(waveform_id)
+        waveform = self._find_waveform_any(waveform_id)
         if waveform.builtin:
             raise ValueError("内置波形不支持删除")
-        if any(rule.waveform_id == waveform_id for rule in self.payload.bluetooth_event_rules):
+        if any(rule.waveform_id == waveform_id or rule.toy_waveform_id == waveform_id for rule in self.payload.bluetooth_event_rules):
             raise ValueError("请先修改规则绑定后再删除该波形")
-        self.payload.ems_waveforms = [item for item in self.payload.ems_waveforms if item.id != waveform_id]
+        if isinstance(waveform, ToyWaveform):
+            self.payload.toy_waveforms = [item for item in self.payload.toy_waveforms if item.id != waveform_id]
+        else:
+            self.payload.ems_waveforms = [item for item in self.payload.ems_waveforms if item.id != waveform_id]
         self.store.save(self.payload)
+        payload_dict = payload_to_dict(self.payload)
         return {
             "success": True,
             "deleted_waveform_id": waveform_id,
-            "waveforms": payload_to_dict(self.payload)["ems_waveforms"],
+            "ems_waveforms": payload_dict["ems_waveforms"],
+            "toy_waveforms": payload_dict["toy_waveforms"],
         }
 
     def _find_waveform(self, waveform_id: str) -> EmsWaveform:
@@ -396,6 +453,16 @@ class BluetoothService:
         if waveform is None:
             raise ValueError(f"未找到波形: {waveform_id}")
         return waveform
+
+    def _find_waveform_any(self, waveform_id: str) -> EmsWaveform | ToyWaveform:
+        """在 EMS 和 Toy 波形列表中查找波形。"""
+        waveform = next((item for item in self.payload.ems_waveforms if item.id == waveform_id), None)
+        if waveform is not None:
+            return waveform
+        waveform = next((item for item in self.payload.toy_waveforms if item.id == waveform_id), None)
+        if waveform is not None:
+            return waveform
+        raise ValueError(f"未找到波形: {waveform_id}")
 
     def _publish_bluetooth_control(self, payload: dict[str, Any]) -> None:
         """写入蓝牙波形控制日志。"""
@@ -484,7 +551,7 @@ def _normalize_battery_level(value) -> int | None:
 
 
 def _generate_custom_waveform_id(payload: BluetoothConfigPayload) -> str:
-    existing_ids = {item.id for item in payload.ems_waveforms}
+    existing_ids = {item.id for item in payload.ems_waveforms} | {item.id for item in payload.toy_waveforms}
     while True:
         waveform_id = f"custom-wave-{uuid.uuid4().hex[:8]}"
         if waveform_id not in existing_ids:
@@ -502,6 +569,15 @@ def _clone_waveform_step(step: EmsWaveformStep) -> EmsWaveformStep:
         channel_b_mode=step.channel_b_mode,
         channel_b_frequency=step.channel_b_frequency,
         channel_b_pulse_width=step.channel_b_pulse_width,
+    )
+
+
+def _clone_toy_waveform_step(step: ToyWaveformStep) -> ToyWaveformStep:
+    return ToyWaveformStep(
+        duration_ms=step.duration_ms,
+        motor_a=step.motor_a,
+        motor_b=step.motor_b,
+        motor_c=step.motor_c,
     )
 
 
@@ -527,14 +603,37 @@ def _merge_editable_steps(*, existing_steps: list[EmsWaveformStep], incoming_ste
     return normalized_steps
 
 
+def _merge_toy_editable_steps(*, existing_steps: list[ToyWaveformStep], incoming_steps: list[dict]) -> list[ToyWaveformStep]:
+    if not incoming_steps:
+        raise ValueError("波形至少需要一个分段")
+    normalized_steps: list[ToyWaveformStep] = []
+    for index, step in enumerate(incoming_steps):
+        base_step = existing_steps[index] if index < len(existing_steps) else ToyWaveformStep()
+        normalized_steps.append(
+            ToyWaveformStep(
+                duration_ms=max(1, int(step.get("duration_ms", base_step.duration_ms) or base_step.duration_ms)),
+                motor_a=_normalize_toy_speed(step.get("motor_a", base_step.motor_a)),
+                motor_b=_normalize_toy_speed(step.get("motor_b", base_step.motor_b)),
+                motor_c=_normalize_toy_speed(step.get("motor_c", base_step.motor_c)),
+            )
+        )
+    return normalized_steps
+
+
+def _normalize_toy_speed(value) -> int:
+    return max(0, min(int(value), 20))
+
+
 def _normalize_waveform_strength(value) -> int:
     return max(0, min(int(value), 180))
 
 
-def _resolve_waveform_max_strength(waveform: EmsWaveform) -> int:
-    """计算波形在 A/B 通道中的最大强度。"""
+def _resolve_waveform_max_strength(waveform: EmsWaveform | ToyWaveform) -> int:
+    """计算波形在 A/B 通道或马达中的最大强度。"""
     if not waveform.steps:
         return 0
+    if isinstance(waveform, ToyWaveform):
+        return max(max(step.motor_a, step.motor_b, step.motor_c) for step in waveform.steps)
     return max(max(step.channel_a, step.channel_b) for step in waveform.steps)
 
 
@@ -607,12 +706,17 @@ def _resolve_overlay_event_message(event_type: str, payload: dict[str, Any]) -> 
     return ""
 
 
-def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform: EmsWaveform) -> dict:
-    waveform_data = next(item for item in payload_to_dict(payload)["ems_waveforms"] if item["id"] == waveform.id)
+def _build_waveform_mutation_response(payload: BluetoothConfigPayload, waveform: EmsWaveform | ToyWaveform) -> dict:
+    payload_dict = payload_to_dict(payload)
+    if isinstance(waveform, ToyWaveform):
+        waveform_data = next(item for item in payload_dict["toy_waveforms"] if item["id"] == waveform.id)
+    else:
+        waveform_data = next(item for item in payload_dict["ems_waveforms"] if item["id"] == waveform.id)
     return {
         "success": True,
         "waveform": waveform_data,
-        "waveforms": payload_to_dict(payload)["ems_waveforms"],
+        "ems_waveforms": payload_dict["ems_waveforms"],
+        "toy_waveforms": payload_dict["toy_waveforms"],
     }
 
 

@@ -56,6 +56,7 @@ class BluetoothDispatcher:
 
         original_event_type = str(event.get("event_type", "") or "")
         payload_data = event.get("payload", {})
+        connected_device_type = self._get_connected_device_type()
         if is_danmaku_event_type(original_event_type):
             session_match_result = self._match_session_danmaku_keywords(event, payload_data)
             if session_match_result is not None:
@@ -73,9 +74,10 @@ class BluetoothDispatcher:
                 danmaku_rule_result = self._match_danmaku_rule(rule.filters, payload_data)
                 if danmaku_rule_result is not None:
                     return danmaku_rule_result
+            selected_waveform_id = _select_waveform_id(rule, connected_device_type)
             return await self.bluetooth_service.trigger_waveform(
                 event_type=original_event_type,
-                waveform_id=rule.waveform_id,
+                waveform_id=selected_waveform_id,
             )
 
         return {
@@ -83,6 +85,17 @@ class BluetoothDispatcher:
             "success": False,
             "message": "未命中蓝牙规则",
         }
+
+    def _get_connected_device_type(self) -> str:
+        """获取当前连接设备的类型 (ems / toy)，未连接时返回 ems。"""
+        try:
+            overlay = self.bluetooth_service.get_overlay_payload()
+            device_type = str(overlay.get("device_type", "") or "").lower()
+            if device_type in ("ems", "toy"):
+                return device_type
+        except Exception:
+            pass
+        return "ems"
 
     def _rule_matches_event_type(self, rule_event_type: str, original_event_type: str) -> bool:
         normalized_rule_event_type = str(rule_event_type or "")
@@ -229,3 +242,16 @@ def _meets_min_guard_level(*, guard_level: int, min_guard_level: int) -> bool:
     if normalized_guard_level <= 0:
         return False
     return normalized_guard_level <= normalized_min_guard_level
+
+
+def _select_waveform_id(rule: Any, device_type: str) -> str:
+    """根据连接设备类型选择 EMS 或 Toy 波形 ID。
+
+    当 device_type == "toy" 且规则配置了 toy_waveform_id 时，优先使用 Toy 波形；
+    否则回退到 waveform_id（兼容旧配置和 EMS 设备）。
+    """
+    if device_type == "toy":
+        toy_id = getattr(rule, "toy_waveform_id", None) or ""
+        if toy_id:
+            return toy_id
+    return str(getattr(rule, "waveform_id", "") or "")

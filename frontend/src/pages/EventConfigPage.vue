@@ -62,7 +62,8 @@
     <BluetoothEventRulePanel
       v-else
       :rule-groups="draftRuleGroups"
-      :waveform-options="waveformOptions"
+      :ems-waveform-options="emsWaveformOptions"
+      :toy-waveform-options="toyWaveformOptions"
       @update-min-price="updateMinPrice"
       @update-max-price="updateMaxPriceFilter"
     />
@@ -115,14 +116,19 @@ const groupedRules = computed(() => {
 });
 const commandSlots = computed(() => commandStore.studio?.command_slots || []);
 const commandSlotOptions = computed(() => commandSlots.value.map((slot) => ({ label: slot, value: slot })));
-const waveformOptions = computed(() =>
-  (bluetoothStore.studio?.waveforms || []).map((waveform) => ({ label: waveform.name, value: waveform.id })),
+const emsWaveformOptions = computed(() =>
+  (bluetoothStore.studio?.ems_waveforms || []).map((waveform) => ({ label: waveform.name, value: waveform.id })),
+);
+const toyWaveformOptions = computed(() =>
+  (bluetoothStore.studio?.toy_waveforms || []).map((waveform) => ({ label: waveform.name, value: waveform.id })),
 );
 const commandRuleCount = computed(() => draftRules.value.length);
 const bluetoothRuleCount = computed(() =>
   draftRuleGroups.value.reduce((sum, group) => sum + group.rules.length, 0),
 );
-const waveformCount = computed(() => bluetoothStore.studio?.waveforms.length || 0);
+const waveformCount = computed(() =>
+  (bluetoothStore.studio?.ems_waveforms.length || 0) + (bluetoothStore.studio?.toy_waveforms.length || 0),
+);
 const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_renew"]);
 
 watch(activeTab, (value) => {
@@ -252,6 +258,7 @@ async function handleSaveBluetoothRules() {
         id: rule.id,
         enabled: rule.enabled,
         waveform_id: rule.waveform_id,
+        toy_waveform_id: rule.toy_waveform_id || "",
         min_price: priceFilterGroupIds.has(group.group_id)
           ? Math.max(0, Math.round(Number(rule.filters?.min_price || 0)))
           : null,

@@ -5,6 +5,7 @@ import time
 from app.bluetooth.models import BluetoothConnectionStatus
 from app.bluetooth.models import BluetoothDevice
 from app.bluetooth.models import EmsWaveform
+from app.bluetooth.models import ToyWaveform
 
 
 class MemoryBluetoothRuntime:
@@ -17,10 +18,14 @@ class MemoryBluetoothRuntime:
         self._overlay_payload = {
             "connected": False,
             "device_name": "",
+            "device_type": "",
             "waveform_name": "",
             "battery_level": None,
             "channel_a": 0,
             "channel_b": 0,
+            "motor_a": 0,
+            "motor_b": 0,
+            "motor_c": 0,
             "step_index": 0,
             "step_count": 0,
             "updated_at": 0.0,
@@ -46,6 +51,14 @@ class MemoryBluetoothRuntime:
                 rssi=-51,
                 connected=self._connected_device_id == "ems-demo-002",
             ),
+            BluetoothDevice(
+                device_id="toy-demo-001",
+                name="YCY-FJB-DEMO",
+                device_type="toy",
+                protocol="toy",
+                rssi=-38,
+                connected=self._connected_device_id == "toy-demo-001",
+            ),
         ]
         return list(self._devices)
 
@@ -54,12 +67,13 @@ class MemoryBluetoothRuntime:
         if device is None:
             raise ValueError("未找到指定蓝牙设备")
         self._connected_device_id = device_id
-        self._battery_level = 100 if device.protocol == "ems_v2" else None
+        self._battery_level = 100
         for item in self._devices:
             item.connected = item.device_id == device_id
         self._set_overlay_payload(
             connected=True,
             device_name=device.name,
+            device_type=device.device_type,
             battery_level=self._battery_level,
         )
         return BluetoothConnectionStatus(
@@ -77,10 +91,14 @@ class MemoryBluetoothRuntime:
         self._set_overlay_payload(
             connected=False,
             device_name="",
+            device_type="",
             waveform_name="",
             battery_level=None,
             channel_a=0,
             channel_b=0,
+            motor_a=0,
+            motor_b=0,
+            motor_c=0,
             step_index=0,
             step_count=0,
             history=[],
@@ -110,36 +128,73 @@ class MemoryBluetoothRuntime:
             "history": list(self._overlay_payload["history"]),
         }
 
-    async def play_waveform(self, waveform: EmsWaveform) -> None:
+    async def play_waveform(self, waveform: EmsWaveform | ToyWaveform) -> None:
         if not waveform.steps:
             return None
+        device = next((item for item in self._devices if item.connected), None)
+        is_toy_device = device is not None and device.device_type == "toy"
         history = list(self._overlay_payload["history"])
         for index, step in enumerate(waveform.steps, start=1):
-            history.append(
-                {
-                    "channel_a": step.channel_a,
-                    "channel_b": step.channel_b,
-                }
-            )
-            history = history[-90:]
+            if is_toy_device:
+                if isinstance(step, ToyWaveformStep):
+                    toy_step = step
+                else:
+                    from app.bluetooth.runtime.bleak_runtime import _ems_step_to_toy
+                    toy_step = _ems_step_to_toy(step)
+                history.append(
+                    {
+                        "motor_a": toy_step.motor_a,
+                        "motor_b": toy_step.motor_b,
+                        "motor_c": toy_step.motor_c,
+                    }
+                )
+                self._set_overlay_payload(
+                    connected=bool(self._connected_device_id),
+                    waveform_name=waveform.name,
+                    motor_a=toy_step.motor_a,
+                    motor_b=toy_step.motor_b,
+                    motor_c=toy_step.motor_c,
+                    step_index=index,
+                    step_count=len(waveform.steps),
+                    history=history[-90:],
+                )
+            else:
+                history.append(
+                    {
+                        "channel_a": getattr(step, "channel_a", 0),
+                        "channel_b": getattr(step, "channel_b", 0),
+                    }
+                )
+                self._set_overlay_payload(
+                    connected=bool(self._connected_device_id),
+                    waveform_name=waveform.name,
+                    channel_a=getattr(step, "channel_a", 0),
+                    channel_b=getattr(step, "channel_b", 0),
+                    step_index=index,
+                    step_count=len(waveform.steps),
+                    history=history[-90:],
+                )
+        if is_toy_device:
             self._set_overlay_payload(
                 connected=bool(self._connected_device_id),
-                waveform_name=waveform.name,
-                channel_a=step.channel_a,
-                channel_b=step.channel_b,
-                step_index=index,
-                step_count=len(waveform.steps),
-                history=history,
+                waveform_name="",
+                motor_a=0,
+                motor_b=0,
+                motor_c=0,
+                step_index=0,
+                step_count=0,
+                history=[*history[-90:], {"motor_a": 0, "motor_b": 0, "motor_c": 0}][-90:],
             )
-        self._set_overlay_payload(
-            connected=bool(self._connected_device_id),
-            waveform_name="",
-            channel_a=0,
-            channel_b=0,
-            step_index=0,
-            step_count=0,
-            history=[*history, {"channel_a": 0, "channel_b": 0}][-90:],
-        )
+        else:
+            self._set_overlay_payload(
+                connected=bool(self._connected_device_id),
+                waveform_name="",
+                channel_a=0,
+                channel_b=0,
+                step_index=0,
+                step_count=0,
+                history=[*history[-90:], {"channel_a": 0, "channel_b": 0}][-90:],
+            )
         return None
 
     def _set_overlay_payload(self, **updates) -> None:

@@ -17,12 +17,22 @@
               <Checkbox v-model:checked="rule.enabled">启用</Checkbox>
             </div>
             <div class="rule-grid">
-              <label class="field field-span-2">
-                <span>绑定波形</span>
+              <label class="field">
+                <span>EMS 波形</span>
                 <Select
                   :data-testid="`rule-waveform-${rule.id}`"
                   v-model:value="rule.waveform_id"
-                  :options="waveformOptions"
+                  :options="emsWaveformOptions"
+                />
+              </label>
+              <label class="field">
+                <span>Toy 波形</span>
+                <Select
+                  :data-testid="`rule-toy-waveform-${rule.id}`"
+                  v-model:value="rule.toy_waveform_id"
+                  :options="toyWaveformOptions"
+                  allow-clear
+                  placeholder="可选"
                 />
               </label>
               <template v-if="priceFilterGroupIds.has(group.group_id)">
@@ -69,7 +79,11 @@ import type { BluetoothRuleGroup } from "@/types/bluetooth";
 
 defineProps<{
   ruleGroups: BluetoothRuleGroup[];
-  waveformOptions: Array<{
+  emsWaveformOptions: Array<{
+    label: string;
+    value: string;
+  }>;
+  toyWaveformOptions: Array<{
     label: string;
     value: string;
   }>;

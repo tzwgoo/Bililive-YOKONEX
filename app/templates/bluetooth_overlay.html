@@ -12,6 +12,7 @@
         --overlay-line: rgba(255, 255, 255, 0.18);
         --channel-a: #ff8a4c;
         --channel-b: #51a8ff;
+        --channel-c: #a78bfa;
         --panel-bg: rgba(18, 12, 10, 0.16);
       }
 
@@ -366,6 +367,15 @@
         box-shadow: 0 0 18px rgba(81, 168, 255, 0.28);
       }
 
+      .overlay-bar-fill-c {
+        background: linear-gradient(90deg, rgba(167, 139, 250, 0.24), var(--channel-c));
+        box-shadow: 0 0 18px rgba(167, 139, 250, 0.28);
+      }
+
+      .overlay-channel.is-hidden {
+        display: none;
+      }
+
       .overlay-canvas-wrap {
         height: 84px;
         border-radius: 18px;
@@ -636,22 +646,31 @@
 
         <section class="overlay-telemetry overlay-surface">
           <section class="overlay-channels">
-            <article class="overlay-channel">
+            <article class="overlay-channel" id="overlay-channel-a-article">
               <div class="overlay-channel-head">
-                <span>A 通道</span>
+                <span id="overlay-channel-a-label">A 通道</span>
                 <strong id="overlay-channel-a-value">0</strong>
               </div>
               <div class="overlay-bar-track">
                 <div class="overlay-bar-fill overlay-bar-fill-a" id="overlay-channel-a-bar"></div>
               </div>
             </article>
-            <article class="overlay-channel">
+            <article class="overlay-channel" id="overlay-channel-b-article">
               <div class="overlay-channel-head">
-                <span>B 通道</span>
+                <span id="overlay-channel-b-label">B 通道</span>
                 <strong id="overlay-channel-b-value">0</strong>
               </div>
               <div class="overlay-bar-track">
                 <div class="overlay-bar-fill overlay-bar-fill-b" id="overlay-channel-b-bar"></div>
+              </div>
+            </article>
+            <article class="overlay-channel is-hidden" id="overlay-channel-c-article">
+              <div class="overlay-channel-head">
+                <span id="overlay-channel-c-label">震动</span>
+                <strong id="overlay-channel-c-value">0</strong>
+              </div>
+              <div class="overlay-bar-track">
+                <div class="overlay-bar-fill overlay-bar-fill-c" id="overlay-channel-c-bar"></div>
               </div>
             </article>
           </section>

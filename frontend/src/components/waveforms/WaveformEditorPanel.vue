@@ -2,6 +2,7 @@
   <ACard title="波形编辑器" :bordered="false" class="waveform-editor-panel" :style="DESKTOP_PANEL_STYLE">
     <template #extra>
       <div class="studio-card-actions">
+        <Button size="small" :disabled="!waveform || !connected" :loading="previewing" @click="emit('preview-waveform')">试播</Button>
         <Button size="small" @click="emit('duplicate-waveform')">复制为自定义</Button>
         <Button size="small" :disabled="!waveform || waveform.builtin" @click="emit('delete-waveform')">删除当前波形</Button>
         <Button data-testid="save-waveform" size="small" type="primary" :loading="savingWaveform" @click="emit('save-waveform')">保存波形</Button>
@@ -35,7 +36,7 @@
               <strong>{{ resolveTotalDuration(waveform) }} ms</strong>
             </article>
             <article>
-              <span>最大强度</span>
+              <span>{{ isToy ? '最大速度' : '最大强度' }}</span>
               <strong>{{ resolveMaxStrength(waveform) }}</strong>
             </article>
           </div>
@@ -45,7 +46,7 @@
           <div
             data-testid="waveform-drag-track"
             class="waveform-track"
-            :class="{ 'is-dragging': activeSegmentIndex !== null }"
+            :class="{ 'is-dragging': activeSegmentIndex !== null, 'is-toy': isToy }"
           >
             <article
               v-for="(step, index) in waveform.steps"
@@ -66,32 +67,79 @@
                   class="timeline-guide-line"
                   :style="{ bottom: `${resolveGuideLineBottom(step, index)}%` }"
                 ></span>
-                <span class="timeline-axis-label is-a">A</span>
-                <span class="timeline-axis-label is-b">B</span>
-                <button
-                  :data-testid="`waveform-bar-channel-a-${index}`"
-                  type="button"
-                  class="timeline-bar is-a"
-                  :class="{
-                    'is-disabled': waveform.builtin,
-                    'is-active': activeSegmentIndex === index && dragField === 'channel_a',
-                  }"
-                  :style="{ height: `${(resolveStepStrength(step, index, 'channel_a') / 180) * 100}%` }"
-                  :disabled="waveform.builtin"
-                  @mousedown="startDrag(index, 'channel_a', $event)"
-                ></button>
-                <button
-                  :data-testid="`waveform-bar-channel-b-${index}`"
-                  type="button"
-                  class="timeline-bar is-b"
-                  :class="{
-                    'is-disabled': waveform.builtin,
-                    'is-active': activeSegmentIndex === index && dragField === 'channel_b',
-                  }"
-                  :style="{ height: `${(resolveStepStrength(step, index, 'channel_b') / 180) * 100}%` }"
-                  :disabled="waveform.builtin"
-                  @mousedown="startDrag(index, 'channel_b', $event)"
-                ></button>
+                <template v-if="isToy">
+                  <span class="timeline-axis-label is-a">旋转</span>
+                  <span class="timeline-axis-label is-b">吮吸</span>
+                  <span class="timeline-axis-label is-c">震动</span>
+                </template>
+                <template v-else>
+                  <span class="timeline-axis-label is-a">A</span>
+                  <span class="timeline-axis-label is-b">B</span>
+                </template>
+                <template v-if="isToy">
+                  <button
+                    :data-testid="`waveform-bar-motor-a-${index}`"
+                    type="button"
+                    class="timeline-bar is-a"
+                    :class="{
+                      'is-disabled': waveform.builtin,
+                      'is-active': activeSegmentIndex === index && dragField === 'motor_a',
+                    }"
+                    :style="{ height: `${(resolveStepStrength(step, index, 'motor_a') / maxBarValue) * 100}%` }"
+                    :disabled="waveform.builtin"
+                    @mousedown="startDrag(index, 'motor_a', $event)"
+                  ></button>
+                  <button
+                    :data-testid="`waveform-bar-motor-b-${index}`"
+                    type="button"
+                    class="timeline-bar is-b"
+                    :class="{
+                      'is-disabled': waveform.builtin,
+                      'is-active': activeSegmentIndex === index && dragField === 'motor_b',
+                    }"
+                    :style="{ height: `${(resolveStepStrength(step, index, 'motor_b') / maxBarValue) * 100}%` }"
+                    :disabled="waveform.builtin"
+                    @mousedown="startDrag(index, 'motor_b', $event)"
+                  ></button>
+                  <button
+                    :data-testid="`waveform-bar-motor-c-${index}`"
+                    type="button"
+                    class="timeline-bar is-c"
+                    :class="{
+                      'is-disabled': waveform.builtin,
+                      'is-active': activeSegmentIndex === index && dragField === 'motor_c',
+                    }"
+                    :style="{ height: `${(resolveStepStrength(step, index, 'motor_c') / maxBarValue) * 100}%` }"
+                    :disabled="waveform.builtin"
+                    @mousedown="startDrag(index, 'motor_c', $event)"
+                  ></button>
+                </template>
+                <template v-else>
+                  <button
+                    :data-testid="`waveform-bar-channel-a-${index}`"
+                    type="button"
+                    class="timeline-bar is-a"
+                    :class="{
+                      'is-disabled': waveform.builtin,
+                      'is-active': activeSegmentIndex === index && dragField === 'channel_a',
+                    }"
+                    :style="{ height: `${(resolveStepStrength(step, index, 'channel_a') / maxBarValue) * 100}%` }"
+                    :disabled="waveform.builtin"
+                    @mousedown="startDrag(index, 'channel_a', $event)"
+                  ></button>
+                  <button
+                    :data-testid="`waveform-bar-channel-b-${index}`"
+                    type="button"
+                    class="timeline-bar is-b"
+                    :class="{
+                      'is-disabled': waveform.builtin,
+                      'is-active': activeSegmentIndex === index && dragField === 'channel_b',
+                    }"
+                    :style="{ height: `${(resolveStepStrength(step, index, 'channel_b') / maxBarValue) * 100}%` }"
+                    :disabled="waveform.builtin"
+                    @mousedown="startDrag(index, 'channel_b', $event)"
+                  ></button>
+                </template>
                 <button
                   :data-testid="`waveform-handle-duration-${index}`"
                   type="button"
@@ -133,34 +181,80 @@
                 />
               </div>
             </label>
-            <label class="field">
-              <span>A 通道</span>
-              <div :data-testid="`step-channel-a-${index}`">
-                <InputNumber
-                  :value="step.channel_a"
-                  :disabled="waveform.builtin"
-                  :min="0"
-                  :max="180"
-                  :step="1"
-                  class="field-number"
-                  @update:value="emit('update-step', index, 'channel_a', Number($event ?? 0))"
-                />
-              </div>
-            </label>
-            <label class="field">
-              <span>B 通道</span>
-              <div :data-testid="`step-channel-b-${index}`">
-                <InputNumber
-                  :value="step.channel_b"
-                  :disabled="waveform.builtin"
-                  :min="0"
-                  :max="180"
-                  :step="1"
-                  class="field-number"
-                  @update:value="emit('update-step', index, 'channel_b', Number($event ?? 0))"
-                />
-              </div>
-            </label>
+            <template v-if="isToy">
+              <label class="field">
+                <span>旋转</span>
+                <div :data-testid="`step-motor-a-${index}`">
+                  <InputNumber
+                    :value="(step as ToyWaveformStep).motor_a"
+                    :disabled="waveform.builtin"
+                    :min="0"
+                    :max="20"
+                    :step="1"
+                    class="field-number"
+                    @update:value="emit('update-step', index, 'motor_a', Number($event ?? 0))"
+                  />
+                </div>
+              </label>
+              <label class="field">
+                <span>吮吸</span>
+                <div :data-testid="`step-motor-b-${index}`">
+                  <InputNumber
+                    :value="(step as ToyWaveformStep).motor_b"
+                    :disabled="waveform.builtin"
+                    :min="0"
+                    :max="20"
+                    :step="1"
+                    class="field-number"
+                    @update:value="emit('update-step', index, 'motor_b', Number($event ?? 0))"
+                  />
+                </div>
+              </label>
+              <label class="field">
+                <span>震动</span>
+                <div :data-testid="`step-motor-c-${index}`">
+                  <InputNumber
+                    :value="(step as ToyWaveformStep).motor_c"
+                    :disabled="waveform.builtin"
+                    :min="0"
+                    :max="20"
+                    :step="1"
+                    class="field-number"
+                    @update:value="emit('update-step', index, 'motor_c', Number($event ?? 0))"
+                  />
+                </div>
+              </label>
+            </template>
+            <template v-else>
+              <label class="field">
+                <span>A 通道</span>
+                <div :data-testid="`step-channel-a-${index}`">
+                  <InputNumber
+                    :value="(step as BluetoothWaveformStep).channel_a"
+                    :disabled="waveform.builtin"
+                    :min="0"
+                    :max="180"
+                    :step="1"
+                    class="field-number"
+                    @update:value="emit('update-step', index, 'channel_a', Number($event ?? 0))"
+                  />
+                </div>
+              </label>
+              <label class="field">
+                <span>B 通道</span>
+                <div :data-testid="`step-channel-b-${index}`">
+                  <InputNumber
+                    :value="(step as BluetoothWaveformStep).channel_b"
+                    :disabled="waveform.builtin"
+                    :min="0"
+                    :max="180"
+                    :step="1"
+                    class="field-number"
+                    @update:value="emit('update-step', index, 'channel_b', Number($event ?? 0))"
+                  />
+                </div>
+              </label>
+            </template>
             <div class="step-actions">
               <Button size="small" :disabled="waveform.builtin" @click="emit('duplicate-step', index)">复制</Button>
               <Button
@@ -180,27 +274,36 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { Button, Card as ACard, Empty as AEmpty, Input, InputNumber } from "ant-design-vue";
-import type { BluetoothWaveform, BluetoothWaveformStep } from "@/types/bluetooth";
+import type { BluetoothWaveform, BluetoothWaveformStep, ToyWaveform, ToyWaveformStep } from "@/types/bluetooth";
 
 const props = defineProps<{
-  waveform: BluetoothWaveform | null;
+  waveform: (BluetoothWaveform | ToyWaveform) | null;
   savingWaveform: boolean;
+  previewing: boolean;
+  connected: boolean;
+  deviceType: "ems" | "toy";
 }>();
 
 const emit = defineEmits<{
   "save-waveform": [];
   "duplicate-waveform": [];
   "delete-waveform": [];
+  "preview-waveform": [];
   "update-waveform-name": [name: string];
-  "update-step": [index: number, field: keyof BluetoothWaveformStep, value: number];
+  "update-step": [index: number, field: string, value: number];
   "add-step": [];
   "duplicate-step": [index: number];
   "remove-step": [index: number];
 }>();
 
-type DragField = keyof BluetoothWaveformStep;
+type EmsDragField = keyof BluetoothWaveformStep;
+type ToyDragField = keyof ToyWaveformStep;
+type DragField = EmsDragField | ToyDragField;
+
+const isToy = computed(() => props.deviceType === "toy");
+const maxBarValue = computed(() => isToy.value ? 20 : 180);
 
 const dragState = ref<{
   index: number;
@@ -227,15 +330,22 @@ function normalizeDuration(value: number) {
 }
 
 function normalizeStrength(value: number) {
-  return Math.max(0, Math.min(180, Math.round(Number(value || 0))));
+  const max = maxBarValue.value;
+  return Math.max(0, Math.min(max, Math.round(Number(value || 0))));
 }
 
-function resolveTotalDuration(waveform: BluetoothWaveform) {
+function resolveTotalDuration(waveform: BluetoothWaveform | ToyWaveform) {
   return waveform.steps.reduce((sum, step) => sum + normalizeDuration(step.duration_ms), 0);
 }
 
-function resolveMaxStrength(waveform: BluetoothWaveform) {
-  return waveform.steps.reduce(
+function resolveMaxStrength(waveform: BluetoothWaveform | ToyWaveform) {
+  if (isToy.value) {
+    return (waveform as ToyWaveform).steps.reduce(
+      (maxValue, step) => Math.max(maxValue, normalizeStrength(step.motor_a), normalizeStrength(step.motor_b), normalizeStrength(step.motor_c)),
+      0,
+    );
+  }
+  return (waveform as BluetoothWaveform).steps.reduce(
     (maxValue, step) => Math.max(maxValue, normalizeStrength(step.channel_a), normalizeStrength(step.channel_b)),
     0,
   );
@@ -248,24 +358,29 @@ function resolvePreviewValue(index: number, field: DragField, fallbackValue: num
   return fallbackValue;
 }
 
-function resolveStepStrength(step: BluetoothWaveformStep, index: number, field: "channel_a" | "channel_b") {
-  return normalizeStrength(resolvePreviewValue(index, field, Number(step[field])));
+function resolveStepStrength(step: BluetoothWaveformStep | ToyWaveformStep, index: number, field: DragField) {
+  return normalizeStrength(resolvePreviewValue(index, field, Number((step as Record<string, unknown>)[field]) || 0));
 }
 
-function resolveStepDuration(step: BluetoothWaveformStep, index: number) {
+function resolveStepDuration(step: BluetoothWaveformStep | ToyWaveformStep, index: number) {
   return normalizeDuration(resolvePreviewValue(index, "duration_ms", Number(step.duration_ms)));
 }
 
-function resolveHandleLabel(step: BluetoothWaveformStep, index: number, field: DragField) {
+function resolveHandleLabel(step: BluetoothWaveformStep | ToyWaveformStep, index: number, field: DragField) {
   if (field !== "duration_ms") {
     return "";
   }
   return `${resolveStepDuration(step, index)} ms`;
 }
 
-function resolveGuideLineBottom(step: BluetoothWaveformStep, index: number) {
-  const strengthField = dragField.value === "channel_b" ? "channel_b" : "channel_a";
-  return (resolveStepStrength(step, index, strengthField) / 180) * 100;
+function resolveGuideLineBottom(step: BluetoothWaveformStep | ToyWaveformStep, index: number) {
+  if (isToy.value) {
+    const toyFields: ToyDragField[] = ["motor_a", "motor_b", "motor_c"];
+    const f = (toyFields.includes(dragField.value as ToyDragField) ? dragField.value : "motor_a") as DragField;
+    return (resolveStepStrength(step, index, f) / maxBarValue.value) * 100;
+  }
+  const emsField = dragField.value === "channel_b" ? "channel_b" : "channel_a";
+  return (resolveStepStrength(step, index, emsField) / maxBarValue.value) * 100;
 }
 
 function toggleStepList() {
@@ -284,12 +399,13 @@ function startDrag(index: number, field: DragField, event: MouseEvent) {
   if (!step) {
     return;
   }
+  const startValue = Number((step as Record<string, unknown>)[field]) || 0;
   dragState.value = {
     index,
     field,
     startX: event.clientX,
-    startValue: Number(step[field]),
-    currentValue: Number(step[field]),
+    startValue,
+    currentValue: startValue,
     surface,
   };
   activeSegmentIndex.value = index;
@@ -314,7 +430,7 @@ function handleDragMove(event: MouseEvent) {
   const rect = surface.getBoundingClientRect();
   const offsetY = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
   const ratio = rect.height === 0 ? 0 : (rect.height - offsetY) / rect.height;
-  const nextValue = normalizeStrength(ratio * 180);
+  const nextValue = normalizeStrength(ratio * maxBarValue.value);
   dragState.value.currentValue = nextValue;
   emit("update-step", index, field, nextValue);
 }
@@ -428,7 +544,6 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 18px;
   z-index: 1;
-  width: calc(50% - 22px);
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -438,33 +553,79 @@ onBeforeUnmount(() => {
 
 .timeline-axis-label.is-a {
   left: 14px;
+  width: calc(33% - 18px);
 }
 
 .timeline-axis-label.is-b {
+  width: calc(33% - 12px);
+}
+
+.timeline-axis-label.is-c {
   right: 14px;
+  width: calc(33% - 18px);
+}
+
+.waveform-track:not(.is-toy) .timeline-axis-label.is-a {
+  left: 14px;
+  width: calc(50% - 22px);
+}
+
+.waveform-track:not(.is-toy) .timeline-axis-label.is-b {
+  right: 14px;
+  width: calc(50% - 22px);
+}
+
+.waveform-track.is-toy .timeline-axis-label.is-b {
+  left: calc(33% + 2px);
 }
 
 .timeline-bar {
   position: absolute;
   bottom: 48px;
-  width: calc(50% - 22px);
   min-height: 8px;
   border: 0;
-  border-radius: 16px 16px 10px 10px;
-  box-shadow: 0 12px 20px rgba(28, 25, 23, 0.08);
+  border-radius: 14px 14px 8px 8px;
+  box-shadow: 0 6px 16px rgba(28, 25, 23, 0.12);
   cursor: ns-resize;
   user-select: none;
   transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
 }
 
-.timeline-bar.is-a {
+.waveform-track:not(.is-toy) .timeline-bar.is-a {
   left: 14px;
-  background: linear-gradient(180deg, #fb923c, #f97316);
+  width: calc(50% - 22px);
+}
+
+.waveform-track:not(.is-toy) .timeline-bar.is-b {
+  right: 14px;
+  width: calc(50% - 22px);
+}
+
+.waveform-track.is-toy .timeline-bar.is-a {
+  left: 14px;
+  width: calc(33% - 18px);
+}
+
+.waveform-track.is-toy .timeline-bar.is-b {
+  left: calc(33% + 2px);
+  width: calc(33% - 12px);
+}
+
+.waveform-track.is-toy .timeline-bar.is-c {
+  right: 14px;
+  width: calc(33% - 18px);
+}
+
+.timeline-bar.is-a {
+  background: linear-gradient(180deg, #fdba74 0%, #fb923c 30%, #ea580c 80%, #c2410c 100%);
 }
 
 .timeline-bar.is-b {
-  right: 14px;
-  background: linear-gradient(180deg, #60a5fa, #2563eb);
+  background: linear-gradient(180deg, #93c5fd 0%, #60a5fa 30%, #2563eb 80%, #1d4ed8 100%);
+}
+
+.timeline-bar.is-c {
+  background: linear-gradient(180deg, #c4b5fd 0%, #a78bfa 30%, #7c3aed 80%, #6d28d9 100%);
 }
 
 .timeline-duration-handle {
