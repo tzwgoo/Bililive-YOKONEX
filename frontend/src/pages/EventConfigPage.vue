@@ -66,6 +66,7 @@
       :toy-waveform-options="toyWaveformOptions"
       @update-min-price="updateMinPrice"
       @update-max-price="updateMaxPriceFilter"
+      @update-guard-waveform="updateGuardWaveform"
     />
   </main>
 </template>
@@ -230,6 +231,35 @@ function updateMaxPriceFilter(ruleId: string, value: number | null) {
   }
 }
 
+function updateGuardWaveform(ruleId: string, guardLevel: string, field: string, value: string) {
+  for (const group of draftRuleGroups.value) {
+    const rule = group.rules.find((item) => item.id === ruleId);
+    if (!rule) {
+      continue;
+    }
+    const currentFilters = { ...(rule.filters || {}) };
+    const currentGuardWfMap: Record<string, any> = { ...(currentFilters.guard_waveforms || {}) };
+    const currentOverride = { ...(currentGuardWfMap[guardLevel] || {}) };
+
+    if (value) {
+      currentOverride[field] = value;
+    } else {
+      delete currentOverride[field];
+    }
+
+    if (Object.keys(currentOverride).length > 0) {
+      currentGuardWfMap[guardLevel] = currentOverride;
+    } else {
+      delete currentGuardWfMap[guardLevel];
+    }
+
+    rule.filters = {
+      ...currentFilters,
+      guard_waveforms: currentGuardWfMap,
+    };
+  }
+}
+
 async function handleSaveImRules() {
   savingCommandRules.value = true;
   try {
@@ -264,6 +294,9 @@ async function handleSaveBluetoothRules() {
           : null,
         max_price: priceFilterGroupIds.has(group.group_id)
           ? (rule.filters?.max_price == null ? null : Math.max(0, Math.round(Number(rule.filters.max_price))))
+          : null,
+        guard_waveforms: group.group_id === "gift"
+          ? (rule.filters?.guard_waveforms || null)
           : null,
       })),
     );

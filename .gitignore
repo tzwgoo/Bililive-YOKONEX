@@ -22,6 +22,7 @@ htmlcov/
 venv/
 env/
 .build-venv/
+.build-venv-msys2/
 .worktrees/
 
 build/

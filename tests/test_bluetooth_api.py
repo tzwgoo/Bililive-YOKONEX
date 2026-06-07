@@ -460,6 +460,7 @@ def test_bluetooth_rules_endpoint_saves_rule_selection() -> None:
             "waveform_id": "ems-preset-06",
             "min_price": 0,
             "max_price": 199,
+            "guard_waveforms": None,
         }
     ]
 

@@ -36,7 +36,7 @@ def test_store_returns_default_payload_when_file_missing(tmp_path) -> None:
     assert payload.bluetooth_event_rules[27].enabled is True
     assert payload.bluetooth_event_rules[0].id == "gift-tier-01"
     assert payload.bluetooth_event_rules[0].waveform_id == "ems-preset-01"
-    assert payload.bluetooth_event_rules[0].filters == {"min_price": 0, "max_price": 99}
+    assert payload.bluetooth_event_rules[0].filters == {"min_price": 0, "max_price": 99, "guard_waveforms": {}}
     assert payload.bluetooth_event_rules[9].id == "gift-tier-10"
     assert payload.bluetooth_event_rules[9].waveform_id == "ems-preset-10"
     assert payload.bluetooth_event_rules[10].waveform_id == "ems-preset-01"

@@ -85,6 +85,7 @@ def parse_event_message(message: dict[str, Any]) -> LiveEvent | None:
     payload: dict[str, Any]
     if cmd == "LIVE_OPEN_PLATFORM_SEND_GIFT":
         event_type = EventType.GIFT
+        guard_level = int(data.get("guard_level", 0) or 0)
         payload = {
             "gift_id": data.get("gift_id", 0),
             "gift_name": data.get("gift_name", ""),
@@ -94,6 +95,12 @@ def parse_event_message(message: dict[str, Any]) -> LiveEvent | None:
             "paid": data.get("paid", False),
             "gift_icon": data.get("gift_icon", ""),
             "combo_gift": data.get("combo_gift", False),
+            "guard_level": guard_level,
+            "guard_label": {
+                1: "总督",
+                2: "提督",
+                3: "舰长",
+            }.get(guard_level, ""),
         }
     elif cmd == "LIVE_OPEN_PLATFORM_DM":
         event_type = resolve_danmaku_event_type(int(data.get("guard_level", 0) or 0))

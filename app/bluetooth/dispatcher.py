@@ -74,7 +74,11 @@ class BluetoothDispatcher:
                 danmaku_rule_result = self._match_danmaku_rule(rule.filters, payload_data)
                 if danmaku_rule_result is not None:
                     return danmaku_rule_result
-            selected_waveform_id = _select_waveform_id(rule, connected_device_type)
+            if original_event_type == "gift":
+                guard_level = self._coerce_int(payload_data.get("guard_level")) or 0
+                selected_waveform_id = _select_guard_waveform(rule, guard_level, connected_device_type)
+            else:
+                selected_waveform_id = _select_waveform_id(rule, connected_device_type)
             return await self.bluetooth_service.trigger_waveform(
                 event_type=original_event_type,
                 waveform_id=selected_waveform_id,
@@ -176,12 +180,16 @@ class BluetoothDispatcher:
         if min_price is None and max_price is None:
             if event_type == "gift":
                 tier = match_gift_tier_rule(price)
-                return tier is not None
-            return True
-        if min_price is not None and price < min_price:
-            return False
-        if max_price is not None and price > max_price:
-            return False
+                if tier is None:
+                    return False
+            else:
+                pass
+        else:
+            if min_price is not None and price < min_price:
+                return False
+            if max_price is not None and price > max_price:
+                return False
+
         return True
 
     def _coerce_int(self, value: Any, *, allow_none: bool = False) -> int | None:
@@ -255,3 +263,20 @@ def _select_waveform_id(rule: Any, device_type: str) -> str:
         if toy_id:
             return toy_id
     return str(getattr(rule, "waveform_id", "") or "")
+
+
+def _select_guard_waveform(rule: Any, guard_level: int, device_type: str) -> str:
+    """礼物规则中按舰队等级选择覆盖波形，无覆盖时回退到默认波形。"""
+    filters = getattr(rule, "filters", {}) or {}
+    guard_waveforms = filters.get("guard_waveforms", {}) if isinstance(filters, dict) else {}
+    if isinstance(guard_waveforms, dict):
+        override = guard_waveforms.get(str(guard_level))
+        if isinstance(override, dict):
+            if device_type == "toy":
+                toy_id = str(override.get("toy_waveform_id", "") or "")
+                if toy_id:
+                    return toy_id
+            wf_id = str(override.get("waveform_id", "") or "")
+            if wf_id:
+                return wf_id
+    return _select_waveform_id(rule, device_type)

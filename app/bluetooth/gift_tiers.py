@@ -45,6 +45,7 @@ def build_default_gift_rules(*, enabled: bool = True) -> list[dict[str, Any]]:
             "filters": {
                 "min_price": tier.min_price,
                 "max_price": tier.max_price,
+                "guard_waveforms": {},
             },
         }
         for tier in GIFT_TIER_DEFINITIONS

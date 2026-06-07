@@ -106,6 +106,11 @@ export interface BluetoothRuleGroup {
   rules: BluetoothStudioRule[];
 }
 
+export interface GuardWaveformOverride {
+  waveform_id: string;
+  toy_waveform_id: string;
+}
+
 export interface SaveBluetoothRulesPayload {
   rules: Array<{
     id: string;
@@ -114,6 +119,7 @@ export interface SaveBluetoothRulesPayload {
     toy_waveform_id?: string;
     min_price: number | null;
     max_price: number | null;
+    guard_waveforms: Record<string, GuardWaveformOverride> | null;
   }>;
 }
 

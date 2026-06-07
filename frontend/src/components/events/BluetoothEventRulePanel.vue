@@ -58,6 +58,39 @@
                   />
                 </label>
               </template>
+              <template v-if="group.group_id === 'gift'">
+                <div class="guard-waveform-section">
+                  <ACollapse :bordered="false" :default-active-key="[]">
+                    <ACollapsePanel key="guard-waveforms" header="舰队专属波形（可选覆盖）">
+                      <div class="guard-grid">
+                        <div v-for="g in guardLevels" :key="g.level" class="guard-row">
+                          <span class="guard-label">{{ g.label }}</span>
+                          <label class="field guard-field">
+                            <span>EMS 波形</span>
+                            <Select
+                              :value="getGuardWaveformId(rule, g.level, 'ems')"
+                              :options="emsWaveformOptions"
+                              allow-clear
+                              placeholder="跟随默认"
+                              @update:value="emit('update-guard-waveform', rule.id, g.level, 'waveform_id', String($event ?? ''))"
+                            />
+                          </label>
+                          <label class="field guard-field">
+                            <span>Toy 波形</span>
+                            <Select
+                              :value="getGuardWaveformId(rule, g.level, 'toy')"
+                              :options="toyWaveformOptions"
+                              allow-clear
+                              placeholder="跟随默认"
+                              @update:value="emit('update-guard-waveform', rule.id, g.level, 'toy_waveform_id', String($event ?? ''))"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </ACollapsePanel>
+                  </ACollapse>
+                </div>
+              </template>
             </div>
           </article>
         </div>
@@ -92,10 +125,24 @@ defineProps<{
 const emit = defineEmits<{
   "update-min-price": [ruleId: string, value: number];
   "update-max-price": [ruleId: string, value: number | null];
+  "update-guard-waveform": [ruleId: string, guardLevel: string, field: string, value: string];
 }>();
 
 const ACollapsePanel = ACollapse.Panel;
 const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_renew"]);
+const guardLevels = [
+  { level: "0", label: "普通用户" },
+  { level: "3", label: "舰长" },
+  { level: "2", label: "提督" },
+  { level: "1", label: "总督" },
+];
+
+function getGuardWaveformId(rule: any, level: string, type: "ems" | "toy"): string {
+  const guardWfMap = rule.filters?.guard_waveforms || {};
+  const override = guardWfMap[level];
+  if (!override) return "";
+  return type === "toy" ? (override.toy_waveform_id || "") : (override.waveform_id || "");
+}
 </script>
 
 <style scoped>
@@ -152,6 +199,32 @@ const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_r
   grid-column: span 2;
 }
 
+.guard-waveform-section {
+  margin-top: 4px;
+}
+
+.guard-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.guard-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.guard-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #78716c;
+}
+
+.guard-field {
+  gap: 2px;
+}
+
 @media (max-width: 900px) {
   .rule-grid {
     grid-template-columns: 1fr;
@@ -159,6 +232,11 @@ const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_r
 
   .field-span-2 {
     grid-column: span 1;
+  }
+
+  .guard-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 </style>

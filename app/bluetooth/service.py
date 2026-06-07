@@ -729,11 +729,18 @@ def _resolve_updated_filters(*, current: BluetoothEventRule, incoming: dict[str,
     max_price = _coerce_optional_non_negative_int(incoming.get("max_price"))
     if max_price is not None and max_price < min_price:
         max_price = min_price
-    return {
+    result = {
         **next_filters,
         "min_price": min_price,
         "max_price": max_price,
     }
+    if current.event_type == "gift":
+        incoming_guard = incoming.get("guard_waveforms")
+        if isinstance(incoming_guard, dict):
+            result["guard_waveforms"] = incoming_guard
+        else:
+            result["guard_waveforms"] = next_filters.get("guard_waveforms", {})
+    return result
 
 
 def _validate_price_rule_overlaps(

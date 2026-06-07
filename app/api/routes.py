@@ -57,6 +57,7 @@ class BluetoothRuleUpdateItem(BaseModel):
     waveform_id: str
     min_price: int | None = None
     max_price: int | None = None
+    guard_waveforms: dict[str, dict[str, str]] | None = None
 
 
 class UpdateBluetoothRulesRequest(BaseModel):

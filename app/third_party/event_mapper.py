@@ -12,6 +12,7 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
 
     if cmd in {"SEND_GIFT", "COMBO_SEND"}:
         data = message.get("data", {})
+        guard_level = _resolve_gift_guard_level(data)
         return {
             "source": "third_party_ws",
             "event_type": "gift",
@@ -31,6 +32,8 @@ def map_third_party_message(message: dict[str, Any], *, room_id: int) -> dict[st
                     or data.get("r_price")
                     or data.get("price")
                 ),
+                "guard_level": guard_level,
+                "guard_label": _guard_level_to_label(guard_level),
             },
         }
 
@@ -249,6 +252,27 @@ def _guard_level_to_label(guard_level: int) -> str:
         2: "提督",
         3: "舰长",
     }.get(_as_int(guard_level), "")
+
+
+def _resolve_gift_guard_level(data: dict[str, Any]) -> int:
+    """从礼物数据中提取用户舰队等级。"""
+    direct_level = _as_int(data.get("guard_level"))
+    if direct_level > 0:
+        return direct_level
+
+    medal_info = data.get("medal_info")
+    if isinstance(medal_info, dict):
+        medal_level = _as_int(medal_info.get("guard_level"))
+        if medal_level > 0:
+            return medal_level
+
+    uinfo = data.get("uinfo")
+    if isinstance(uinfo, dict):
+        uinfo_level = _as_int(uinfo.get("guard_level"))
+        if uinfo_level > 0:
+            return uinfo_level
+
+    return 0
 
 
 def _resolve_guard_level_from_name(value: Any) -> int:

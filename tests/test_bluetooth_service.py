@@ -421,9 +421,9 @@ def test_service_save_rules_allows_editing_gift_price_ranges_and_sorts_by_price(
     gift_rules = payload["rule_groups"][0]["rules"]
 
     assert [rule["id"] for rule in gift_rules[:2]] == ["gift-tier-01", "gift-tier-02"]
-    assert gift_rules[0]["filters"] == {"min_price": 0, "max_price": 199}
+    assert gift_rules[0]["filters"] == {"min_price": 0, "max_price": 199, "guard_waveforms": {}}
     assert gift_rules[0]["rule_label"] == "礼物档位 01 · 0-199"
-    assert gift_rules[1]["filters"] == {"min_price": 200, "max_price": 499}
+    assert gift_rules[1]["filters"] == {"min_price": 200, "max_price": 499, "guard_waveforms": {}}
     assert gift_rules[1]["rule_label"] == "礼物档位 02 · 200-499"
 
 
