@@ -31,6 +31,16 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "BiliLive-YOKONEX.exe" in workflow
     assert "Bililive-YOKONEX-" in workflow
     assert '--add-data", "frontend/dist;frontend/dist"' in workflow
+    assert '--hidden-import", "bleak.backends.winrt.client"' in workflow
+    assert '--hidden-import", "bleak.backends.winrt.scanner"' in workflow
+    assert '--exclude-module", "jupyter_server"' in workflow
+    assert '--exclude-module", "gevent"' in workflow
+    assert '--exclude-module", "sqlalchemy"' in workflow
+    assert '--exclude-module", "zmq"' in workflow
+    assert '--exclude-module", "numpy"' in workflow
+    assert '--exclude-module", "scipy"' in workflow
+    assert '--exclude-module", "pandas"' in workflow
+    assert 'CurlCFFIClient' not in workflow
 
 
 def test_release_workflow_powershell_run_blocks_use_ascii_error_messages() -> None:
