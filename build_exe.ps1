@@ -107,7 +107,6 @@ New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "docs") | Out-
 Copy-Item ".env.example" (Join-Path $packageRoot ".env.example") -Force
 Copy-Item "config/gift_command_mappings.json" (Join-Path $packageRoot "config/gift_command_mappings.json") -Force
 Copy-Item "config/gift_command_mappings.example.json" (Join-Path $packageRoot "config/gift_command_mappings.example.json") -Force
-Copy-Item "config/bluetooth_settings.json" (Join-Path $packageRoot "config/bluetooth_settings.json") -Force
 Copy-Item (Join-Path $projectRoot "docs\*.md") (Join-Path $packageRoot "docs") -Force
 
 $exePath = Join-Path $packageRoot "BiliLive-YOKONEX.exe"

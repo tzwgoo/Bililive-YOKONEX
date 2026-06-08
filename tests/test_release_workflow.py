@@ -41,6 +41,7 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert '--exclude-module", "scipy"' in workflow
     assert '--exclude-module", "pandas"' in workflow
     assert 'CurlCFFIClient' not in workflow
+    assert 'Copy-Item "config/bluetooth_settings.json"' not in workflow
 
 
 def test_release_workflow_powershell_run_blocks_use_ascii_error_messages() -> None:
