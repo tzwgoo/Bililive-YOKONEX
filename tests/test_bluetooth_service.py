@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.bluetooth.runtime.memory_runtime import MemoryBluetoothRuntime
@@ -183,6 +185,182 @@ async def test_service_preview_waveform_publishes_control_log(
     assert event_hub.control_snapshot()[-1]["type"] == "bluetooth_trigger"
     assert event_hub.control_snapshot()[-1]["payload"]["event_type"] == "waveform_preview"
     assert event_hub.control_snapshot()[-1]["payload"]["waveform_id"] == "ems-preset-01"
+
+
+class PreemptibleRuntime:
+    backend_name = "preemptible"
+
+    def __init__(self) -> None:
+        self.started_waveforms: list[str] = []
+        self.cancelled_waveforms: list[str] = []
+        self.completed_waveforms: list[str] = []
+        self._devices = []
+        self._release_events: dict[str, list[asyncio.Event]] = {}
+
+    async def scan(self):
+        return []
+
+    async def connect(self, device_id: str):
+        raise NotImplementedError
+
+    async def disconnect(self):
+        raise NotImplementedError
+
+    def get_status(self):
+        from app.bluetooth.models import BluetoothConnectionStatus
+        return BluetoothConnectionStatus()
+
+    def get_devices(self):
+        return list(self._devices)
+
+    def get_overlay_payload(self):
+        return {
+            "connected": False,
+            "device_name": "",
+            "device_type": "",
+            "waveform_name": "",
+            "battery_level": None,
+            "channel_a": 0,
+            "channel_b": 0,
+            "motor_a": 0,
+            "motor_b": 0,
+            "motor_c": 0,
+            "step_index": 0,
+            "step_count": 0,
+            "updated_at": 0.0,
+            "history": [],
+            "revision": 0,
+        }
+
+    async def play_waveform(self, waveform) -> None:
+        self.started_waveforms.append(waveform.id)
+        release_event = asyncio.Event()
+        self._release_events.setdefault(waveform.id, []).append(release_event)
+        try:
+            await release_event.wait()
+            await asyncio.sleep(sum(max(1, int(getattr(step, "duration_ms", 0) or 0)) for step in waveform.steps) / 1000)
+        except asyncio.CancelledError:
+            self.cancelled_waveforms.append(waveform.id)
+            raise
+        else:
+            self.completed_waveforms.append(waveform.id)
+
+    def release_next(self, waveform_id: str) -> None:
+        events = self._release_events.get(waveform_id, [])
+        if not events:
+            raise AssertionError(f"未找到待释放的波形轮次: {waveform_id}")
+        events.pop(0).set()
+
+
+async def _wait_for_started_waveforms(runtime: PreemptibleRuntime, expected_count: int) -> None:
+    for _ in range(50):
+        if len(runtime.started_waveforms) >= expected_count:
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError(f"波形启动次数未达到预期: expected={expected_count} actual={len(runtime.started_waveforms)}")
+
+
+@pytest.mark.anyio
+async def test_service_ignores_lower_strength_waveform_when_stronger_one_is_running(tmp_path) -> None:
+    event_hub = EventHub()
+    runtime = PreemptibleRuntime()
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+    service.runtime = runtime
+    stronger_waveform = service.create_waveform(name="强波形")
+    service.update_waveform(
+        waveform_id=stronger_waveform["waveform"]["id"],
+        name="强波形",
+        steps=[{"duration_ms": 200, "channel_a": 180, "channel_b": 180}],
+    )
+
+    strong_task = asyncio.create_task(
+        service.trigger_waveform(event_type="gift", waveform_id=stronger_waveform["waveform"]["id"])
+    )
+    await _wait_for_started_waveforms(runtime, 1)
+
+    weaker_result = await service.trigger_waveform(event_type="like", waveform_id="ems-preset-01")
+    runtime.release_next(stronger_waveform["waveform"]["id"])
+    strong_result = await strong_task
+
+    assert weaker_result["success"] is True
+    assert "已忽略" in weaker_result["message"]
+    assert strong_result["success"] is True
+    assert "已触发波形" in strong_result["message"]
+    assert runtime.started_waveforms == [stronger_waveform["waveform"]["id"]]
+    assert runtime.completed_waveforms == [stronger_waveform["waveform"]["id"]]
+
+
+@pytest.mark.anyio
+async def test_service_preempts_running_waveform_when_new_one_has_higher_strength(tmp_path) -> None:
+    event_hub = EventHub()
+    runtime = PreemptibleRuntime()
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+    service.runtime = runtime
+    stronger_waveform = service.create_waveform(name="更强波形")
+    service.update_waveform(
+        waveform_id=stronger_waveform["waveform"]["id"],
+        name="更强波形",
+        steps=[{"duration_ms": 200, "channel_a": 180, "channel_b": 120}],
+    )
+
+    weaker_task = asyncio.create_task(service.trigger_waveform(event_type="like", waveform_id="ems-preset-01"))
+    await _wait_for_started_waveforms(runtime, 1)
+
+    stronger_task = asyncio.create_task(
+        service.trigger_waveform(event_type="gift", waveform_id=stronger_waveform["waveform"]["id"])
+    )
+    await _wait_for_started_waveforms(runtime, 2)
+
+    weaker_result = await weaker_task
+    runtime.release_next(stronger_waveform["waveform"]["id"])
+    stronger_result = await stronger_task
+
+    assert weaker_result["success"] is True
+    assert "抢占" in weaker_result["message"]
+    assert stronger_result["success"] is True
+    assert "已触发波形" in stronger_result["message"]
+    assert runtime.started_waveforms == ["ems-preset-01", stronger_waveform["waveform"]["id"]]
+    assert runtime.cancelled_waveforms == ["ems-preset-01"]
+    assert runtime.completed_waveforms == [stronger_waveform["waveform"]["id"]]
+
+
+@pytest.mark.anyio
+async def test_service_extends_duration_when_same_waveform_is_triggered_again(tmp_path) -> None:
+    event_hub = EventHub()
+    runtime = PreemptibleRuntime()
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json", event_hub=event_hub)
+    service.runtime = runtime
+    looping_waveform = service.create_waveform(name="续时波形")
+    service.update_waveform(
+        waveform_id=looping_waveform["waveform"]["id"],
+        name="续时波形",
+        steps=[{"duration_ms": 200, "channel_a": 90, "channel_b": 60}],
+    )
+
+    first_task = asyncio.create_task(
+        service.trigger_waveform(event_type="gift", waveform_id=looping_waveform["waveform"]["id"])
+    )
+    await _wait_for_started_waveforms(runtime, 1)
+
+    extend_result = await service.trigger_waveform(
+        event_type="gift",
+        waveform_id=looping_waveform["waveform"]["id"],
+    )
+
+    runtime.release_next(looping_waveform["waveform"]["id"])
+    await _wait_for_started_waveforms(runtime, 2)
+    assert runtime.started_waveforms == [looping_waveform["waveform"]["id"], looping_waveform["waveform"]["id"]]
+
+    runtime.release_next(looping_waveform["waveform"]["id"])
+    first_result = await first_task
+
+    assert extend_result["success"] is True
+    assert "追加" in extend_result["message"]
+    assert first_result["success"] is True
+    assert runtime.completed_waveforms == [
+        looping_waveform["waveform"]["id"],
+        looping_waveform["waveform"]["id"],
+    ]
 
 
 def test_service_overlay_payload_includes_recent_live_events(

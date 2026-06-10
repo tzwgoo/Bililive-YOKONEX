@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,13 @@ class BluetoothService:
         self.payload = payload or self.store.load()
         # 控制日志事件中心，用于记录波形触发结果。
         self.event_hub = event_hub
+        # 波形执行锁，用于保证同一时刻只保留一个有效波形任务。
+        self._waveform_lock = asyncio.Lock()
+        self._active_waveform_task: asyncio.Task[None] | None = None
+        self._active_waveform_request_id = ""
+        self._active_waveform_id = ""
+        self._active_waveform_strength = -1
+        self._active_waveform_deadline = 0.0
 
     @classmethod
     def create_default(cls, *, config_path: Path, event_hub: Any | None = None) -> "BluetoothService":
@@ -117,36 +125,99 @@ class BluetoothService:
 
     async def trigger_waveform(self, *, event_type: str, waveform_id: str) -> dict:
         waveform = self._find_waveform_any(waveform_id)
-        if waveform is None:
-            result = {
-                "matched": True,
-                "event_type": event_type,
-                "waveform_id": waveform_id,
-                "success": False,
-                "message": "目标波形不存在",
-            }
-            self._publish_bluetooth_control(result)
-            return result
+        waveform_strength = _resolve_waveform_max_strength(waveform)
+        waveform_duration_seconds = _resolve_waveform_duration_seconds(waveform)
+        request_id = uuid.uuid4().hex
+        task_to_await: asyncio.Task[None] | None = None
+        async with self._waveform_lock:
+            self._cleanup_finished_waveform_task()
+            now = time.monotonic()
+            if self._active_waveform_task is not None:
+                # 新事件只在强度更高时抢占当前波形；强度相同或更弱时直接忽略。
+                if waveform_strength <= self._active_waveform_strength:
+                    if waveform_id == self._active_waveform_id:
+                        # 相同波形直接续一整轮时长，避免连续命中时被截断。
+                        self._active_waveform_deadline = max(self._active_waveform_deadline, now) + waveform_duration_seconds
+                        result = {
+                            "matched": True,
+                            "event_type": event_type,
+                            "waveform_id": waveform_id,
+                            "waveform_name": waveform.name,
+                            "max_strength": waveform_strength,
+                            "success": True,
+                            "message": f"{event_type} 已为当前波形追加 {waveform_duration_seconds:.2f} 秒时长",
+                        }
+                        self._publish_bluetooth_control(result)
+                        return result
+                    result = {
+                        "matched": True,
+                        "event_type": event_type,
+                        "waveform_id": waveform_id,
+                        "waveform_name": waveform.name,
+                        "max_strength": waveform_strength,
+                        "success": True,
+                        "message": f"当前已有更高强度波形执行中，已忽略 {event_type} 触发",
+                    }
+                    self._publish_bluetooth_control(result)
+                    return result
+                previous_task = self._active_waveform_task
+                self._active_waveform_request_id = request_id
+                self._active_waveform_id = waveform_id
+                self._active_waveform_strength = waveform_strength
+                self._active_waveform_deadline = now + waveform_duration_seconds
+                task_to_await = asyncio.create_task(self._run_waveform_until_deadline(waveform, request_id=request_id))
+                self._active_waveform_task = task_to_await
+                previous_task.cancel()
+            else:
+                self._active_waveform_request_id = request_id
+                self._active_waveform_id = waveform_id
+                self._active_waveform_strength = waveform_strength
+                self._active_waveform_deadline = now + waveform_duration_seconds
+                task_to_await = asyncio.create_task(self._run_waveform_until_deadline(waveform, request_id=request_id))
+                self._active_waveform_task = task_to_await
         try:
-            await self.runtime.play_waveform(waveform)
+            await task_to_await
+        except asyncio.CancelledError:
+            # 这里表示当前波形被更高强度的新事件抢占，不视为执行失败。
+            if self._active_waveform_request_id != request_id:
+                result = {
+                    "matched": True,
+                    "event_type": event_type,
+                    "waveform_id": waveform_id,
+                    "waveform_name": waveform.name,
+                    "max_strength": waveform_strength,
+                    "success": True,
+                    "message": f"{event_type} 波形已被更高强度事件抢占",
+                }
+                self._publish_bluetooth_control(result)
+                return result
+            raise
         except Exception as exc:
             result = {
                 "matched": True,
                 "event_type": event_type,
                 "waveform_id": waveform_id,
                 "waveform_name": waveform.name,
-                "max_strength": _resolve_waveform_max_strength(waveform),
+                "max_strength": waveform_strength,
                 "success": False,
                 "message": f"波形执行失败: {exc}",
             }
             self._publish_bluetooth_control(result)
             return result
+        finally:
+            async with self._waveform_lock:
+                if self._active_waveform_request_id == request_id:
+                    self._active_waveform_task = None
+                    self._active_waveform_request_id = ""
+                    self._active_waveform_id = ""
+                    self._active_waveform_strength = -1
+                    self._active_waveform_deadline = 0.0
         result = {
             "matched": True,
             "event_type": event_type,
             "waveform_id": waveform_id,
             "waveform_name": waveform.name,
-            "max_strength": _resolve_waveform_max_strength(waveform),
+            "max_strength": waveform_strength,
             "success": True,
             "message": f"{event_type} 已触发波形 {waveform.name}",
         }
@@ -500,6 +571,33 @@ class BluetoothService:
             }
         )
 
+    def _cleanup_finished_waveform_task(self) -> None:
+        """清理已经结束的波形任务，避免历史状态影响后续抢占判断。"""
+        if self._active_waveform_task is None or not self._active_waveform_task.done():
+            return
+        self._active_waveform_task = None
+        self._active_waveform_request_id = ""
+        self._active_waveform_id = ""
+        self._active_waveform_strength = -1
+        self._active_waveform_deadline = 0.0
+
+    async def _run_waveform_until_deadline(
+        self,
+        waveform: EmsWaveform | ToyWaveform,
+        *,
+        request_id: str,
+    ) -> None:
+        """按当前截止时间循环执行波形，用于支持同波形续时长。"""
+        while True:
+            await self.runtime.play_waveform(waveform)
+            async with self._waveform_lock:
+                # 只有当前活动请求还能继续续播，旧请求被抢占后立即退出。
+                if self._active_waveform_request_id != request_id:
+                    return
+                remaining_seconds = self._active_waveform_deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                return
+
 
 def create_real_bluetooth_runtime(
     *,
@@ -635,6 +733,12 @@ def _resolve_waveform_max_strength(waveform: EmsWaveform | ToyWaveform) -> int:
     if isinstance(waveform, ToyWaveform):
         return max(max(step.motor_a, step.motor_b, step.motor_c) for step in waveform.steps)
     return max(max(step.channel_a, step.channel_b) for step in waveform.steps)
+
+
+def _resolve_waveform_duration_seconds(waveform: EmsWaveform | ToyWaveform) -> float:
+    """计算单轮波形总时长，供抢占与续时长策略复用。"""
+    total_duration_ms = sum(max(1, int(getattr(step, "duration_ms", 0) or 0)) for step in waveform.steps)
+    return max(total_duration_ms / 1000, 0.001)
 
 
 def _build_overlay_recent_events(event_hub: Any | None) -> list[dict[str, Any]]:

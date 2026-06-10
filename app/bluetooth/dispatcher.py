@@ -61,7 +61,8 @@ class BluetoothDispatcher:
             session_match_result = self._match_session_danmaku_keywords(event, payload_data)
             if session_match_result is not None:
                 return session_match_result
-        for rule in payload.bluetooth_event_rules:
+        # 先精确匹配事件类型，再回退到通用弹幕规则，避免舰长/提督/总督弹幕被普通弹幕规则提前吞掉。
+        for rule in self._iter_matching_rules(payload.bluetooth_event_rules, original_event_type):
             if not rule.enabled or not self._rule_matches_event_type(rule.event_type, original_event_type):
                 continue
             if original_event_type in PRICE_FILTER_EVENT_TYPES and not self._match_price_rule(
@@ -89,6 +90,19 @@ class BluetoothDispatcher:
             "success": False,
             "message": "未命中蓝牙规则",
         }
+
+    def _iter_matching_rules(self, rules: list[Any], original_event_type: str) -> list[Any]:
+        """按业务优先级返回候选规则，专属事件优先于通用弹幕兜底规则。"""
+        exact_rules: list[Any] = []
+        fallback_rules: list[Any] = []
+        for rule in rules:
+            normalized_rule_event_type = str(getattr(rule, "event_type", "") or "")
+            if normalized_rule_event_type == original_event_type:
+                exact_rules.append(rule)
+                continue
+            if self._rule_matches_event_type(normalized_rule_event_type, original_event_type):
+                fallback_rules.append(rule)
+        return [*exact_rules, *fallback_rules]
 
     def _get_connected_device_type(self) -> str:
         """获取当前连接设备的类型 (ems / toy)，未连接时返回 ems。"""
