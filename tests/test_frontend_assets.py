@@ -22,7 +22,7 @@ def test_command_form_uses_local_storage_keys() -> None:
     assert "biliLive.triggerMode" in app_js
 
 
-def test_frontend_contains_dual_mode_controls() -> None:
+def test_frontend_contains_third_party_mode_controls() -> None:
     base_dir = Path(__file__).resolve().parent.parent
     app_js = (base_dir / "app" / "static" / "app.js").read_text(encoding="utf-8")
     index_html = (base_dir / "app" / "templates" / "index.html").read_text(encoding="utf-8")
@@ -31,7 +31,7 @@ def test_frontend_contains_dual_mode_controls() -> None:
     assert "connection-mode" in index_html
     assert "output-mode" not in index_html
     assert "trigger-mode" in index_html
-    assert "open_live" in index_html
+    assert "open_live" not in index_html
     assert "third_party" in index_html
     assert "mode: sessionModeSelect.value" in app_js
     assert "value: sessionValueInput.value" in app_js
@@ -181,7 +181,7 @@ def test_frontend_contains_bluetooth_panel_skeleton() -> None:
     assert ">波形库<" not in index_html
     assert 'fetch("/api/bluetooth/status")' in app_js
     assert 'fetch("/api/bluetooth/scan"' in app_js
-    assert 'window.open("/bluetooth/overlay"' in app_js
+    assert 'window.open("/bluetooth/overlay?style=panel"' in app_js
     assert "rule.rule_label || rule.event_label || rule.event_type || \"unknown\"" in app_js
     assert "rule.waveform_name || rule.waveform_id || \"-\"" in app_js
 
@@ -320,22 +320,25 @@ def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
     assert 'id="overlay-channel-b-bar"' in overlay_html
     assert 'id="overlay-waveform-canvas"' in overlay_html
     assert 'id="overlay-danmaku-list"' in overlay_html
-    assert 'id="overlay-highlight-label"' in overlay_html
-    assert 'id="overlay-highlight-device-name"' in overlay_html
-    assert 'id="overlay-highlight-message"' in overlay_html
     assert 'id="overlay-event-side"' in overlay_html
+    assert 'id="overlay-highlight-label"' in overlay_html
+    assert 'id="overlay-highlight-guard"' in overlay_html
+    assert 'id="overlay-highlight-battery-chip"' in overlay_html
     assert 'id="overlay-event-waveform-name"' in overlay_html
     assert 'fetch("/api/bluetooth/overlay/status")' in overlay_js
     assert 'new EventSource("/api/bluetooth/overlay/stream")' in overlay_js
     assert 'overlayState.battery_level' in overlay_js
     assert "recent_events" in overlay_js
     assert "function renderOverlayDanmaku" in overlay_js
-    assert "function resolveOverlayLayout()" in overlay_js
-    assert "function resolveRecentEventLimit()" in overlay_js
-    assert 'overlayRoot.dataset.layout = overlayRoot.dataset.style === "event" ? resolveOverlayLayout() : "panel"' in overlay_js
     assert "function renderOverlayHighlight" in overlay_js
+    assert "function resolveRecentEventLimit()" in overlay_js
+    assert "function resolveOverlayLayout()" in overlay_js
+    assert "function applyOverlayViewportMode()" in overlay_js
+    assert "function resolveVisualStrengthRatio(" in overlay_js
+    assert "function formatOverlayStrengthSummary(" in overlay_js
+    assert "function renderStrengthBar(" in overlay_js
+    assert 'overlayHighlightWaveform.textContent = `当前强度 · ${formatOverlayStrengthSummary(maxVal)}`' in overlay_js
     assert 'item.waveform_name || item.waveform_id || ""' in overlay_js
-    assert 'latestEvent.waveform_name || latestEvent.waveform_id || overlayState.waveform_name || "待机中"' in overlay_js
 
 
 def test_frontend_contains_control_log_panel_and_stream() -> None:

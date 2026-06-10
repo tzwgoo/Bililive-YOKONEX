@@ -27,7 +27,7 @@ def _spa_index_response() -> FileResponse | None:
 
 
 class StartSessionRequest(BaseModel):
-    mode: str
+    mode: str = "third_party"
     value: str
     connection_mode: str | None = None
     output_mode: str | None = None
@@ -362,17 +362,13 @@ async def bluetooth_overlay_stream(request: Request, once: bool = False) -> Stre
     bluetooth_service = request.app.state.bluetooth_service
 
     async def generate():
-        last_revision = -1
         while True:
             if await request.is_disconnected():
                 break
             payload = bluetooth_service.get_overlay_payload()
-            revision = int(payload.get("revision", 0) or 0)
-            if revision != last_revision:
-                last_revision = revision
-                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-                if once:
-                    break
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            if once:
+                break
             await asyncio.sleep(0.12)
 
     return StreamingResponse(generate(), media_type="text/event-stream")

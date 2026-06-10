@@ -7,6 +7,7 @@ from typing import Any, Awaitable, Callable
 
 from app.models import SessionStatus
 from app.models import is_danmaku_event_type
+from app.models import normalize_event_type_value
 from app.services.event_hub import EventHub
 from app.third_party.event_mapper import map_third_party_message
 from app.third_party.ws_client import ThirdPartyWsClient
@@ -140,7 +141,6 @@ class ThirdPartyLiveSessionService:
         return {
             "status": self.status.value,
             "message": self.last_error,
-            "game_id": "",
             "room_id": self.room_id,
             "anchor_name": self.anchor_name,
             "last_event_at": self.last_event_at,
@@ -186,24 +186,25 @@ class ThirdPartyLiveSessionService:
         event = map_third_party_message(message, room_id=self.room_id)
         if event is None:
             return
-        if self.output_mode == "im" and event.get("event_type") in GIFT_LIKE_EVENT_TYPES and self.gift_dispatcher is not None:
+        event_type = normalize_event_type_value(event.get("event_type", ""))
+        if self.output_mode == "im" and event_type in GIFT_LIKE_EVENT_TYPES and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_gift_event(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
-        elif self.output_mode == "im" and event.get("event_type") == "like" and self.gift_dispatcher is not None:
+        elif self.output_mode == "im" and event_type == "like" and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_like_event(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
-        elif self.output_mode == "im" and event.get("event_type") == "interact" and self.gift_dispatcher is not None:
+        elif self.output_mode == "im" and event_type == "interact" and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_interact_event(event)
             self.last_command_id = dispatch_result.get("command_id", "")
             self.last_command_message = dispatch_result.get("message", "")
             event["command_dispatch"] = dispatch_result
         elif (
             self.output_mode == "im"
-            and is_danmaku_event_type(str(event.get("event_type", "") or ""))
+            and is_danmaku_event_type(event_type)
             and self.danmaku_dispatcher is not None
         ):
             dispatch_result = await self.danmaku_dispatcher.dispatch(event)

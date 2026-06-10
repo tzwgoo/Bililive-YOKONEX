@@ -408,7 +408,8 @@ class BleakBluetoothRuntime:
                 response=False,
             )
             return
-        if device.protocol != "ems_v2":
+        # YYC-DJ v1 / v2 当前都走同一套 EMS 通知特征和电量查询包。
+        if device.device_type != "ems":
             return
         start_notify = getattr(client, "start_notify", None)
         if not callable(start_notify):

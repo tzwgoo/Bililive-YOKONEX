@@ -30,7 +30,8 @@ class EventType(str, Enum):
 
 
 class LiveEvent(BaseModel):
-    source: str = "open_live"
+    # 当前运行态只保留第三方消息流，这里默认沿用第三方事件源标识。
+    source: str = "third_party_ws"
     event_type: EventType
     cmd: str
     room_id: int
@@ -59,5 +60,27 @@ def resolve_danmaku_event_type(guard_level: int) -> EventType:
     return EventType.DANMAKU
 
 
-def is_danmaku_event_type(event_type: str) -> bool:
-    return str(event_type or "") in DANMAKU_EVENT_TYPES
+def normalize_event_type_value(event_type: object) -> str:
+    """统一提取事件类型值，兼容字符串、str 枚举和其他历史传参。"""
+    if isinstance(event_type, Enum):
+        return str(event_type.value or "").strip()
+    return str(event_type or "").strip()
+
+
+def resolve_incoming_danmaku_event_type(event_type: object, guard_level: object) -> str:
+    """按弹幕守护等级纠正事件类型，避免第三方链路把专属弹幕降级成普通弹幕。"""
+    normalized_event_type = normalize_event_type_value(event_type)
+    if normalized_event_type and normalized_event_type != EventType.DANMAKU.value and normalized_event_type in DANMAKU_EVENT_TYPES:
+        return normalized_event_type
+    return resolve_danmaku_event_type(_normalize_guard_level(guard_level)).value
+
+
+def is_danmaku_event_type(event_type: str | object) -> bool:
+    return normalize_event_type_value(event_type) in DANMAKU_EVENT_TYPES
+
+
+def _normalize_guard_level(guard_level: object) -> int:
+    try:
+        return max(0, int(guard_level or 0))
+    except (TypeError, ValueError):
+        return 0

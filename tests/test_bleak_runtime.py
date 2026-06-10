@@ -139,6 +139,38 @@ async def test_bleak_runtime_connect_queries_battery_for_ems_v2_device() -> None
 
 
 @pytest.mark.anyio
+async def test_bleak_runtime_connect_queries_battery_for_ems_v1_device() -> None:
+    created_clients: list[FakeBleakClient] = []
+
+    async def fake_discover(*, timeout: float, return_adv: bool):
+        return {
+            "AA:BB:CC:DD:EE:02": (
+                SimpleNamespace(address="AA:BB:CC:DD:EE:02", name="YYC-DJ-001", rssi=-53),
+                SimpleNamespace(local_name="YYC-DJ-001", service_uuids=[EMS_SERVICE_UUID]),
+            ),
+        }
+
+    def client_factory(*args, **kwargs):
+        client = FakeBleakClient(*args, **kwargs)
+        created_clients.append(client)
+        return client
+
+    runtime = BleakBluetoothRuntime(
+        scan_timeout_seconds=5,
+        scanner_discover=fake_discover,
+        client_factory=client_factory,
+    )
+
+    await runtime.scan()
+    await runtime.connect("AA:BB:CC:DD:EE:02")
+
+    client = created_clients[-1]
+    assert "0000ff32-0000-1000-8000-00805f9b34fb" in client.notify_callbacks
+    assert client.writes[0][0] == EMS_WRITE_CHAR_UUID
+    assert client.writes[0][1] == bytes([0x35, 0x71, 0x04, 0xAA])
+
+
+@pytest.mark.anyio
 async def test_bleak_runtime_updates_battery_level_from_notify_packet() -> None:
     created_clients: list[FakeBleakClient] = []
 
@@ -171,6 +203,41 @@ async def test_bleak_runtime_updates_battery_level_from_notify_packet() -> None:
 
     assert status.battery_level == 88
     assert overlay["battery_level"] == 88
+
+
+@pytest.mark.anyio
+async def test_bleak_runtime_updates_battery_level_from_notify_packet_for_ems_v1() -> None:
+    created_clients: list[FakeBleakClient] = []
+
+    async def fake_discover(*, timeout: float, return_adv: bool):
+        return {
+            "AA:BB:CC:DD:EE:02": (
+                SimpleNamespace(address="AA:BB:CC:DD:EE:02", name="YYC-DJ-001", rssi=-53),
+                SimpleNamespace(local_name="YYC-DJ-001", service_uuids=[EMS_SERVICE_UUID]),
+            ),
+        }
+
+    def client_factory(*args, **kwargs):
+        client = FakeBleakClient(*args, **kwargs)
+        created_clients.append(client)
+        return client
+
+    runtime = BleakBluetoothRuntime(
+        scan_timeout_seconds=5,
+        scanner_discover=fake_discover,
+        client_factory=client_factory,
+    )
+
+    await runtime.scan()
+    await runtime.connect("AA:BB:CC:DD:EE:02")
+    notify_callback = created_clients[-1].notify_callbacks["0000ff32-0000-1000-8000-00805f9b34fb"]
+    await notify_callback("0000ff32-0000-1000-8000-00805f9b34fb", bytearray([0x35, 0x71, 0x04, 76, 0x00]))
+
+    status = runtime.get_status()
+    overlay = runtime.get_overlay_payload()
+
+    assert status.battery_level == 76
+    assert overlay["battery_level"] == 76
 
 
 @pytest.mark.anyio

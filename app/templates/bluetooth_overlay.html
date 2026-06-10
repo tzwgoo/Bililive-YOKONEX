@@ -172,6 +172,7 @@
       }
 
       .overlay-highlight-device-name {
+        order: 1;
         font-size: 14px;
         font-weight: 700;
         color: rgba(255, 243, 236, 0.92);
@@ -183,6 +184,27 @@
         justify-content: flex-end;
         gap: 10px;
         flex-wrap: wrap;
+      }
+
+      .overlay-strength-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        border: 1px solid var(--overlay-line);
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--overlay-soft);
+      }
+
+      .overlay-strength-chip strong {
+        color: var(--overlay-white);
+        font-size: 14px;
+        letter-spacing: 0;
       }
 
       .overlay-highlight-tags {
@@ -220,6 +242,7 @@
         grid-area: left;
         display: grid;
         gap: 14px;
+        grid-template-rows: auto minmax(0, 1fr);
         align-content: start;
         min-width: 0;
         min-height: 0;
@@ -305,6 +328,14 @@
         backdrop-filter: blur(8px);
       }
 
+      .overlay-battery-chip.is-hidden {
+        display: none;
+      }
+
+      .overlay-root[data-style="event"] .overlay-meta .overlay-battery-chip {
+        display: none;
+      }
+
       .overlay-channels {
         display: grid;
         gap: 10px;
@@ -327,34 +358,62 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        font-size: 13px;
+        gap: 12px;
+        font-size: 14px;
         color: var(--overlay-soft);
+      }
+
+      .overlay-channel-head strong {
+        min-width: 44px;
+        text-align: right;
+        font-size: 18px;
+        color: var(--overlay-white);
       }
 
       .overlay-bar-track {
         width: 100%;
-        height: 16px;
+        height: 22px;
         overflow: hidden;
         border-radius: 999px;
         border: 1px solid var(--overlay-line);
-        background: var(--panel-bg);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 42%),
+          rgba(16, 10, 8, 0.42);
         backdrop-filter: blur(8px);
+        box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.18);
       }
 
       .overlay-root[data-style="event"] .overlay-bar-track {
-        height: 12px;
+        height: 18px;
       }
 
       .overlay-root[data-style="event"][data-layout="compact"] .overlay-bar-track,
       .overlay-root[data-style="event"][data-layout="cinema"] .overlay-bar-track {
-        height: 10px;
+        height: 14px;
       }
 
       .overlay-bar-fill {
         height: 100%;
         width: 0%;
         border-radius: inherit;
-        transition: width 120ms linear;
+        position: relative;
+        transform-origin: left center;
+        transition: width 120ms linear, transform 120ms ease-out, filter 120ms ease-out, opacity 120ms ease-out;
+        opacity: 0.92;
+      }
+
+      .overlay-bar-fill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+        mix-blend-mode: screen;
+      }
+
+      .overlay-bar-fill.is-active {
+        transform: scaleY(1.08);
+        filter: saturate(1.18) brightness(1.08);
+        opacity: 1;
       }
 
       .overlay-bar-fill-a {
@@ -380,6 +439,9 @@
         height: 84px;
         border-radius: 18px;
         overflow: hidden;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0)),
+          rgba(14, 8, 8, 0.24);
       }
 
       .overlay-root[data-style="panel"] .overlay-canvas-wrap {
@@ -387,7 +449,7 @@
       }
 
       .overlay-root[data-style="event"] .overlay-canvas-wrap {
-        height: auto;
+        height: 100%;
         min-height: 92px;
       }
 
@@ -416,6 +478,9 @@
       }
 
       .overlay-root[data-style="event"] .overlay-recent {
+        height: 100%;
+        min-height: 0;
+        grid-template-rows: auto minmax(0, 1fr);
         align-content: stretch;
       }
 
@@ -427,6 +492,7 @@
         grid-area: side;
         display: grid;
         gap: 14px;
+        grid-template-rows: auto minmax(0, 1fr);
         align-content: start;
         min-width: 0;
         min-height: 0;
@@ -459,6 +525,12 @@
         gap: 12px;
         padding: 12px 14px;
         border-radius: 20px;
+      }
+
+      .overlay-root[data-style="event"] .overlay-telemetry {
+        height: 100%;
+        min-height: 0;
+        grid-template-rows: auto minmax(0, 1fr);
       }
 
       .overlay-root[data-style="event"][data-layout="compact"] .overlay-telemetry,
@@ -508,6 +580,7 @@
 
       .overlay-root[data-style="event"] .overlay-danmaku-list {
         max-height: none;
+        min-height: 0;
         align-content: start;
       }
 
@@ -598,6 +671,7 @@
   </head>
   <body>
     <main class="overlay-root" id="overlay-root" data-connected="false" data-style="{{ overlay_style }}" data-layout="wide">
+      <!-- 事件叠加窗需要把最新一次触发单独高亮，方便 OBS 画面直接展示。 -->
       <section class="overlay-highlight overlay-surface">
         <div class="overlay-highlight-head">
           <div class="overlay-highlight-copy">
@@ -615,7 +689,7 @@
             </div>
             <div class="overlay-highlight-device-meta">
               <div class="overlay-highlight-device-name" id="overlay-highlight-device-name">未连接设备</div>
-              <div class="overlay-battery-chip">
+              <div class="overlay-battery-chip" id="overlay-highlight-battery-chip">
                 <span>电量</span>
                 <strong id="overlay-highlight-battery-value">--</strong>
               </div>
@@ -624,7 +698,7 @@
         </div>
         <div class="overlay-highlight-tags">
           <span class="overlay-tag" id="overlay-highlight-guard">等待身份</span>
-          <span class="overlay-tag" id="overlay-highlight-waveform">待机波形</span>
+          <span class="overlay-tag" id="overlay-highlight-waveform">当前强度 · A 0 · B 0</span>
         </div>
       </section>
 
@@ -644,6 +718,7 @@
           </div>
         </section>
 
+        <!-- 通道强度与波形曲线共用同一块实时遥测区域，两种叠加样式都依赖这里。 -->
         <section class="overlay-telemetry overlay-surface">
           <section class="overlay-channels">
             <article class="overlay-channel" id="overlay-channel-a-article">

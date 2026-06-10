@@ -143,6 +143,7 @@ async def test_service_overlay_payload_includes_battery_level(
     overlay = service.get_overlay_payload()
 
     assert overlay["battery_level"] == 100
+    assert overlay["display_max_strength"] == 50
 
 
 @pytest.mark.anyio
@@ -378,6 +379,7 @@ def test_service_overlay_payload_includes_recent_live_events(
                 "guard_label": "舰长",
             },
             "bluetooth_dispatch": {
+                "matched": True,
                 "waveform_id": "ems-preset-04",
                 "waveform_name": "EMS 预设 04 - 快速按捏",
                 "success": True,
@@ -411,6 +413,12 @@ def test_service_overlay_payload_includes_recent_like_event(
             "payload": {
                 "like_text": "点赞了直播间",
                 "like_count": 120,
+            },
+            "bluetooth_dispatch": {
+                "matched": True,
+                "waveform_id": "ems-preset-01",
+                "waveform_name": "EMS 预设 01 - 呼吸",
+                "success": True,
             },
         }
     )

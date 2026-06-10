@@ -23,8 +23,7 @@ class FakeBluetoothService:
 
 
 class FakeSession:
-    def __init__(self, *, mode: str) -> None:
-        self.mode = mode
+    def __init__(self) -> None:
         self.started_with: str | None = None
         self.stopped = False
         self.trigger_mode = "by_quantity"
@@ -34,7 +33,6 @@ class FakeSession:
             "message": "",
             "room_id": 0,
             "anchor_name": "",
-            "game_id": "",
             "trigger_mode": "by_quantity",
             "last_event_at": 0,
             "last_heartbeat_at": 0,
@@ -98,118 +96,121 @@ def create_manager(
     *,
     command_connected: bool = False,
     bluetooth_connected: bool = False,
-) -> tuple[LiveSessionManager, FakeSession, FakeSession]:
-    open_live = FakeSession(mode="open_live")
-    third_party = FakeSession(mode="third_party")
+) -> tuple[LiveSessionManager, FakeSession]:
+    third_party = FakeSession()
     manager = LiveSessionManager(
-        open_live_session=open_live,
         third_party_session=third_party,
         command_session=FakeCommandSession(connected=command_connected),
         bluetooth_service=FakeBluetoothService(connected=bluetooth_connected),
     )
-    return manager, open_live, third_party
-
-
-@pytest.mark.anyio
-async def test_manager_routes_open_live_start() -> None:
-    manager, open_live, third_party = create_manager()
-
-    await manager.start(mode="open_live", value="code-demo", trigger_mode="single", output_mode="bluetooth")
-
-    assert open_live.started_with == "code-demo"
-    assert open_live.trigger_mode == "single"
-    assert open_live.output_mode == "bluetooth"
-    assert third_party.started_with is None
+    return manager, third_party
 
 
 @pytest.mark.anyio
 async def test_manager_routes_third_party_start() -> None:
-    manager, open_live, third_party = create_manager()
+    manager, third_party = create_manager()
 
     await manager.start(mode="third_party", value="123456", trigger_mode="by_quantity", output_mode="im")
 
     assert third_party.started_with == "123456"
     assert third_party.trigger_mode == "by_quantity"
     assert third_party.output_mode == "im"
-    assert open_live.started_with is None
+
+
+@pytest.mark.anyio
+async def test_manager_defaults_blank_mode_to_third_party() -> None:
+    manager, third_party = create_manager()
+
+    await manager.start(mode="", value="123456", trigger_mode="single", output_mode="bluetooth")
+
+    assert manager.mode == "third_party"
+    assert third_party.started_with == "123456"
+    assert third_party.output_mode == "bluetooth"
+
+
+@pytest.mark.anyio
+async def test_manager_rejects_removed_open_live_mode() -> None:
+    manager, _ = create_manager()
+
+    with pytest.raises(ValueError, match="不支持的监听模式"):
+        await manager.start(mode="open_live", value="code-demo")
 
 
 @pytest.mark.anyio
 async def test_manager_ignores_custom_danmaku_command_id_and_uses_fixed_slot() -> None:
-    manager, open_live, _ = create_manager()
+    manager, third_party = create_manager()
 
     await manager.start(
-        mode="open_live",
-        value="code-demo",
+        mode="third_party",
+        value="123456",
         danmaku_enabled=True,
         danmaku_keywords="开火",
         danmaku_command_id="boss_warning",
     )
 
-    assert open_live.status_payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
+    assert third_party.status_payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
     assert manager.danmaku_command_id == FIXED_DANMAKU_COMMAND_ID
 
 
 @pytest.mark.anyio
 async def test_manager_defaults_output_mode_to_im() -> None:
-    manager, open_live, _ = create_manager()
+    manager, third_party = create_manager()
 
-    await manager.start(mode="open_live", value="code-demo")
+    await manager.start(mode="third_party", value="123456")
 
     assert manager.output_mode == "im"
-    assert open_live.output_mode == "im"
+    assert third_party.output_mode == "im"
 
 
 @pytest.mark.anyio
 async def test_manager_prefers_bluetooth_output_when_bluetooth_is_connected() -> None:
-    manager, open_live, _ = create_manager(command_connected=True, bluetooth_connected=True)
+    manager, third_party = create_manager(command_connected=True, bluetooth_connected=True)
 
-    await manager.start(mode="open_live", value="code-demo")
+    await manager.start(mode="third_party", value="123456")
 
     assert manager.output_mode == "bluetooth"
-    assert open_live.output_mode == "bluetooth"
+    assert third_party.output_mode == "bluetooth"
 
 
 @pytest.mark.anyio
 async def test_manager_uses_im_output_when_only_im_is_connected() -> None:
-    manager, open_live, _ = create_manager(command_connected=True, bluetooth_connected=False)
+    manager, third_party = create_manager(command_connected=True, bluetooth_connected=False)
 
-    await manager.start(mode="open_live", value="code-demo")
+    await manager.start(mode="third_party", value="123456")
 
     assert manager.output_mode == "im"
-    assert open_live.output_mode == "im"
+    assert third_party.output_mode == "im"
 
 
 @pytest.mark.anyio
 async def test_manager_switches_running_session_to_bluetooth_after_device_connects() -> None:
-    manager, open_live, _ = create_manager(command_connected=True, bluetooth_connected=False)
+    manager, third_party = create_manager(command_connected=True, bluetooth_connected=False)
 
-    await manager.start(mode="open_live", value="code-demo", output_mode="im")
+    await manager.start(mode="third_party", value="123456", output_mode="im")
 
     manager.handle_bluetooth_connected()
 
     assert manager.output_mode == "bluetooth"
-    assert open_live.output_mode == "bluetooth"
+    assert third_party.output_mode == "bluetooth"
 
 
 @pytest.mark.anyio
-async def test_manager_stop_only_calls_active_mode() -> None:
-    manager, open_live, third_party = create_manager()
+async def test_manager_stop_only_calls_active_session() -> None:
+    manager, third_party = create_manager()
 
     await manager.start(mode="third_party", value="123456", trigger_mode="by_quantity")
     await manager.stop()
 
     assert third_party.stopped is True
-    assert open_live.stopped is False
 
 
 def test_manager_status_includes_current_mode() -> None:
-    manager, _, _ = create_manager()
+    manager, _ = create_manager()
 
     payload = manager.get_status_payload()
 
-    assert payload["mode"] == "open_live"
-    assert payload["mode_label"] == "官方 open-live"
+    assert payload["mode"] == "third_party"
+    assert payload["mode_label"] == "第三方房间消息流"
     assert payload["output_mode"] == "im"
     assert payload["trigger_mode"] == "by_quantity"
     assert payload["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID
@@ -221,7 +222,7 @@ def test_manager_status_includes_current_mode() -> None:
 
 @pytest.mark.anyio
 async def test_manager_passes_extended_danmaku_controls_to_session() -> None:
-    manager, _, third_party = create_manager()
+    manager, third_party = create_manager()
 
     await manager.start(
         mode="third_party",

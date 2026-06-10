@@ -84,11 +84,6 @@ build_exe.ps1           Windows EXE 打包脚本
 - Python `3.11+`
 - Windows 本地运行或打包环境
 - 第三方模式下可访问普通 B 站直播间消息流
-- 官方模式下额外需要：
-  - B 站开放平台 `APP_ID`
-  - `BILI_ACCESS_KEY_ID`
-  - `BILI_ACCESS_KEY_SECRET`
-  - 主播身份码 `code`
 
 ## 快速开始
 
@@ -103,15 +98,12 @@ pip install -r requirements.txt
 参考 `.env.example` 创建 `.env`：
 
 ```env
-APP_ID=1234567890123
-BILI_ACCESS_KEY_ID=your_access_key_id
-BILI_ACCESS_KEY_SECRET=your_access_key_secret
 GIFT_MAPPING_PATH=config/gift_command_mappings.json
 ```
 
 > **说明**：
-> - 仅使用第三方模式可不填开放平台字段
-> - 主播身份码 `code` 和下游指令通道参数在页面中手动输入
+> - 当前版本仅支持第三方房间消息流
+> - 直播间房间长 ID 和下游指令通道参数在页面中手动输入
 
 ### 3. 配置礼物映射（可选）
 
@@ -151,10 +143,10 @@ uvicorn app.main:app --reload
 
 ### 5. 使用流程
 
-1. 打开主控台 `/`，选择监听模式（官方 / 第三方）
+1. 打开主控台 `/`，确认监听模式为第三方房间消息流
 2. 选择礼物触发模式（按数量 / 单次）
 3. 输入下游 WebSocket 地址并登录指令通道
-4. 官方模式输入主播身份码，第三方模式输入房间长 ID
+4. 输入直播间房间长 ID
 5. 点击"启动监听"
 6. 在 `/events` 页面维护 IM 档位规则和蓝牙事件绑定规则
 7. 在 `/waveforms` 页面管理蓝牙波形
@@ -212,21 +204,9 @@ pytest tests/test_frontend_assets.py -v
 
 ## 常见问题
 
-### 官方模式提示配置缺失
+### 页面显示配置未加载
 
-请检查 `.env` 是否存在，并确认 `APP_ID`、`BILI_ACCESS_KEY_ID`、`BILI_ACCESS_KEY_SECRET` 已填写。仅使用第三方模式可忽略此提示。
-
-### `7007` 身份码错误
-
-主播身份码 `code` 无效或已过期，请重新获取。
-
-### `7003` 心跳过期
-
-当前 `game_id` 已失效，需要重新启动监听。
-
-### `7010` 超过连接上限
-
-同一直播间下同一应用连接数超限，请先停止旧连接。
+请检查 `.env` 是否存在，并确认 `GIFT_MAPPING_PATH` 指向的礼物映射文件路径有效。
 
 ## License
 

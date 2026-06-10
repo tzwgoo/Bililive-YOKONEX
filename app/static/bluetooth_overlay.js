@@ -2,6 +2,8 @@ const overlayRoot = document.getElementById("overlay-root");
 const overlayConnectionText = document.getElementById("overlay-connection-text");
 const overlayWaveformName = document.getElementById("overlay-waveform-name");
 const overlayDeviceName = document.getElementById("overlay-device-name");
+const overlayBatteryChip = document.querySelector(".overlay-meta .overlay-battery-chip");
+const overlayHighlightBatteryChip = document.getElementById("overlay-highlight-battery-chip");
 const overlayBatteryValue = document.getElementById("overlay-battery-value");
 const overlayChannelAValue = document.getElementById("overlay-channel-a-value");
 const overlayChannelBValue = document.getElementById("overlay-channel-b-value");
@@ -33,6 +35,7 @@ let overlayState = {
   device_type: "",
   waveform_name: "",
   battery_level: null,
+  display_max_strength: 50,
   channel_a: 0,
   channel_b: 0,
   motor_a: 0,
@@ -47,6 +50,14 @@ function isToyDevice() {
   return String(overlayState.device_type || "").toLowerCase() === "toy";
 }
 
+function resolveOverlayDisplayMaxStrength() {
+  if (isToyDevice()) {
+    return 20;
+  }
+  return 180;
+}
+
+// 根据 OBS 裁切后的宽高比切换事件叠加窗布局，避免高亮区和侧栏互相挤压。
 function resolveOverlayLayout() {
   const width = Math.max(window.innerWidth || 0, 1);
   const height = Math.max(window.innerHeight || 0, 1);
@@ -95,9 +106,17 @@ function clampStrength(value, max) {
   return Math.max(0, Math.min(max, Number(value || 0)));
 }
 
+// 仅放大叠加窗的视觉反馈，不改变真实设备下发强度。
+function resolveVisualStrengthRatio(value, max) {
+  const strength = clampStrength(value, max);
+  if (strength <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, strength / (max || 180)));
+}
+
 function resolveStrengthWidth(value, max) {
-  max = max || 180;
-  return `${(clampStrength(value, max) / max) * 100}%`;
+  return `${resolveVisualStrengthRatio(value, max) * 100}%`;
 }
 
 function formatBatteryLevel(value) {
@@ -106,6 +125,17 @@ function formatBatteryLevel(value) {
   }
   const normalized = Math.max(0, Math.min(100, Number(value)));
   return `${Math.round(normalized)}%`;
+}
+
+function hasBatteryLevel(value) {
+  return value !== null && value !== undefined && !Number.isNaN(Number(value));
+}
+
+function formatOverlayStrengthSummary(maxVal) {
+  if (isToyDevice()) {
+    return `R ${clampStrength(overlayState.motor_a, maxVal)} · S ${clampStrength(overlayState.motor_b, maxVal)} · V ${clampStrength(overlayState.motor_c, maxVal)}`;
+  }
+  return `A ${clampStrength(overlayState.channel_a, maxVal)} · B ${clampStrength(overlayState.channel_b, maxVal)}`;
 }
 
 function resizeOverlayCanvas() {
@@ -132,14 +162,14 @@ function drawOverlayHistory(history) {
   }
 
   const toy = isToyDevice();
-  const maxVal = toy ? 20 : 180;
+  const maxVal = toy ? 20 : resolveOverlayDisplayMaxStrength();
   const padding = 8 * window.devicePixelRatio;
   const drawLine = (key, color) => {
     context.beginPath();
     items.forEach((item, index) => {
       const x = padding + (index / Math.max(1, items.length - 1)) * (width - padding * 2);
-      const strength = clampStrength(item[key], maxVal);
-      const y = height - padding - (strength / maxVal) * (height - padding * 2);
+      const ratio = resolveVisualStrengthRatio(item[key], maxVal);
+      const y = height - padding - ratio * (height - padding * 2);
       if (index === 0) {
         context.moveTo(x, y);
       } else {
@@ -193,6 +223,7 @@ function renderOverlayDanmaku(recentEvents) {
     .join("");
 }
 
+// 事件风格会把最近一次触发摘要成高亮卡片，直播画面不用看侧栏也能知道刚刚发生了什么。
 function renderOverlayHighlight(recentEvents) {
   const latestEvent = Array.isArray(recentEvents) && recentEvents.length ? recentEvents[0] : null;
   if (!latestEvent) {
@@ -200,17 +231,14 @@ function renderOverlayHighlight(recentEvents) {
     overlayHighlightUser.textContent = "直播事件发生后显示";
     overlayHighlightMessage.textContent = "当前还没有新的弹幕、SC、上舰或点赞触发。";
     overlayHighlightGuard.textContent = "等待身份";
-    overlayHighlightWaveform.textContent = overlayState.waveform_name ? `波形 ${overlayState.waveform_name}` : "待机波形";
     return;
   }
 
   const guardText = latestEvent.guard_label || "普通观众";
-  const waveformText = latestEvent.waveform_name || latestEvent.waveform_id || overlayState.waveform_name || "待机中";
   overlayHighlightLabel.textContent = latestEvent.event_label || "事件触发";
   overlayHighlightUser.textContent = latestEvent.uname || "匿名用户";
   overlayHighlightMessage.textContent = latestEvent.msg || "已触发蓝牙演出";
   overlayHighlightGuard.textContent = guardText;
-  overlayHighlightWaveform.textContent = `波形 ${waveformText}`;
 }
 
 function renderDeviceTypeUI() {
@@ -226,13 +254,20 @@ function renderDeviceTypeUI() {
   }
 }
 
+function renderStrengthBar(element, value, max) {
+  const strength = clampStrength(value, max);
+  element.style.width = resolveStrengthWidth(strength, max);
+  element.classList.toggle("is-active", strength > 0);
+}
+
+// 两种叠加样式共用同一份蓝牙状态，这里统一同步高亮区、侧栏和通道条，避免局部漏刷。
 function renderOverlay(payload) {
   overlayState = {
     ...overlayState,
     ...payload,
   };
   const toy = isToyDevice();
-  const maxVal = toy ? 20 : 180;
+  const maxVal = toy ? 20 : resolveOverlayDisplayMaxStrength();
   overlayRoot.dataset.connected = String(Boolean(overlayState.connected));
   overlayConnectionText.textContent = overlayState.connected ? "蓝牙已连接" : "蓝牙未连接";
   overlayHighlightConnectionText.textContent = overlayConnectionText.textContent;
@@ -242,6 +277,9 @@ function renderOverlay(payload) {
   overlayHighlightDeviceName.textContent = overlayDeviceName.textContent;
   overlayBatteryValue.textContent = formatBatteryLevel(overlayState.battery_level);
   overlayHighlightBatteryValue.textContent = overlayBatteryValue.textContent;
+  overlayHighlightWaveform.textContent = `当前强度 · ${formatOverlayStrengthSummary(maxVal)}`;
+  overlayBatteryChip?.classList.toggle("is-hidden", !hasBatteryLevel(overlayState.battery_level));
+  overlayHighlightBatteryChip?.classList.toggle("is-hidden", !hasBatteryLevel(overlayState.battery_level));
 
   renderDeviceTypeUI();
 
@@ -249,14 +287,15 @@ function renderOverlay(payload) {
     overlayChannelAValue.textContent = String(clampStrength(overlayState.motor_a, maxVal));
     overlayChannelBValue.textContent = String(clampStrength(overlayState.motor_b, maxVal));
     overlayChannelCValue.textContent = String(clampStrength(overlayState.motor_c, maxVal));
-    overlayChannelABar.style.width = resolveStrengthWidth(overlayState.motor_a, maxVal);
-    overlayChannelBBar.style.width = resolveStrengthWidth(overlayState.motor_b, maxVal);
-    overlayChannelCBar.style.width = resolveStrengthWidth(overlayState.motor_c, maxVal);
+    renderStrengthBar(overlayChannelABar, overlayState.motor_a, maxVal);
+    renderStrengthBar(overlayChannelBBar, overlayState.motor_b, maxVal);
+    renderStrengthBar(overlayChannelCBar, overlayState.motor_c, maxVal);
   } else {
     overlayChannelAValue.textContent = String(clampStrength(overlayState.channel_a, maxVal));
     overlayChannelBValue.textContent = String(clampStrength(overlayState.channel_b, maxVal));
-    overlayChannelABar.style.width = resolveStrengthWidth(overlayState.channel_a, maxVal);
-    overlayChannelBBar.style.width = resolveStrengthWidth(overlayState.channel_b, maxVal);
+    renderStrengthBar(overlayChannelABar, overlayState.channel_a, maxVal);
+    renderStrengthBar(overlayChannelBBar, overlayState.channel_b, maxVal);
+    renderStrengthBar(overlayChannelCBar, 0, maxVal);
   }
 
   drawOverlayHistory(overlayState.history || []);

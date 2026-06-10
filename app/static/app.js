@@ -83,11 +83,6 @@ const connectionModeOptions = {
   bluetooth: "蓝牙",
 };
 const sessionModeOptions = {
-  open_live: {
-    modeLabel: "官方 open-live",
-    label: "主播身份码",
-    placeholder: "请输入主播身份码 code",
-  },
   third_party: {
     modeLabel: "第三方房间消息流",
     label: "房间长 ID",
@@ -283,7 +278,7 @@ function updateStatusTone(element, status) {
 
 function updateSessionModeForm() {
   const mode = sessionModeSelect.value;
-  const modeConfig = sessionModeOptions[mode] || sessionModeOptions.open_live;
+  const modeConfig = sessionModeOptions[mode] || sessionModeOptions.third_party;
   sessionValueLabel.textContent = modeConfig.label;
   sessionValueInput.placeholder = modeConfig.placeholder;
 }
@@ -544,7 +539,7 @@ function renderBluetoothRules(rules) {
 }
 
 function openBluetoothOverlayWindow() {
-  return window.open("/bluetooth/overlay", bluetoothOverlayWindowName, "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no");
+  return window.open("/bluetooth/overlay?style=panel", bluetoothOverlayWindowName, "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no");
 }
 
 async function connectBluetoothDevice(deviceId, overlayWindow = null) {
@@ -563,7 +558,7 @@ async function connectBluetoothDevice(deviceId, overlayWindow = null) {
     return;
   }
   if (overlayWindow && !overlayWindow.closed) {
-    overlayWindow.location.replace("/bluetooth/overlay");
+    overlayWindow.location.replace("/bluetooth/overlay?style=panel");
     overlayWindow.focus();
   }
   await refreshBluetoothStatus();

@@ -12,7 +12,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Bilibili Live Control Deck</p>
           <h1>直播互动监听控制台</h1>
-          <p class="subtitle">同页切换官方 open-live 与第三方房间消息流，共用礼物映射和指令通道，适合挂机监听与联调。</p>
+          <p class="subtitle">统一使用第三方房间消息流接收直播事件，共用礼物映射、弹幕触发和蓝牙波形分发，便于长期挂机监听与联调。</p>
           <div class="hero-tags">
             <span>双链路监听</span>
             <span>礼物映射派发</span>
@@ -51,13 +51,12 @@
                   <div class="field">
                     <label for="session-mode">监听模式</label>
                     <select id="session-mode">
-                      <option value="open_live">官方 open-live</option>
                       <option value="third_party">第三方房间消息流</option>
                     </select>
                   </div>
                   <div class="field session-value-field">
-                    <label for="session-value-input" id="session-value-label">主播身份码</label>
-                    <input id="session-value-input" type="text" placeholder="请输入主播身份码 code" />
+                    <label for="session-value-input" id="session-value-label">房间长 ID</label>
+                    <input id="session-value-input" type="text" placeholder="请输入直播间房间长 ID room_id" />
                   </div>
                 </div>
               </section>

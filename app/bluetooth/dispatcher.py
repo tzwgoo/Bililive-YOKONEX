@@ -6,6 +6,8 @@ from typing import Any
 from app.bluetooth.gift_tiers import match_gift_tier_rule
 from app.bluetooth.price_tiers import PRICE_FILTER_EVENT_TYPES
 from app.models import is_danmaku_event_type
+from app.models import normalize_event_type_value
+from app.models import resolve_incoming_danmaku_event_type
 
 
 class BluetoothDispatcher:
@@ -54,8 +56,14 @@ class BluetoothDispatcher:
                 "message": "蓝牙配置不可用",
             }
 
-        original_event_type = str(event.get("event_type", "") or "")
         payload_data = event.get("payload", {})
+        raw_event_type = normalize_event_type_value(event.get("event_type", ""))
+        # 第三方消息流里可能把舰长/提督/总督弹幕降级成普通 danmaku，这里按守护等级兜底纠正。
+        original_event_type = (
+            resolve_incoming_danmaku_event_type(raw_event_type, payload_data.get("guard_level"))
+            if is_danmaku_event_type(raw_event_type)
+            else raw_event_type
+        )
         connected_device_type = self._get_connected_device_type()
         if is_danmaku_event_type(original_event_type):
             session_match_result = self._match_session_danmaku_keywords(event, payload_data)

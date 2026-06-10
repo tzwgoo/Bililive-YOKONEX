@@ -318,6 +318,11 @@ class BluetoothService:
             "device_type": str(payload.get("device_type", "") or ""),
             "waveform_name": str(payload.get("waveform_name", "") or ""),
             "battery_level": _normalize_battery_level(payload.get("battery_level")),
+            # 仅用于 OBS 叠加窗视觉缩放，避免中低档位在画面里看起来过小。
+            "display_max_strength": _resolve_overlay_display_max_strength(
+                payload=payload,
+                active_waveform_strength=self._active_waveform_strength,
+            ),
             "channel_a": max(0, int(payload.get("channel_a", 0) or 0)),
             "channel_b": max(0, int(payload.get("channel_b", 0) or 0)),
             "motor_a": max(0, int(payload.get("motor_a", 0) or 0)),
@@ -735,6 +740,35 @@ def _resolve_waveform_max_strength(waveform: EmsWaveform | ToyWaveform) -> int:
     return max(max(step.channel_a, step.channel_b) for step in waveform.steps)
 
 
+def _resolve_overlay_display_max_strength(*, payload: dict[str, Any], active_waveform_strength: int) -> int:
+    """给 OBS 小窗一个更贴近当前波形的显示量程，只影响视觉比例，不改变设备输出。"""
+    device_type = str(payload.get("device_type", "") or "").lower()
+    if device_type == "toy":
+        return 20
+
+    if active_waveform_strength > 0:
+        return max(1, min(180, int(active_waveform_strength)))
+
+    peak_strength = max(
+        [
+            max(0, int(payload.get("channel_a", 0) or 0)),
+            max(0, int(payload.get("channel_b", 0) or 0)),
+            *[
+                max(
+                    max(0, int(item.get("channel_a", 0) or 0)),
+                    max(0, int(item.get("channel_b", 0) or 0)),
+                )
+                for item in payload.get("history", [])
+                if isinstance(item, dict)
+            ],
+        ],
+        default=0,
+    )
+    if peak_strength > 0:
+        return max(50, min(180, peak_strength))
+    return 50
+
+
 def _resolve_waveform_duration_seconds(waveform: EmsWaveform | ToyWaveform) -> float:
     """计算单轮波形总时长，供抢占与续时长策略复用。"""
     total_duration_ms = sum(max(1, int(getattr(step, "duration_ms", 0) or 0)) for step in waveform.steps)
@@ -754,8 +788,11 @@ def _build_overlay_recent_events(event_hub: Any | None) -> list[dict[str, Any]]:
 
 
 def _is_overlay_recent_event(event: dict[str, Any]) -> bool:
-    """判断直播事件是否需要进入 OBS 小窗列表。"""
+    """判断直播事件是否需要进入 OBS 小窗列表（仅展示命中波形的事件）。"""
     event_type = str(event.get("event_type", "") or "")
+    bluetooth_dispatch = event.get("bluetooth_dispatch")
+    if not isinstance(bluetooth_dispatch, dict) or not bluetooth_dispatch.get("matched", False):
+        return False
     return event_type in {"gift", "super_chat", "guard_buy", "guard_renew", "interact", "like"} or is_danmaku_event_type(event_type)
 
 

@@ -33,6 +33,7 @@ class FakeBluetoothService:
             "device_name": "YYC-DJ-DEMO",
             "waveform_name": "",
             "battery_level": None,
+            "display_max_strength": 50,
             "channel_a": 0,
             "channel_b": 0,
             "step_index": 0,
@@ -375,6 +376,7 @@ def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:
     assert response.status_code == 200
     assert response.json()["connected"] is True
     assert response.json()["waveform_name"] == "EMS 预设 06 - 心跳节奏"
+    assert response.json()["display_max_strength"] == 50
     assert response.json()["battery_level"] == 63
     assert response.json()["channel_a"] == 48
     assert response.json()["channel_b"] == 45
@@ -388,6 +390,12 @@ def test_bluetooth_overlay_status_endpoint_includes_recent_events() -> None:
             "uname": "弹幕用户",
             "timestamp": 1714113037,
             "payload": {"msg": "开火"},
+            "bluetooth_dispatch": {
+                "matched": True,
+                "waveform_id": "ems-preset-04",
+                "waveform_name": "EMS 预设 04 - 快速按捏",
+                "success": True,
+            },
         }
     )
     client = TestClient(app)
@@ -408,6 +416,12 @@ def test_bluetooth_overlay_status_endpoint_includes_recent_like_event() -> None:
             "payload": {
                 "like_text": "点赞了直播间",
                 "like_count": 120,
+            },
+            "bluetooth_dispatch": {
+                "matched": True,
+                "waveform_id": "ems-preset-01",
+                "waveform_name": "EMS 预设 01 - 呼吸",
+                "success": True,
             },
         }
     )

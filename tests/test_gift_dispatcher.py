@@ -109,7 +109,7 @@ async def test_dispatcher_triggers_like_command_for_each_crossed_multiple_bounda
 
     first = await dispatcher.dispatch_like_event(
         {
-            "source": "open_live",
+            "source": "third_party_ws",
             "room_id": 123,
             "payload": {
                 "like_count": 9,
@@ -118,7 +118,7 @@ async def test_dispatcher_triggers_like_command_for_each_crossed_multiple_bounda
     )
     second = await dispatcher.dispatch_like_event(
         {
-            "source": "open_live",
+            "source": "third_party_ws",
             "room_id": 123,
             "payload": {
                 "like_count": 20,
@@ -127,7 +127,7 @@ async def test_dispatcher_triggers_like_command_for_each_crossed_multiple_bounda
     )
     third = await dispatcher.dispatch_like_event(
         {
-            "source": "open_live",
+            "source": "third_party_ws",
             "room_id": 123,
             "payload": {
                 "like_count": 21,
@@ -152,7 +152,7 @@ async def test_dispatcher_does_not_repeat_like_command_for_same_multiple_count()
 
     first = await dispatcher.dispatch_like_event(
         {
-            "source": "open_live",
+            "source": "third_party_ws",
             "room_id": 123,
             "payload": {
                 "like_count": 100,
@@ -161,7 +161,7 @@ async def test_dispatcher_does_not_repeat_like_command_for_same_multiple_count()
     )
     second = await dispatcher.dispatch_like_event(
         {
-            "source": "open_live",
+            "source": "third_party_ws",
             "room_id": 123,
             "payload": {
                 "like_count": 100,
@@ -363,7 +363,7 @@ async def test_dispatcher_blocks_danmaku_trigger_during_cooldown() -> None:
 
     first = await dispatcher.dispatch(
         {
-            "source": "open_live",
+            "source": "third_party_ws",
             "room_id": 1,
             "payload": {
                 "msg": "现在开火",
@@ -372,7 +372,7 @@ async def test_dispatcher_blocks_danmaku_trigger_during_cooldown() -> None:
     )
     second = await dispatcher.dispatch(
         {
-            "source": "open_live",
+            "source": "third_party_ws",
             "room_id": 1,
             "payload": {
                 "msg": "继续开火",
@@ -587,6 +587,42 @@ async def test_dispatcher_uses_explicit_danmaku_event_type_rules() -> None:
     assert normal_user["command_id"] == "command_one"
     assert governor_user["command_id"] == "command_ten"
     assert command_session.called_with == ["command_one", "command_ten"]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_repairs_third_party_generic_danmaku_to_guard_specific_command() -> None:
+    command_session = FakeCommandSession()
+    dispatcher = DanmakuCommandDispatcher(
+        command_session=command_session,
+    )
+    dispatcher.configure(
+        enabled=True,
+        keywords="go",
+        command_id="danmaku_trigger",
+        cooldown_seconds=0,
+    )
+    dispatcher.set_command_slot_rules(
+        [
+            {"event_type": "danmaku", "command_slot": "command_one", "enabled": True},
+            {"event_type": "danmaku_governor", "command_slot": "command_ten", "enabled": True},
+        ]
+    )
+
+    result = await dispatcher.dispatch(
+        {
+            "event_type": "danmaku",
+            "source": "third_party_ws",
+            "room_id": 1,
+            "payload": {
+                "msg": "go",
+                "uid": 1002,
+                "guard_level": 1,
+            },
+        }
+    )
+
+    assert result["command_id"] == "command_ten"
+    assert command_session.called_with == ["command_ten"]
 
 
 @pytest.mark.anyio

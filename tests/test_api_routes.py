@@ -65,8 +65,8 @@ class FakeSessionManager:
         self.status = {
             "status": "idle",
             "message": "",
-            "mode": "open_live",
-            "mode_label": "官方 open-live",
+            "mode": "third_party",
+            "mode_label": "第三方房间消息流",
             "output_mode": "im",
             "trigger_mode": "by_quantity",
             "like_multiple": 100,
@@ -78,7 +78,6 @@ class FakeSessionManager:
             "danmaku_user_limit_window_seconds": 0,
             "danmaku_user_limit_max_triggers": 0,
             "danmaku_min_guard_level": 0,
-            "game_id": "",
             "room_id": 0,
             "anchor_name": "",
             "last_event_at": 0,
@@ -199,7 +198,7 @@ def test_status_endpoint_returns_idle_state() -> None:
 
     assert response.status_code == 200
     assert response.json()["status"] == "idle"
-    assert response.json()["mode"] == "open_live"
+    assert response.json()["mode"] == "third_party"
     assert response.json()["output_mode"] == "im"
     assert response.json()["trigger_mode"] == "by_quantity"
     assert response.json()["danmaku_command_id"] == FIXED_DANMAKU_COMMAND_ID

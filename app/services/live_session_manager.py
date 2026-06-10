@@ -8,13 +8,11 @@ from app.services.gift_dispatcher import normalize_trigger_mode
 
 
 class LiveSessionManager:
-    MODE_OPEN_LIVE = "open_live"
     MODE_THIRD_PARTY = "third_party"
     OUTPUT_MODE_IM = "im"
     OUTPUT_MODE_BLUETOOTH = "bluetooth"
 
     MODE_LABELS = {
-        MODE_OPEN_LIVE: "官方 open-live",
         MODE_THIRD_PARTY: "第三方房间消息流",
     }
 
@@ -26,16 +24,15 @@ class LiveSessionManager:
     def __init__(
         self,
         *,
-        open_live_session: Any,
         third_party_session: Any,
         command_session: Any | None = None,
         bluetooth_service: Any | None = None,
     ) -> None:
-        self.open_live_session = open_live_session
         self.third_party_session = third_party_session
         self.command_session = command_session
         self.bluetooth_service = bluetooth_service
-        self.mode = self.MODE_OPEN_LIVE
+        # 核心业务约束：当前版本只允许第三方消息流作为唯一直播事件入口。
+        self.mode = self.MODE_THIRD_PARTY
         self._active_mode: str | None = None
         self.output_mode = self.OUTPUT_MODE_IM
         self.trigger_mode = "by_quantity"
@@ -81,9 +78,6 @@ class LiveSessionManager:
         if normalized_danmaku_enabled and not normalized_danmaku_keywords:
             raise ValueError("已开启弹幕关键词触发时，关键词不能为空")
 
-        if self._active_mode is not None and self._active_mode != normalized_mode:
-            await self.stop()
-
         self.mode = normalized_mode
         self.output_mode = normalized_output_mode
         self.trigger_mode = normalized_trigger_mode
@@ -95,7 +89,7 @@ class LiveSessionManager:
         self.danmaku_user_limit_window_seconds = normalized_danmaku_user_limit_window_seconds
         self.danmaku_user_limit_max_triggers = normalized_danmaku_user_limit_max_triggers
         self.danmaku_min_guard_level = normalized_danmaku_min_guard_level
-        await self._get_service(normalized_mode).start(
+        await self.third_party_session.start(
             value=normalized_value,
             output_mode=normalized_output_mode,
             trigger_mode=normalized_trigger_mode,
@@ -113,7 +107,7 @@ class LiveSessionManager:
     async def stop(self) -> None:
         if self._active_mode is None:
             return
-        await self._get_service(self._active_mode).stop()
+        await self.third_party_session.stop()
         self._active_mode = None
 
     def handle_bluetooth_connected(self) -> None:
@@ -122,8 +116,7 @@ class LiveSessionManager:
         self._set_output_mode(self.OUTPUT_MODE_BLUETOOTH)
 
     def get_status_payload(self) -> dict[str, Any]:
-        service_mode = self._active_mode or self.mode
-        payload = dict(self._get_service(service_mode).get_status_payload())
+        payload = dict(self.third_party_session.get_status_payload())
         payload["mode"] = self.mode
         payload["mode_label"] = self.MODE_LABELS[self.mode]
         payload["output_mode"] = self.output_mode
@@ -140,15 +133,8 @@ class LiveSessionManager:
         payload["danmaku_min_guard_level"] = self.danmaku_min_guard_level
         return payload
 
-    def _get_service(self, mode: str) -> Any:
-        if mode == self.MODE_OPEN_LIVE:
-            return self.open_live_session
-        if mode == self.MODE_THIRD_PARTY:
-            return self.third_party_session
-        raise ValueError("不支持的监听模式")
-
     def _normalize_mode(self, mode: str) -> str:
-        normalized_mode = mode.strip()
+        normalized_mode = str(mode or self.MODE_THIRD_PARTY).strip() or self.MODE_THIRD_PARTY
         if normalized_mode not in self.MODE_LABELS:
             raise ValueError("不支持的监听模式")
         return normalized_mode
@@ -162,11 +148,8 @@ class LiveSessionManager:
     def _set_output_mode(self, output_mode: str) -> None:
         normalized_output_mode = self._normalize_output_mode(output_mode)
         self.output_mode = normalized_output_mode
-        if self._active_mode is None:
-            return
-        active_service = self._get_service(self._active_mode)
-        if hasattr(active_service, "output_mode"):
-            active_service.output_mode = normalized_output_mode
+        if hasattr(self.third_party_session, "output_mode"):
+            self.third_party_session.output_mode = normalized_output_mode
 
     def _resolve_output_mode(self, output_mode: str) -> str:
         normalized_output_mode = str(output_mode or "").strip()

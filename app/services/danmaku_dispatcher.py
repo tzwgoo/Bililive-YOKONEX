@@ -6,6 +6,7 @@ from typing import Any
 
 from app.command_gateway.mapping import ALLOWED_COMMAND_SLOTS
 from app.models import is_danmaku_event_type, resolve_danmaku_event_type
+from app.models import resolve_incoming_danmaku_event_type
 from app.services.danmaku_settings import resolve_fixed_danmaku_command_id
 
 
@@ -102,8 +103,12 @@ class DanmakuCommandDispatcher:
             }
 
         guard_level = self._normalize_count(payload.get("guard_level"), default=0)
+        resolved_event_type = resolve_incoming_danmaku_event_type(
+            event.get("event_type", ""),
+            guard_level,
+        )
         resolved_command_id = self._resolve_command_id(
-            event_type=str(event.get("event_type", "") or ""),
+            event_type=resolved_event_type,
             guard_level=guard_level,
         )
         if not _meets_min_guard_level(guard_level=guard_level, min_guard_level=self.min_guard_level):
