@@ -113,14 +113,26 @@ if ($pyInstallerExitCode -ne 0) {
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "config") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "docs") | Out-Null
 Copy-Item ".env.example" (Join-Path $packageRoot ".env.example") -Force
+# Ship bundled mapping defaults so runtime can hydrate AppData on first launch.
 Copy-Item "config/gift_command_mappings.json" (Join-Path $packageRoot "config/gift_command_mappings.json") -Force
 Copy-Item "config/gift_command_mappings.example.json" (Join-Path $packageRoot "config/gift_command_mappings.example.json") -Force
-Copy-Item "config/bluetooth_settings.json" (Join-Path $packageRoot "config/bluetooth_settings.json") -Force
 Copy-Item (Join-Path $projectRoot "docs\*.md") (Join-Path $packageRoot "docs") -Force
 
 $exePath = Join-Path $packageRoot "BiliLive-YOKONEX.exe"
 if (-not (Test-Path $exePath)) {
     throw "Missing EXE output: $exePath"
+}
+
+$requiredPackageFiles = @(
+    (Join-Path $packageRoot ".env.example"),
+    (Join-Path $packageRoot "config/gift_command_mappings.json"),
+    (Join-Path $packageRoot "config/gift_command_mappings.example.json")
+)
+foreach ($requiredFile in $requiredPackageFiles) {
+    # Fail early if a template file is missing from the packaged app.
+    if (-not (Test-Path $requiredFile)) {
+        throw "Missing packaged file: $requiredFile"
+    }
 }
 
 Write-Host ""

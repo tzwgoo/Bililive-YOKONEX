@@ -16,7 +16,10 @@ def test_build_script_includes_bilibili_client_hidden_imports() -> None:
     assert "-RedirectStandardError $stderrLog" in script
     assert "$pyInstallerExitCode = $pyInstallerProcess.ExitCode" in script
     assert 'throw "PyInstaller build failed with exit code: $pyInstallerExitCode"' in script
-    assert 'Copy-Item "config/bluetooth_settings.json"' in script
+    assert 'Copy-Item "config/gift_command_mappings.json"' in script
+    assert 'Copy-Item "config/bluetooth_settings.json"' not in script
+    assert '$requiredPackageFiles = @(' in script
+    assert 'throw "Missing packaged file: $requiredFile"' in script
     assert 'Push-Location (Join-Path $projectRoot "frontend")' in script
     assert '& $npmCommand ci' in script
     assert '& $npmCommand run build' in script
