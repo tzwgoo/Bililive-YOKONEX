@@ -4,7 +4,15 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
 $env:PYTHONNOUSERSITE = "1"
 
-$buildEnvRoot = Join-Path $projectRoot ".build-venv"
+$preferredBuildEnvRoot = Join-Path $projectRoot ".build-venv-cpython"
+$fallbackBuildEnvRoot = Join-Path $projectRoot ".build-venv"
+
+if (Test-Path (Join-Path $preferredBuildEnvRoot "Scripts\python.exe")) {
+    $buildEnvRoot = $preferredBuildEnvRoot
+} else {
+    $buildEnvRoot = $fallbackBuildEnvRoot
+}
+
 $buildPython = Join-Path $buildEnvRoot "Scripts\python.exe"
 
 if (-not (Test-Path $buildPython)) {
@@ -116,8 +124,8 @@ if (-not (Test-Path $exePath)) {
 }
 
 Write-Host ""
-Write-Host "构建完成：" -ForegroundColor Green
+Write-Host "Build completed:" -ForegroundColor Green
 Write-Host $packageRoot
 Write-Host ""
-Write-Host "启动文件：" -ForegroundColor Green
+Write-Host "Executable:" -ForegroundColor Green
 Write-Host $exePath
