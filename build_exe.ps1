@@ -38,6 +38,11 @@ if (-not (Test-Path $frontendDistIndex)) {
     throw "Missing frontend dist output: $frontendDistIndex"
 }
 
+$appIconPath = Join-Path $projectRoot "docs\assets\app-icon.ico"
+if (-not (Test-Path $appIconPath)) {
+    throw "Missing EXE icon asset: $appIconPath"
+}
+
 $distRoot = Join-Path $projectRoot "dist"
 $packageRoot = Join-Path $distRoot "BiliLive-YOKONEX"
 $buildLogDir = Join-Path $projectRoot "build_logs"
@@ -58,6 +63,7 @@ $pyInstallerArgs = @(
     "--clean",
     "--onedir",
     "--name", "BiliLive-YOKONEX",
+    "--icon", $appIconPath,
     "--exclude-module", "PyQt5",
     "--exclude-module", "PyQt6",
     "--exclude-module", "PySide2",

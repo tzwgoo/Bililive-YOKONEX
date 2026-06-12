@@ -1,0 +1,69 @@
+<svg width="1600" height="512" viewBox="0 0 1600 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">BiliLive YOKONEX Logo</title>
+  <desc id="logoDesc">A horizontal brand logo for BiliLive YOKONEX with a neon control deck icon and live interaction wordmark.</desc>
+  <defs>
+    <linearGradient id="heroBg" x1="120" y1="76" x2="540" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2A161F"/>
+      <stop offset="0.55" stop-color="#160C16"/>
+      <stop offset="1" stop-color="#09070B"/>
+    </linearGradient>
+    <linearGradient id="heroAccent" x1="176" y1="118" x2="418" y2="388" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A4C"/>
+      <stop offset="0.45" stop-color="#FF6B6B"/>
+      <stop offset="1" stop-color="#D98AA8"/>
+    </linearGradient>
+    <linearGradient id="heroWave" x1="160" y1="336" x2="392" y2="364" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD2A8"/>
+      <stop offset="1" stop-color="#F4A3C0"/>
+    </linearGradient>
+    <linearGradient id="wordGlow" x1="660" y1="110" x2="1440" y2="346" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A4C"/>
+      <stop offset="0.46" stop-color="#FF8E64"/>
+      <stop offset="1" stop-color="#E8A7C3"/>
+    </linearGradient>
+    <radialGradient id="heroGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 256) rotate(90) scale(192)">
+      <stop stop-color="#FF8A4C" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#FF8A4C" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="heroShadow" x="52" y="40" width="420" height="432" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.34"/>
+    </filter>
+    <filter id="typeShadow" x="620" y="70" width="918" height="292" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="512" rx="48" fill="#0B070D"/>
+
+  <!-- 图标延续深色控制台与暖色霓虹的视觉基调 -->
+  <g filter="url(#heroShadow)">
+    <rect x="72" y="56" width="368" height="368" rx="96" fill="url(#heroBg)"/>
+    <rect x="72.75" y="56.75" width="366.5" height="366.5" rx="95.25" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
+  </g>
+
+  <circle cx="256" cy="256" r="164" fill="url(#heroGlow)"/>
+  <path d="M180 122L152 88" stroke="#F6D4B4" stroke-width="15" stroke-linecap="round" stroke-opacity="0.9"/>
+  <path d="M332 122L360 88" stroke="#F6D4B4" stroke-width="15" stroke-linecap="round" stroke-opacity="0.9"/>
+  <rect x="122" y="120" width="268" height="236" rx="68" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+  <path d="M162 186C134 200 118 227 118 258C118 289 134 316 162 330" stroke="#F4B6A4" stroke-width="11" stroke-linecap="round" stroke-opacity="0.78"/>
+  <path d="M350 186C378 200 394 227 394 258C394 289 378 316 350 330" stroke="#F4B6A4" stroke-width="11" stroke-linecap="round" stroke-opacity="0.78"/>
+  <path d="M184 172L256 246L328 172" stroke="url(#heroAccent)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 246V346" stroke="url(#heroAccent)" stroke-width="32" stroke-linecap="round"/>
+  <circle cx="184" cy="172" r="14" fill="#FFE0C3"/>
+  <circle cx="328" cy="172" r="14" fill="#F7B3C8"/>
+  <circle cx="256" cy="246" r="12" fill="#FFF3E9"/>
+  <circle cx="256" cy="246" r="28" stroke="rgba(255,255,255,0.18)" stroke-width="8"/>
+  <path d="M154 332H190L212 306L236 342L260 282L288 356L314 320H358" stroke="url(#heroWave)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g filter="url(#typeShadow)">
+    <rect x="612" y="102" width="242" height="44" rx="22" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
+    <text x="648" y="131" fill="#FF9A64" font-family="'Segoe UI', 'Arial', sans-serif" font-size="18" font-weight="700" letter-spacing="4">LIVE CONTROL DECK</text>
+
+    <text x="612" y="246" fill="#FFF4F3" font-family="'Segoe UI', 'Arial', sans-serif" font-size="92" font-weight="800" letter-spacing="1">BiliLive</text>
+    <text x="978" y="246" fill="url(#wordGlow)" font-family="'Segoe UI', 'Arial', sans-serif" font-size="88" font-weight="900" letter-spacing="2">YOKONEX</text>
+
+    <text x="614" y="304" fill="#D9BBC7" font-family="'Segoe UI', 'Arial', sans-serif" font-size="26" font-weight="500" letter-spacing="0.6">
+      Signal routing for live events, command gateway and EMS control
+    </text>
+  </g>
+</svg>

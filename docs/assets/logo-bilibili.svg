@@ -1,0 +1,80 @@
+<svg width="1600" height="512" viewBox="0 0 1600 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="biliLogoTitle biliLogoDesc">
+  <title id="biliLogoTitle">BiliLive YOKONEX Bilibili Style Logo</title>
+  <desc id="biliLogoDesc">A horizontal logo variant with stronger Bilibili live cues, TV framing, danmaku bars and blue pink streaming accents.</desc>
+  <defs>
+    <linearGradient id="biliHeroBg" x1="88" y1="52" x2="438" y2="424" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D1B2A"/>
+      <stop offset="0.52" stop-color="#0A1320"/>
+      <stop offset="1" stop-color="#070E17"/>
+    </linearGradient>
+    <linearGradient id="biliHeroScreen" x1="126" y1="120" x2="384" y2="352" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#233A54"/>
+      <stop offset="1" stop-color="#111F2F"/>
+    </linearGradient>
+    <linearGradient id="biliHeroAccent" x1="168" y1="150" x2="340" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#37D3F4"/>
+      <stop offset="0.48" stop-color="#71CAFF"/>
+      <stop offset="1" stop-color="#FB7299"/>
+    </linearGradient>
+    <linearGradient id="biliHeroWave" x1="154" y1="328" x2="356" y2="356" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#97ECFF"/>
+      <stop offset="1" stop-color="#FFC0D4"/>
+    </linearGradient>
+    <linearGradient id="biliWord" x1="1020" y1="158" x2="1460" y2="258" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38D6F5"/>
+      <stop offset="0.48" stop-color="#76CAFF"/>
+      <stop offset="1" stop-color="#FB7299"/>
+    </linearGradient>
+    <radialGradient id="biliHeroGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(258 238) rotate(90) scale(170)">
+      <stop stop-color="#38D6F5" stop-opacity="0.24"/>
+      <stop offset="0.72" stop-color="#FB7299" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#FB7299" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="biliHeroShadow" x="52" y="36" width="416" height="436" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.34"/>
+    </filter>
+    <filter id="biliTypeShadow" x="604" y="82" width="898" height="264" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="512" rx="48" fill="#090B12"/>
+
+  <g filter="url(#biliHeroShadow)">
+    <rect x="72" y="56" width="368" height="368" rx="96" fill="url(#biliHeroBg)"/>
+    <rect x="72.75" y="56.75" width="366.5" height="366.5" rx="95.25" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
+  </g>
+
+  <circle cx="258" cy="238" r="162" fill="url(#biliHeroGlow)"/>
+  <path d="M186 122L158 88" stroke="#A8EFFF" stroke-width="15" stroke-linecap="round"/>
+  <path d="M330 122L358 88" stroke="#A8EFFF" stroke-width="15" stroke-linecap="round"/>
+
+  <rect x="120" y="118" width="272" height="226" rx="64" fill="url(#biliHeroScreen)" stroke="url(#biliHeroAccent)" stroke-width="6"/>
+  <rect x="146" y="150" width="220" height="158" rx="38" fill="rgba(255,255,255,0.04)" stroke="rgba(168,239,255,0.16)" stroke-width="2"/>
+  <rect x="160" y="176" width="46" height="11" rx="5.5" fill="#AAF1FF" fill-opacity="0.92"/>
+  <rect x="216" y="176" width="62" height="11" rx="5.5" fill="#79D6FF"/>
+  <rect x="290" y="176" width="62" height="11" rx="5.5" fill="#FFA3C1"/>
+
+  <path d="M204 214L256 258L308 214" stroke="url(#biliHeroAccent)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 258V332" stroke="url(#biliHeroAccent)" stroke-width="26" stroke-linecap="round"/>
+  <circle cx="204" cy="214" r="11" fill="#B8F3FF"/>
+  <circle cx="308" cy="214" r="11" fill="#FFC1D5"/>
+  <circle cx="256" cy="258" r="11" fill="#F4FBFF"/>
+  <circle cx="256" cy="258" r="28" stroke="rgba(255,255,255,0.12)" stroke-width="8"/>
+  <path d="M160 326H194L218 298L242 338L266 280L290 344L316 314H354" stroke="url(#biliHeroWave)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M124 240C124 212 138 188 162 174" stroke="#7ADCFF" stroke-width="10" stroke-linecap="round" stroke-opacity="0.84"/>
+  <path d="M388 240C388 212 374 188 350 174" stroke="#FF9EC0" stroke-width="10" stroke-linecap="round" stroke-opacity="0.84"/>
+
+  <g filter="url(#biliTypeShadow)">
+    <rect x="612" y="104" width="252" height="44" rx="22" fill="rgba(255,255,255,0.04)" stroke="rgba(61,213,243,0.22)" stroke-width="1.5"/>
+    <text x="640" y="132" fill="#7FDEFF" font-family="'Segoe UI', 'Arial', sans-serif" font-size="17" font-weight="800" letter-spacing="3.4">BILIBILI LIVE SIGNAL</text>
+
+    <text x="612" y="244" fill="#EDF9FF" font-family="'Segoe UI', 'Arial', sans-serif" font-size="88" font-weight="820" letter-spacing="0.8">BiliLive</text>
+    <text x="972" y="244" fill="url(#biliWord)" font-family="'Segoe UI', 'Arial', sans-serif" font-size="86" font-weight="920" letter-spacing="1.5">YOKONEX</text>
+
+    <text x="614" y="300" fill="#C7D5E8" font-family="'Segoe UI', 'Arial', sans-serif" font-size="26" font-weight="500" letter-spacing="0.3">
+      Danmaku driven control deck, command gateway and EMS interaction
+    </text>
+  </g>
+</svg>

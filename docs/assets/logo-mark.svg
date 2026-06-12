@@ -1,0 +1,64 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logoMarkTitle logoMarkDesc">
+  <title id="logoMarkTitle">BiliLive YOKONEX Logo Mark</title>
+  <desc id="logoMarkDesc">A neon control-deck style logo mark combining live signal arcs, a routing Y monogram, and a waveform base.</desc>
+  <defs>
+    <linearGradient id="markBg" x1="72" y1="64" x2="440" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2A161F"/>
+      <stop offset="0.55" stop-color="#160C16"/>
+      <stop offset="1" stop-color="#09070B"/>
+    </linearGradient>
+    <linearGradient id="markAccent" x1="144" y1="132" x2="372" y2="388" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A4C"/>
+      <stop offset="0.5" stop-color="#FF6B6B"/>
+      <stop offset="1" stop-color="#D98AA8"/>
+    </linearGradient>
+    <linearGradient id="markWave" x1="128" y1="338" x2="384" y2="370" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD2A8"/>
+      <stop offset="1" stop-color="#F4A3C0"/>
+    </linearGradient>
+    <radialGradient id="markGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 260) rotate(90) scale(180)">
+      <stop stop-color="#FF8A4C" stop-opacity="0.36"/>
+      <stop offset="1" stop-color="#FF8A4C" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="markShadow" x="26" y="22" width="460" height="468" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.36"/>
+    </filter>
+    <filter id="markSoftGlow" x="74" y="74" width="364" height="364" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0.35  0 0 1 0 0.45  0 0 0 1 0"/>
+    </filter>
+  </defs>
+
+  <!-- 外层底板保持深色控制台质感，适合深浅背景单独使用 -->
+  <g filter="url(#markShadow)">
+    <rect x="56" y="56" width="400" height="400" rx="104" fill="url(#markBg)"/>
+    <rect x="56.75" y="56.75" width="398.5" height="398.5" rx="103.25" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
+  </g>
+
+  <circle cx="256" cy="260" r="154" fill="url(#markGlow)"/>
+  <circle cx="256" cy="260" r="136" fill="url(#markGlow)" filter="url(#markSoftGlow)"/>
+
+  <!-- 天线与屏幕结构表达直播监听与控制台语义 -->
+  <path d="M174 120L146 84" stroke="#F6D4B4" stroke-width="16" stroke-linecap="round" stroke-opacity="0.88"/>
+  <path d="M338 120L366 84" stroke="#F6D4B4" stroke-width="16" stroke-linecap="round" stroke-opacity="0.88"/>
+  <rect x="112" y="116" width="288" height="252" rx="72" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+
+  <path d="M152 186C122 202 104 232 104 266C104 300 122 330 152 346" stroke="#F4B6A4" stroke-width="12" stroke-linecap="round" stroke-opacity="0.78"/>
+  <path d="M360 186C390 202 408 232 408 266C408 300 390 330 360 346" stroke="#F4B6A4" stroke-width="12" stroke-linecap="round" stroke-opacity="0.78"/>
+
+  <!-- 核心 Y 形路由表示多源直播事件汇聚到统一指令通道 -->
+  <path d="M176 170L256 252L336 170" stroke="url(#markAccent)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 252V356" stroke="url(#markAccent)" stroke-width="34" stroke-linecap="round"/>
+
+  <circle cx="176" cy="170" r="16" fill="#FFE0C3"/>
+  <circle cx="336" cy="170" r="16" fill="#F7B3C8"/>
+  <circle cx="256" cy="252" r="14" fill="#FFF3E9"/>
+  <circle cx="256" cy="252" r="30" stroke="rgba(255,255,255,0.18)" stroke-width="8"/>
+
+  <path d="M144 346H188L212 318L236 354L260 288L288 368L316 330H368" stroke="url(#markWave)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="128" cy="214" r="9" fill="#FF8A4C"/>
+  <circle cx="384" cy="214" r="9" fill="#D98AA8"/>
+  <circle cx="160" cy="382" r="7" fill="#F6D4B4" fill-opacity="0.92"/>
+  <circle cx="352" cy="382" r="7" fill="#F6D4B4" fill-opacity="0.92"/>
+</svg>

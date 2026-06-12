@@ -1,5 +1,7 @@
 # Bililive-YOKONEX
 
+![BiliLive YOKONEX Bilibili Style Logo](docs/assets/logo-bilibili-preview.png)
+
 一个基于 `Python + FastAPI + Vue 3` 的本地直播互动控制台，用于接入 Bilibili 直播事件（礼物、点赞、弹幕关键词、醒目留言、舰队、互动），并映射为固定指令槽位 `command_one` ~ `command_ten`，发往下游 WebSocket 指令服务或蓝牙 EMS 设备。
 
 ## 界面预览
