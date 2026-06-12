@@ -44,6 +44,14 @@ class MemoryBluetoothRuntime:
                 rssi=-38,
                 connected="toy-demo-001" in self._connected_device_ids,
             ),
+            BluetoothDevice(
+                device_id="gcq-toy-demo-001",
+                name="YISKJ-GCQ-TOY-013-DEMO",
+                device_type="toy",
+                protocol="yiskj_gcq_toy_013",
+                rssi=-36,
+                connected="gcq-toy-demo-001" in self._connected_device_ids,
+            ),
         ]
         return list(self._devices)
 

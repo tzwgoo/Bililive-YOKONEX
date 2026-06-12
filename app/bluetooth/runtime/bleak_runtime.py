@@ -34,7 +34,12 @@ TOY_SERVICE_UUID = "0000ff40-0000-1000-8000-00805f9b34fb"
 TOY_WRITE_CHAR_UUID = "0000ff41-0000-1000-8000-00805f9b34fb"
 TOY_NOTIFY_CHAR_UUID = "0000ff42-0000-1000-8000-00805f9b34fb"
 
+GCQ_TOY_SERVICE_UUID = "0000ff70-0000-1000-8000-00805f9b34fb"
+GCQ_TOY_WRITE_CHAR_UUID = "0000ff71-0000-1000-8000-00805f9b34fb"
+GCQ_TOY_NOTIFY_CHAR_UUID = "0000ff72-0000-1000-8000-00805f9b34fb"
+
 TOY_NAME_PREFIXES = ("YCY-FJB", "YCY-TDD")
+GCQ_TOY_PROTOCOL = "yiskj_gcq_toy_013"
 TOY_MOTOR_ALL = 0x07
 
 LOGGER = logging.getLogger("bili_live.bluetooth.runtime")
@@ -48,6 +53,7 @@ class _RuntimeDeviceState:
     overlay_payload: dict[str, Any]
     manual_disconnect_requested: bool = False
     reconnect_task: asyncio.Task | None = None
+    heartbeat_task: asyncio.Task | None = None
 
 
 class BleakBluetoothRuntime:
@@ -141,6 +147,7 @@ class BleakBluetoothRuntime:
         )
         self._device_states[device_id] = state
         self._client = client
+        await self._refresh_connected_device_profile(state)
         self._sync_connected_flags()
         if not self._is_state_connected(state):
             raise RuntimeError("蓝牙设备连接失败")
@@ -172,10 +179,13 @@ class BleakBluetoothRuntime:
             if state.reconnect_task is not None and not state.reconnect_task.done():
                 state.reconnect_task.cancel()
                 state.reconnect_task = None
+            if state.heartbeat_task is not None and not state.heartbeat_task.done():
+                state.heartbeat_task.cancel()
+                state.heartbeat_task = None
             if state.client is not None and getattr(state.client, "is_connected", False):
                 stop_notify = getattr(state.client, "stop_notify", None)
                 if callable(stop_notify):
-                    notify_uuid = TOY_NOTIFY_CHAR_UUID if state.device.device_type == "toy" else EMS_NOTIFY_CHAR_UUID
+                    notify_uuid = _resolve_notify_uuid(state.device)
                     try:
                         await stop_notify(notify_uuid)
                     except Exception:
@@ -231,7 +241,7 @@ class BleakBluetoothRuntime:
             raise RuntimeError("当前没有已连接的蓝牙设备")
         device = state.device
         is_toy_device = device.device_type == "toy"
-        write_uuid = TOY_WRITE_CHAR_UUID if is_toy_device else EMS_WRITE_CHAR_UUID
+        write_uuid = _resolve_write_uuid(device)
         history = list(state.overlay_payload["history"])
         try:
             if is_toy_device:
@@ -240,7 +250,12 @@ class BleakBluetoothRuntime:
                         toy_step = step
                     else:
                         toy_step = _ems_step_to_toy(step)
-                    packet = create_toy_speed_packet(toy_step)
+                    # 灌肠机协议复用 Toy 三通道波形编辑器：
+                    # motor_a 只表示气阀开关，motor_b/motor_c 直接表示气泵和水泵的 0-5 档位。
+                    if device.protocol == GCQ_TOY_PROTOCOL:
+                        packet = create_gcq_toy_packet(toy_step)
+                    else:
+                        packet = create_toy_speed_packet(toy_step)
                     history.append(
                         {
                             "motor_a": toy_step.motor_a,
@@ -292,7 +307,7 @@ class BleakBluetoothRuntime:
                     await self._sleep(duration_seconds)
         finally:
             if is_toy_device:
-                stop_packet = create_toy_stop_packet()
+                stop_packet = create_gcq_toy_stop_packet() if device.protocol == GCQ_TOY_PROTOCOL else create_toy_stop_packet()
             else:
                 stop_packet = create_stop_packet(protocol=device.protocol)
             await state.client.write_gatt_char(write_uuid, stop_packet, response=False)
@@ -333,6 +348,9 @@ class BleakBluetoothRuntime:
         previous_device_name = state.device.name
         state.client = None
         state.battery_level = None
+        if state.heartbeat_task is not None and not state.heartbeat_task.done():
+            state.heartbeat_task.cancel()
+            state.heartbeat_task = None
         self._sync_connected_flags()
         if state.manual_disconnect_requested:
             LOGGER.info("蓝牙设备已主动断开 device_id=%s name=%s", device_id, previous_device_name)
@@ -394,6 +412,7 @@ class BleakBluetoothRuntime:
             state.client = client
             self._client = client
             state.manual_disconnect_requested = False
+            await self._refresh_connected_device_profile(state)
             self._sync_connected_flags()
             if not self._is_state_connected(state):
                 raise RuntimeError("蓝牙自动重连后状态仍未连接")
@@ -428,6 +447,16 @@ class BleakBluetoothRuntime:
             "revision": int(state.overlay_payload.get("revision", 0)) + 1,
         }
 
+    async def _refresh_connected_device_profile(self, state: _RuntimeDeviceState) -> None:
+        """连接成功后按真实 GATT 服务再次识别设备，避免广播缺字段时误判协议。"""
+        client = state.client
+        if client is None or not getattr(client, "is_connected", False):
+            return
+        service_uuids = await _load_connected_service_uuids(client)
+        if not service_uuids:
+            return
+        state.device = _apply_connected_service_profile(state.device, service_uuids)
+
     async def _initialize_device_telemetry(self, device_id: str, device: BluetoothDevice) -> None:
         state = self._device_states.get(device_id)
         if state is None:
@@ -435,6 +464,29 @@ class BleakBluetoothRuntime:
         state.battery_level = None
         client = state.client
         if client is None or not getattr(client, "is_connected", False):
+            return
+        if device.protocol == GCQ_TOY_PROTOCOL:
+            start_notify = getattr(client, "start_notify", None)
+            if callable(start_notify):
+                await start_notify(
+                    GCQ_TOY_NOTIFY_CHAR_UUID,
+                    lambda sender, data, target_device_id=device_id: self._dispatch_notify_callback(
+                        self._handle_gcq_toy_notify(target_device_id, sender, data),
+                    ),
+                )
+            await client.write_gatt_char(
+                GCQ_TOY_WRITE_CHAR_UUID,
+                _build_gcq_toy_status_query(),
+                response=False,
+            )
+            await client.write_gatt_char(
+                GCQ_TOY_WRITE_CHAR_UUID,
+                _build_gcq_toy_battery_query(),
+                response=False,
+            )
+            if state.heartbeat_task is not None and not state.heartbeat_task.done():
+                state.heartbeat_task.cancel()
+            state.heartbeat_task = asyncio.create_task(self._run_gcq_toy_heartbeat(device_id))
             return
         if device.device_type == "toy":
             start_notify = getattr(client, "start_notify", None)
@@ -515,6 +567,48 @@ class BleakBluetoothRuntime:
             battery_level=state.battery_level,
         )
 
+    async def _handle_gcq_toy_notify(self, device_id: str, _sender: Any, data: bytearray) -> None:
+        parsed = _try_parse_gcq_toy_notify(bytes(data))
+        if parsed is None:
+            return
+        state = self._device_states.get(device_id)
+        if state is None:
+            return
+        updates: dict[str, Any] = {
+            "connected": True,
+            "device_name": state.device.name,
+            "device_type": state.device.device_type,
+            "battery_level": state.battery_level,
+        }
+        if parsed.get("type") == "battery":
+            state.battery_level = parsed["level"]
+            updates["battery_level"] = state.battery_level
+        elif parsed.get("type") == "status":
+            # 设备待机时也会持续上报当前状态，这里只在正在播放波形时刷新叠加窗强度，
+            # 避免停止播放后又被设备状态包把当前强度覆盖成非零。
+            if state.overlay_payload.get("waveform_name"):
+                # 灌肠机按真实设备语义展示：气阀只有开/关，气泵和水泵只有 0-5 档。
+                updates["motor_a"] = 1 if parsed.get("valve_open", False) else 0
+                updates["motor_b"] = _clamp_gcq_level(parsed.get("air_pump_level", 0))
+                updates["motor_c"] = _clamp_gcq_level(parsed.get("water_pump_level", 0))
+        self._set_overlay_payload(device_id, **updates)
+
+    async def _run_gcq_toy_heartbeat(self, device_id: str) -> None:
+        """灌肠机协议要求主机每秒发送一次心跳，避免设备在长连接空闲时主动掉线。"""
+        try:
+            while True:
+                state = self._device_states.get(device_id)
+                if state is None or state.client is None or not getattr(state.client, "is_connected", False):
+                    return
+                await state.client.write_gatt_char(
+                    GCQ_TOY_WRITE_CHAR_UUID,
+                    _build_gcq_toy_heartbeat_packet(),
+                    response=False,
+                )
+                await self._sleep(1.0)
+        except asyncio.CancelledError:
+            raise
+
     def _resolve_state(self, device_id: str | None = None) -> _RuntimeDeviceState | None:
         if device_id is not None:
             state = self._device_states.get(device_id)
@@ -575,6 +669,16 @@ def classify_device(*, ble_device: Any, advertisement: Any) -> BluetoothDevice |
         or getattr(ble_device, "address", "")
     )
     name_upper = str(name).upper()
+
+    if GCQ_TOY_SERVICE_UUID in service_uuids:
+        return BluetoothDevice(
+            device_id=str(getattr(ble_device, "address", "")),
+            name=str(name),
+            device_type="toy",
+            protocol=GCQ_TOY_PROTOCOL,
+            rssi=int(getattr(ble_device, "rssi", getattr(advertisement, "rssi", -60)) or -60),
+            connected=False,
+        )
 
     if TOY_SERVICE_UUID in service_uuids or any(name_upper.startswith(prefix) for prefix in TOY_NAME_PREFIXES):
         return BluetoothDevice(
@@ -715,6 +819,63 @@ def _normalize_service_uuids(service_uuids: Iterable[str] | None) -> set[str]:
     return {str(item).lower() for item in service_uuids if item}
 
 
+async def _load_connected_service_uuids(client: Any) -> set[str]:
+    direct_services = _extract_service_uuids_from_services(getattr(client, "services", None))
+    if direct_services:
+        return direct_services
+
+    get_services = getattr(client, "get_services", None)
+    if not callable(get_services):
+        return set()
+    services = await get_services()
+    return _extract_service_uuids_from_services(services)
+
+
+def _extract_service_uuids_from_services(services: Any) -> set[str]:
+    if services is None:
+        return set()
+    if isinstance(services, dict):
+        candidates = services.values()
+    elif hasattr(services, "values") and callable(getattr(services, "values", None)):
+        candidates = services.values()
+    else:
+        candidates = services
+
+    uuids: set[str] = set()
+    try:
+        for item in candidates:
+            uuid = getattr(item, "uuid", item)
+            if uuid:
+                uuids.add(str(uuid).lower())
+    except TypeError:
+        return set()
+    return uuids
+
+
+def _apply_connected_service_profile(device: BluetoothDevice, service_uuids: set[str]) -> BluetoothDevice:
+    if GCQ_TOY_SERVICE_UUID in service_uuids:
+        device.device_type = "toy"
+        device.protocol = GCQ_TOY_PROTOCOL
+        return device
+    if TOY_SERVICE_UUID in service_uuids:
+        device.device_type = "toy"
+        device.protocol = "toy"
+        return device
+    if EMS_SERVICE_UUID in service_uuids:
+        device.device_type = "ems"
+        device.protocol = _resolve_ems_protocol_by_name(device.name)
+    return device
+
+
+def _resolve_ems_protocol_by_name(name: str) -> str:
+    name_upper = str(name or "").upper()
+    if name_upper.startswith("YYC-DJ-V2"):
+        return "ems_v2"
+    if name_upper.startswith("YYC-DJ"):
+        return "ems_v1"
+    return "ems_v2"
+
+
 def _high(value: int) -> int:
     clipped = max(0, min(int(value), 0xFFFF))
     return (clipped >> 8) & 0xFF
@@ -751,9 +912,27 @@ def create_toy_speed_packet(step: ToyWaveformStep) -> bytes:
     return bytes(values)
 
 
+def create_gcq_toy_packet(step: ToyWaveformStep) -> bytes:
+    """构建灌肠机实时控制包 35 12 valve air_pump water_pump checksum。"""
+    values = [
+        0x35,
+        0x12,
+        0xFF if _clamp_gcq_valve_state(step.motor_a) > 0 else 0x00,
+        _clamp_gcq_level(step.motor_b),
+        _clamp_gcq_level(step.motor_c),
+    ]
+    values.append(_compute_checksum(values))
+    return bytes(values)
+
+
 def create_toy_stop_packet() -> bytes:
     """构建 Toy 停止包，所有马达速度归零。"""
     return create_toy_speed_packet(ToyWaveformStep())
+
+
+def create_gcq_toy_stop_packet() -> bytes:
+    """构建灌肠机停止包，关闭气阀、气泵和水泵。"""
+    return create_gcq_toy_packet(ToyWaveformStep())
 
 
 def _build_toy_device_info_query() -> bytes:
@@ -763,8 +942,34 @@ def _build_toy_device_info_query() -> bytes:
     return bytes(values)
 
 
+def _build_gcq_toy_status_query() -> bytes:
+    values = [0x35, 0x13, 0x00, 0x00, 0x00]
+    values.append(_compute_checksum(values))
+    return bytes(values)
+
+
+def _build_gcq_toy_battery_query() -> bytes:
+    values = [0x35, 0x14, 0x00, 0x00, 0x00]
+    values.append(_compute_checksum(values))
+    return bytes(values)
+
+
+def _build_gcq_toy_heartbeat_packet() -> bytes:
+    values = [0x35, 0x17, 0x00, 0x00, 0x00]
+    values.append(_compute_checksum(values))
+    return bytes(values)
+
+
 def _clamp_toy_speed(value: int) -> int:
     return max(0, min(int(value), 20))
+
+
+def _clamp_gcq_valve_state(value: int) -> int:
+    return 1 if int(value) > 0 else 0
+
+
+def _clamp_gcq_level(value: int) -> int:
+    return max(0, min(int(value), 5))
 
 
 def _ems_step_to_toy(step: EmsWaveformStep) -> ToyWaveformStep:
@@ -796,3 +1001,43 @@ def _try_parse_toy_notify(data: bytes) -> dict | None:
     if cmd == 0x14:
         return {"type": "heartbeat"}
     return None
+
+
+def _try_parse_gcq_toy_notify(data: bytes) -> dict | None:
+    """解析灌肠机设备通知包。"""
+    if len(data) < 3 or data[0] != 0x35:
+        return None
+    cmd = data[1]
+    if cmd == 0x13 and len(data) >= 6:
+        return {
+            "type": "status",
+            "valve_open": data[2] == 0xFF,
+            "air_pump_level": max(0, min(int(data[3]), 5)),
+            "water_pump_level": max(0, min(int(data[4]), 5)),
+        }
+    if cmd == 0x14 and len(data) >= 4:
+        return {"type": "battery", "level": max(0, min(int(data[2]), 100))}
+    if cmd == 0x15 and len(data) >= 8:
+        return {
+            "type": "sensor",
+            "air_pressure": (int(data[2]) << 8) | int(data[3]),
+            "water_pressure": (int(data[4]) << 8) | int(data[5]),
+            "water_temperature": int(data[6]),
+        }
+    return None
+
+
+def _resolve_write_uuid(device: BluetoothDevice) -> str:
+    if device.protocol == GCQ_TOY_PROTOCOL:
+        return GCQ_TOY_WRITE_CHAR_UUID
+    if device.device_type == "toy":
+        return TOY_WRITE_CHAR_UUID
+    return EMS_WRITE_CHAR_UUID
+
+
+def _resolve_notify_uuid(device: BluetoothDevice) -> str:
+    if device.protocol == GCQ_TOY_PROTOCOL:
+        return GCQ_TOY_NOTIFY_CHAR_UUID
+    if device.device_type == "toy":
+        return TOY_NOTIFY_CHAR_UUID
+    return EMS_NOTIFY_CHAR_UUID
