@@ -1,6 +1,6 @@
 <template>
   <section class="studio-stack">
-    <ACard v-for="group in groups" :key="group.eventType" :title="group.label" :bordered="false">
+    <ACard v-if="group" :title="`${group.label}规则`" :bordered="false">
       <template #extra>
         <div class="studio-card-actions">
           <span class="section-count">{{ group.rules.length }} 条</span>
@@ -52,6 +52,10 @@
           </div>
         </article>
       </div>
+    </ACard>
+
+    <ACard v-else :bordered="false">
+      <AEmpty description="请先从右侧选择 IM 事件" />
     </ACard>
 
     <ARow :gutter="[18, 18]">
@@ -107,11 +111,11 @@ import {
 import type { CommandStudioResponse, CommandStudioRule } from "@/types/command";
 
 defineProps<{
-  groups: Array<{
+  group: {
     eventType: string;
     label: string;
     rules: CommandStudioRule[];
-  }>;
+  } | null;
   commandSlotOptions: Array<{
     label: string;
     value: string;
@@ -132,6 +136,18 @@ function normalizeNonNegative(value: number) {
 </script>
 
 <style scoped>
+.studio-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.studio-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .rule-list {
   display: grid;
   gap: 12px;

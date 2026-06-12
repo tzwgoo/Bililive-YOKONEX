@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import WaveformListPanel from "@/components/waveforms/WaveformListPanel.vue";
 
 describe("WaveformListPanel", () => {
-  it("uses an explicit preview drawing height so bar percentages render correctly", () => {
+  it("uses an explicit preview drawing height and scales EMS previews against the real 180 ceiling", () => {
     const wrapper = mount(WaveformListPanel, {
       props: {
         waveforms: [
@@ -21,6 +21,7 @@ describe("WaveformListPanel", () => {
           },
         ],
         selectedWaveformId: "custom-wave-01",
+        deviceType: "ems",
       },
       attachTo: document.body,
     });
@@ -28,11 +29,11 @@ describe("WaveformListPanel", () => {
     const previewBars = wrapper.get(".waveform-preview-bars").element as HTMLElement;
     const previewBarStyles = wrapper.findAll(".waveform-preview-bar").map((item) => item.attributes("style"));
 
-    expect(getComputedStyle(previewBars).height).toBe("52px");
-    expect(previewBarStyles[0]).toContain("height: 10px;");
-    expect(previewBarStyles[1]).toContain("height: 21px;");
-    expect(previewBarStyles[2]).toContain("height: 52px;");
-    expect(previewBarStyles[3]).toContain("height: 31px;");
+    expect(getComputedStyle(previewBars).height).toBe("64px");
+    expect(previewBarStyles[0]).toContain("height: 7px;");
+    expect(previewBarStyles[1]).toContain("height: 14px;");
+    expect(previewBarStyles[2]).toContain("height: 36px;");
+    expect(previewBarStyles[3]).toContain("height: 21px;");
   });
 
   it("keeps the library panel at a fixed desktop height and scrolls inside the list container", () => {
@@ -48,6 +49,7 @@ describe("WaveformListPanel", () => {
           steps: [{ duration_ms: 200, channel_a: 20 + index, channel_b: 40 + index }],
         })),
         selectedWaveformId: "custom-wave-1",
+        deviceType: "ems",
       },
       attachTo: document.body,
     });
@@ -74,6 +76,7 @@ describe("WaveformListPanel", () => {
           },
         ],
         selectedWaveformId: "custom-wave-01",
+        deviceType: "ems",
       },
     });
 
@@ -95,6 +98,7 @@ describe("WaveformListPanel", () => {
           },
         ],
         selectedWaveformId: "custom-wave-01",
+        deviceType: "ems",
       },
     });
 
@@ -118,6 +122,7 @@ describe("WaveformListPanel", () => {
           },
         ],
         selectedWaveformId: "custom-wave-01",
+        deviceType: "ems",
       },
       attachTo: document.body,
     });

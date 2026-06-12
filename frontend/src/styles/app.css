@@ -1,6 +1,15 @@
 body {
   font-family: "Aptos", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: var(--app-bg);
+  /* 背景渐变固定在视口层，避免长页面把整张渐变拉伸后出现中后段过渡生硬的问题 */
+  background-color: var(--app-bg);
+  background:
+    radial-gradient(circle at top left, rgba(217, 138, 168, 0.16), transparent 32%),
+    radial-gradient(circle at top right, rgba(235, 178, 199, 0.12), transparent 30%),
+    linear-gradient(180deg, var(--app-bg-accent) 0%, #100913 42%, var(--app-bg) 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: left top, right top, center top;
+  background-size: 1200px 720px, 1080px 680px, 100% 100%;
+  background-attachment: fixed, fixed, fixed;
   color: var(--app-text);
 }
 
@@ -19,9 +28,10 @@ body {
   gap: 18px;
   padding: 24px 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(244, 241, 235, 0.94)),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.85), rgba(243, 243, 239, 0.92));
-  border-right: 1px solid rgba(120, 113, 108, 0.16);
+    linear-gradient(180deg, rgba(29, 16, 25, 0.94), rgba(12, 8, 11, 0.98)),
+    radial-gradient(circle at top left, rgba(217, 138, 168, 0.12), transparent 32%);
+  border-right: 1px solid var(--app-border);
+  box-shadow: 20px 0 40px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(18px);
   overflow-y: auto;
 }
@@ -41,7 +51,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #78716c;
+  color: var(--app-muted);
 }
 
 .app-menu {
@@ -56,22 +66,23 @@ body {
   padding: 12px 14px;
   border-radius: 18px;
   text-decoration: none;
-  color: #44403c;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(120, 113, 108, 0.12);
+  color: #ffd8e8;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   transition: all 0.2s ease;
 }
 
 .app-menu-link:hover {
-  border-color: rgba(120, 113, 108, 0.24);
+  border-color: var(--app-border-strong);
+  background: rgba(217, 138, 168, 0.07);
   transform: translateX(2px);
 }
 
 .app-menu-link.router-link-active {
-  color: #fafaf9;
-  background: linear-gradient(180deg, #2b2623, #171412);
-  border-color: #1c1917;
-  box-shadow: 0 12px 28px rgba(23, 20, 18, 0.22);
+  color: #fff8fb;
+  background: linear-gradient(180deg, #d98aa8, #ba6887);
+  border-color: #efbfd0;
+  box-shadow: 0 12px 28px rgba(217, 138, 168, 0.24);
 }
 
 .app-menu-title {
@@ -79,12 +90,12 @@ body {
 }
 
 .app-menu-caption {
-  color: #78716c;
+  color: var(--app-muted);
   font-size: 12px;
 }
 
 .app-menu-link.router-link-active .app-menu-caption {
-  color: rgba(250, 250, 249, 0.72);
+  color: rgba(255, 248, 251, 0.84);
 }
 
 .app-main {
@@ -114,7 +125,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #78716c;
+  color: var(--app-muted);
 }
 
 .page-header-copy h1 {
@@ -125,7 +136,7 @@ body {
 
 .page-header-description {
   margin: 10px 0 0;
-  color: #57534e;
+  color: var(--app-muted);
   line-height: 1.6;
 }
 
@@ -171,7 +182,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #78716c;
+  color: var(--app-muted);
 }
 
 .studio-hero h1 {
@@ -183,7 +194,7 @@ body {
 .studio-subtitle {
   max-width: 720px;
   margin: 10px 0 0;
-  color: #57534e;
+  color: var(--app-muted);
   line-height: 1.6;
 }
 
@@ -202,39 +213,184 @@ body {
   gap: 10px;
 }
 
-.studio-page .ant-card {
+:is(.studio-page, .dashboard-page) .ant-card {
   border-radius: 24px;
-  border: 1px solid rgba(120, 113, 108, 0.12);
-  box-shadow: 0 18px 36px rgba(28, 25, 23, 0.05);
+  background: linear-gradient(180deg, rgba(22, 13, 28, 0.96), rgba(10, 8, 14, 0.98));
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow);
 }
 
-.studio-page .ant-card .ant-card-head {
+:is(.studio-page, .dashboard-page) .ant-card .ant-card-head {
   min-height: 58px;
   padding: 0 18px;
-  border-bottom-color: rgba(120, 113, 108, 0.1);
+  background: transparent;
+  border-bottom-color: rgba(217, 138, 168, 0.12);
 }
 
-.studio-page .ant-card .ant-card-head-title {
+:is(.studio-page, .dashboard-page) .ant-card .ant-card-head-title,
+:is(.studio-page, .dashboard-page) .ant-card .ant-card-extra,
+:is(.studio-page, .dashboard-page) .ant-card .ant-card-body {
+  color: var(--app-text);
+}
+
+:is(.studio-page, .dashboard-page) .ant-card .ant-card-head-title {
   font-weight: 700;
 }
 
-.studio-page .ant-card .ant-card-body {
+:is(.studio-page, .dashboard-page) .ant-card .ant-card-body {
   padding: 18px;
 }
 
-.studio-page .ant-alert {
+:is(.studio-page, .dashboard-page) .ant-alert {
   border-radius: 18px;
-  border-color: rgba(120, 113, 108, 0.12);
+  border-color: var(--app-border);
+  background: rgba(217, 138, 168, 0.08);
 }
 
-.studio-page .ant-btn {
+:is(.studio-page, .dashboard-page) .ant-alert .ant-alert-message,
+:is(.studio-page, .dashboard-page) .ant-alert .ant-alert-description,
+:is(.studio-page, .dashboard-page) .ant-alert .ant-alert-icon {
+  color: var(--app-text);
+}
+
+:is(.studio-page, .dashboard-page) .ant-btn {
   border-radius: 12px;
 }
 
-.studio-page .ant-input,
-.studio-page .ant-input-number,
-.studio-page .ant-select-selector {
+:is(.studio-page, .dashboard-page) .ant-btn-primary {
+  background: linear-gradient(180deg, #e0a1b9, #c97d99);
+  border-color: #efbfd0;
+  box-shadow: 0 10px 24px rgba(217, 138, 168, 0.22);
+}
+
+:is(.studio-page, .dashboard-page) .ant-btn-default {
+  color: #ffe8f2;
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:is(.studio-page, .dashboard-page) .ant-btn-default:not(:disabled):hover {
+  color: #fff6fa;
+  border-color: var(--app-border-strong);
+  background: rgba(217, 138, 168, 0.07);
+}
+
+:is(.studio-page, .dashboard-page) .ant-input,
+:is(.studio-page, .dashboard-page) .ant-input-number,
+:is(.studio-page, .dashboard-page) .ant-select-selector,
+:is(.studio-page, .dashboard-page) .ant-input-affix-wrapper {
+  color: var(--app-text);
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
   border-radius: 12px !important;
+}
+
+:is(.studio-page, .dashboard-page) .ant-input::placeholder {
+  color: rgba(255, 232, 242, 0.42);
+}
+
+:is(.studio-page, .dashboard-page) .ant-select-selection-placeholder,
+:is(.studio-page, .dashboard-page) .ant-select-selection-item,
+:is(.studio-page, .dashboard-page) .ant-select-selection-search-input,
+:is(.studio-page, .dashboard-page) .ant-select-arrow,
+:is(.studio-page, .dashboard-page) .ant-select-clear,
+:is(.studio-page, .dashboard-page) .ant-input-password-icon,
+:is(.studio-page, .dashboard-page) .ant-input-suffix,
+:is(.studio-page, .dashboard-page) .ant-input-number-input,
+:is(.studio-page, .dashboard-page) .ant-input-number-group-addon {
+  color: var(--app-text) !important;
+}
+
+/* 深色表单里显式覆盖复选框文案和边框，避免 Ant Design 默认黑字落到深色背景上 */
+:is(.studio-page, .dashboard-page) .ant-checkbox-wrapper,
+:is(.studio-page, .dashboard-page) .ant-checkbox + span {
+  color: var(--app-text) !important;
+}
+
+:is(.studio-page, .dashboard-page) .ant-checkbox-inner {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+:is(.studio-page, .dashboard-page) .ant-checkbox-checked .ant-checkbox-inner {
+  background: var(--app-accent);
+  border-color: var(--app-accent);
+}
+
+:is(.studio-page, .dashboard-page) .ant-empty-description,
+:is(.studio-page, .dashboard-page) .ant-descriptions-item-label,
+:is(.studio-page, .dashboard-page) .ant-descriptions-item-content,
+:is(.studio-page, .dashboard-page) .ant-collapse-header-text,
+:is(.studio-page, .dashboard-page) .ant-collapse-expand-icon,
+:is(.studio-page, .dashboard-page) .ant-tabs-tab,
+:is(.studio-page, .dashboard-page) .ant-tabs-content,
+:is(.studio-page, .dashboard-page) .ant-tag {
+  color: var(--app-text);
+}
+
+:is(.studio-page, .dashboard-page) .ant-descriptions-bordered .ant-descriptions-item-label,
+:is(.studio-page, .dashboard-page) .ant-descriptions-bordered .ant-descriptions-item-content {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+:is(.studio-page, .dashboard-page) .ant-collapse {
+  background: transparent;
+}
+
+:is(.studio-page, .dashboard-page) .ant-collapse > .ant-collapse-item {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+:is(.studio-page, .dashboard-page) .ant-collapse-content {
+  background: transparent;
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+:is(.studio-page, .dashboard-page) .ant-tabs-tab-active .ant-tabs-tab-btn,
+:is(.studio-page, .dashboard-page) .ant-tabs-tab:hover {
+  color: var(--app-accent-soft) !important;
+}
+
+:is(.studio-page, .dashboard-page) .ant-tabs-ink-bar {
+  background: var(--app-accent);
+}
+
+:is(.studio-page, .dashboard-page) .ant-switch.ant-switch-checked {
+  background: var(--app-accent);
+}
+
+.summary-card,
+.hero-metric,
+.event-list-item,
+.rule-item,
+.fixed-item,
+.waveform-card,
+.waveform-editor-panel,
+.waveform-library-panel {
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96)) !important;
+  border-color: var(--app-border) !important;
+  box-shadow: var(--app-shadow) !important;
+}
+
+.summary-card span,
+.hero-metric span,
+.event-list-item-copy span,
+.rule-caption,
+.guard-label,
+.section-kicker,
+.snapshot-kicker {
+  color: var(--app-muted) !important;
+}
+
+.summary-card strong,
+.hero-metric strong,
+.event-list-item-copy strong,
+.fixed-item strong,
+.fixed-item code,
+.rule-item strong {
+  color: var(--app-text) !important;
 }
 
 @media (max-width: 720px) {
@@ -248,7 +404,7 @@ body {
     min-height: auto;
     width: auto;
     border-right: 0;
-    border-bottom: 1px solid rgba(120, 113, 108, 0.16);
+    border-bottom: 1px solid var(--app-border);
     overflow-y: visible;
   }
 

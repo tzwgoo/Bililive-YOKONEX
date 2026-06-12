@@ -1,27 +1,27 @@
 <template>
-  <ACard class="snapshot-card" :bordered="false">
-    <div class="snapshot-head">
-      <div>
-        <p class="snapshot-kicker">Runtime Snapshot</p>
-        <h2>运行状态</h2>
-      </div>
-      <StatusPill :state="session.status" />
-    </div>
-    <ADescriptions :column="2" size="small" bordered>
-      <ADescriptionsItem label="房间号">{{ session.roomId }}</ADescriptionsItem>
-      <ADescriptionsItem label="主播昵称">{{ session.anchorName || "-" }}</ADescriptionsItem>
-      <ADescriptionsItem label="IM 状态">{{ commandStatus }}</ADescriptionsItem>
-      <ADescriptionsItem label="蓝牙状态">{{ bluetoothStatus }}</ADescriptionsItem>
-      <ADescriptionsItem label="最近事件">{{ formatTimestamp(session.lastEventAt) }}</ADescriptionsItem>
-    </ADescriptions>
-  </ACard>
+<!--  <ACard class="snapshot-card" :bordered="false">-->
+<!--    <div class="snapshot-head">-->
+<!--      <div>-->
+<!--        <p class="snapshot-kicker">Runtime Snapshot</p>-->
+<!--        <h2>运行状态</h2>-->
+<!--      </div>-->
+<!--      <StatusPill :state="session.status" />-->
+<!--    </div>-->
+<!--    <ADescriptions :column="2" size="small" bordered>-->
+<!--      <ADescriptionsItem label="房间号">{{ session.roomId }}</ADescriptionsItem>-->
+<!--      <ADescriptionsItem label="主播昵称">{{ session.anchorName || "-" }}</ADescriptionsItem>-->
+<!--      <ADescriptionsItem label="IM 状态">{{ formatStatusLabel(commandStatus) }}</ADescriptionsItem>-->
+<!--      <ADescriptionsItem label="蓝牙状态">{{ formatStatusLabel(bluetoothStatus) }}</ADescriptionsItem>-->
+<!--      <ADescriptionsItem label="最近事件">{{ formatTimestamp(session.lastEventAt) }}</ADescriptionsItem>-->
+<!--    </ADescriptions>-->
+<!--  </ACard>-->
 </template>
 
 <script setup lang="ts">
 import { Card as ACard, Descriptions as ADescriptions } from "ant-design-vue";
 import StatusPill from "@/components/shared/StatusPill.vue";
 import type { SessionStatusModel } from "@/types/session";
-import { formatTimestamp } from "@/utils/format";
+import { formatStatusLabel, formatTimestamp } from "@/utils/format";
 
 defineProps<{
   session: SessionStatusModel;

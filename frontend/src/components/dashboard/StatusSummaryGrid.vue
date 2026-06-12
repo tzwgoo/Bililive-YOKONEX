@@ -22,7 +22,7 @@ import { computed } from "vue";
 import type { BluetoothStatusModel } from "@/types/bluetooth";
 import type { CommandStatusModel } from "@/types/command";
 import type { SessionStatusModel } from "@/types/session";
-import { formatTimestamp } from "@/utils/format";
+import { formatModeLabel, formatStatusLabel, formatTimestamp } from "@/utils/format";
 
 const props = defineProps<{
   session: SessionStatusModel;
@@ -31,11 +31,10 @@ const props = defineProps<{
 }>();
 
 const summaryItems = computed(() => [
-  { label: "监听状态", value: props.session.status || "idle" },
-  { label: "监听模式", value: props.session.mode || "-" },
-  { label: "输出方式", value: props.session.connectionMode || "-" },
-  { label: "IM 状态", value: props.commandStatus.status || "idle" },
-  { label: "蓝牙状态", value: props.bluetoothStatus.connected ? "connected" : "idle" },
+  { label: "监听状态", value: formatStatusLabel(props.session.status) },
+  { label: "输出方式", value: formatModeLabel(props.session.connectionMode) },
+  { label: "IM 状态", value: formatStatusLabel(props.commandStatus.status) },
+  { label: "蓝牙状态", value: formatStatusLabel(props.bluetoothStatus.connected ? "connected" : "idle") },
   { label: "当前房间", value: props.session.roomId || "-" },
   { label: "主播昵称", value: props.session.anchorName || "-" },
   { label: "最近事件", value: formatTimestamp(props.session.lastEventAt) },

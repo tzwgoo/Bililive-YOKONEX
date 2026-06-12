@@ -46,6 +46,12 @@ describe("DashboardPage", () => {
     expect(wrapper.text()).toContain("监听主参数");
     expect(wrapper.text()).toContain("蓝牙设备");
     expect(wrapper.text()).toContain("实时日志");
+    expect(wrapper.text()).toContain("运行中");
+    expect(wrapper.text()).toContain("IM 指令");
+    expect(wrapper.text()).toContain("已连接");
+    expect(wrapper.text()).toContain("空闲");
+    expect(wrapper.text()).not.toContain("礼物 / 点赞触发");
+    expect(wrapper.text()).not.toContain("弹幕关键词触发");
     expect(wrapper.text()).not.toContain("集中查看当前运行状态、保留高频监听参数和连接操作，并在首页持续查看实时日志。");
     expect(wrapper.getComponent(PageHeaderBar).props("kicker")).toBeUndefined();
     expect(wrapper.getComponent(PageHeaderBar).props("description")).toBeUndefined();
@@ -107,8 +113,8 @@ describe("DashboardPage", () => {
     const wrapper = mount(DashboardPage);
     await flushPromises();
 
-    expect(wrapper.text()).toContain("消息源");
-    expect(wrapper.get('[data-testid="session-source-input"]').element).toHaveProperty("value", "第三方消息流");
+    expect(wrapper.text()).not.toContain("消息源");
+    expect(wrapper.text()).toContain("房间号 ID");
     expect(wrapper.text()).not.toContain("主播身份码");
   });
 

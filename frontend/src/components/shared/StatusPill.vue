@@ -5,20 +5,22 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Tag as ATag } from "ant-design-vue";
+import { formatStatusLabel } from "@/utils/format";
 
 const props = defineProps<{
   state?: string;
 }>();
 
-const normalizedState = computed(() => props.state || "idle");
+const rawState = computed(() => props.state || "idle");
+const normalizedState = computed(() => formatStatusLabel(rawState.value));
 const color = computed(() => {
-  if (normalizedState.value === "running" || normalizedState.value === "connected") {
+  if (rawState.value === "running" || rawState.value === "connected") {
     return "success";
   }
-  if (normalizedState.value === "error") {
+  if (rawState.value === "error") {
     return "error";
   }
-  if (normalizedState.value === "connecting") {
+  if (rawState.value === "connecting") {
     return "processing";
   }
   return "default";
@@ -32,6 +34,6 @@ const color = computed(() => {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 </style>

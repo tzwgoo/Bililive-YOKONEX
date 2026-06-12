@@ -124,13 +124,22 @@ function resolveMeta(event: EventRecord) {
   gap: 12px;
 }
 
+/* 实时日志卡片运行在深色背景上，这里显式指定标题和时间颜色，避免落回组件默认黑字。 */
+.event-item-head strong {
+  color: var(--app-text);
+}
+
+.event-item-head small {
+  color: var(--app-muted);
+}
+
 .event-item-text {
   margin: 0;
-  color: #57534e;
+  color: var(--app-muted);
   word-break: break-word;
 }
 
 .event-item-meta {
-  color: #78716c;
+  color: var(--app-muted);
 }
 </style>

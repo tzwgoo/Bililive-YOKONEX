@@ -1,29 +1,9 @@
 <template>
-  <main class="studio-page">
+  <main class="studio-page event-config-page">
     <ACard :bordered="false" data-testid="workspace-summary-card">
       <div class="workspace-summary">
         <div class="workspace-summary-header">
           <h1>事件配置</h1>
-          <div class="workspace-summary-actions">
-            <Button
-              v-if="activeTab === 'im'"
-              data-testid="command-save"
-              type="primary"
-              :loading="savingCommandRules"
-              @click="handleSaveImRules"
-            >
-              保存 IM 规则
-            </Button>
-            <Button
-              v-else
-              data-testid="save-rules"
-              type="primary"
-              :loading="savingBluetoothRules"
-              @click="handleSaveBluetoothRules"
-            >
-              保存蓝牙规则
-            </Button>
-          </div>
         </div>
         <div class="workspace-overview workspace-overview-metrics-only">
           <div class="hero-metrics">
@@ -46,63 +26,160 @@
 
     <AAlert v-if="message" :message="message" type="info" show-icon />
 
-    <EventConfigTabs v-model:active-tab="activeTab" :tabs="tabs" />
+    <section class="event-config-layout">
+      <div class="event-config-main">
+        <ACard :bordered="false" class="editor-shell">
+          <div class="editor-shell-header">
+            <div>
+              <p class="editor-shell-eyebrow">{{ currentSectionLabel }}</p>
+              <h2>{{ currentPanelTitle }}</h2>
+            </div>
+            <Button
+              :data-testid="currentSaveButtonTestId"
+              type="primary"
+              :loading="currentSaveLoading"
+              @click="handlePrimarySave"
+            >
+              {{ currentSaveLabel }}
+            </Button>
+          </div>
+        </ACard>
 
-    <ImRuleGroupsPanel
-      v-if="activeTab === 'im'"
-      :groups="groupedRules"
-      :command-slot-options="commandSlotOptions"
-      :studio="commandStore.studio"
-      @add-rule="addRule"
-      @sort-rules="sortRules"
-      @remove-rule="removeRule"
-      @update-max-price="updateMaxPrice"
-    />
+        <SharedEventSettingsPanel
+          v-if="activeTab === 'shared'"
+          :selected-config="selectedSharedConfig"
+          :session-draft="sessionDraft"
+        />
 
-    <BluetoothEventRulePanel
-      v-else
-      :rule-groups="draftRuleGroups"
-      :ems-waveform-options="emsWaveformOptions"
-      :toy-waveform-options="toyWaveformOptions"
-      @update-min-price="updateMinPrice"
-      @update-max-price="updateMaxPriceFilter"
-      @update-guard-waveform="updateGuardWaveform"
-    />
+        <ImRuleGroupsPanel
+          v-else-if="activeTab === 'im'"
+          :group="currentImGroup"
+          :command-slot-options="commandSlotOptions"
+          :studio="commandStore.studio"
+          @add-rule="addRule"
+          @sort-rules="sortRules"
+          @remove-rule="removeRule"
+          @update-max-price="updateMaxPrice"
+        />
+
+        <BluetoothEventRulePanel
+          v-else
+          :rule-group="currentBluetoothGroup"
+          :ems-waveform-options="emsWaveformOptions"
+          :toy-waveform-options="toyWaveformOptions"
+          @update-min-price="updateMinPrice"
+          @update-max-price="updateMaxPriceFilter"
+          @update-guard-waveform="updateGuardWaveform"
+        />
+      </div>
+
+      <ASidebarCard :bordered="false" class="event-config-sidebar">
+        <EventConfigTabs v-model:active-tab="activeTab" :tabs="tabs" />
+
+        <div class="event-list-header">
+          <strong>事件列表</strong>
+          <span>{{ currentEventItems.length }} 项</span>
+        </div>
+
+        <AEmpty v-if="currentEventItems.length === 0" description="暂无可配置事件" />
+
+        <div v-else class="event-list">
+          <button
+            v-for="item in currentEventItems"
+            :key="item.key"
+            type="button"
+            class="event-list-item"
+            :class="{ 'event-list-item-active': item.key === currentSelectedKey }"
+            :data-testid="`event-item-${item.key}`"
+            @click="handleSelectEvent(item.key)"
+          >
+            <div class="event-list-item-copy">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.description }}</span>
+            </div>
+            <div v-if="item.toggleable" class="event-list-switch" @click.stop>
+              <Switch
+                :checked="item.enabled"
+                size="small"
+                @change="handleToggleEvent(item.key, Boolean($event))"
+              />
+            </div>
+            <span v-else class="event-list-static-tag">通用</span>
+          </button>
+        </div>
+      </ASidebarCard>
+    </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { Alert as AAlert, Button, Card as ACard } from "ant-design-vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { Alert as AAlert, Button, Card as ACard, Empty as AEmpty, Switch } from "ant-design-vue";
 import BluetoothEventRulePanel from "@/components/events/BluetoothEventRulePanel.vue";
 import EventConfigTabs from "@/components/events/EventConfigTabs.vue";
 import ImRuleGroupsPanel from "@/components/events/ImRuleGroupsPanel.vue";
+import SharedEventSettingsPanel from "@/components/events/SharedEventSettingsPanel.vue";
 import { useLocalDraft } from "@/composables/useLocalDraft";
 import { useBluetoothStore } from "@/stores/bluetooth";
 import { useCommandStore } from "@/stores/command";
-import type { BluetoothRuleGroup, BluetoothStudioRule, CommandStudioRule } from "@/types";
+import type { BluetoothRuleGroup, BluetoothStudioRule } from "@/types/bluetooth";
+import type { CommandStudioRule } from "@/types/command";
+import type { SessionStartPayload } from "@/types/session";
+
+const ASidebarCard = ACard;
+
+type EventTabKey = "shared" | "im" | "bluetooth";
+type SharedConfigKey = "like" | "danmaku";
+
+type EventListItem = {
+  key: string;
+  label: string;
+  enabled: boolean;
+  description: string;
+  toggleable: boolean;
+};
+
+const defaultSessionDraft: SessionStartPayload = {
+  mode: "third_party",
+  value: "",
+  trigger_mode: "by_quantity",
+  like_multiple: 100,
+  danmaku_enabled: false,
+  danmaku_keywords: "",
+  danmaku_cooldown_seconds: 0,
+  danmaku_user_limit_window_seconds: 0,
+  danmaku_user_limit_max_triggers: 0,
+  danmaku_min_guard_level: 0,
+};
 
 const props = withDefaults(
   defineProps<{
-    initialTab?: "im" | "bluetooth";
+    initialTab?: EventTabKey;
   }>(),
   {
-    initialTab: "im",
+    initialTab: "shared",
   },
 );
 
 const commandStore = useCommandStore();
 const bluetoothStore = useBluetoothStore();
-const activeTabStorage = useLocalDraft<"im" | "bluetooth">("biliLive.eventConfigTab", props.initialTab);
+const activeTabStorage = useLocalDraft<EventTabKey>("biliLive.eventConfigTab", props.initialTab);
+const sessionDraftStorage = useLocalDraft<SessionStartPayload>("biliLive.sessionDraft", defaultSessionDraft);
 
-const activeTab = ref<"im" | "bluetooth">(activeTabStorage.load());
-const message = ref("规则修改后可分别保存到 IM 和蓝牙配置。");
+const activeTab = ref<EventTabKey>(activeTabStorage.load());
+const message = ref("规则修改后可分别保存到通用监听草稿、IM 配置和蓝牙配置。");
+const savingSharedConfig = ref(false);
 const savingCommandRules = ref(false);
 const savingBluetoothRules = ref(false);
 const draftRules = ref<CommandStudioRule[]>([]);
 const draftRuleGroups = ref<BluetoothRuleGroup[]>([]);
+const sessionDraft = reactive(sessionDraftStorage.load());
+const selectedSharedConfig = ref<SharedConfigKey>("like");
+const selectedImEventType = ref("");
+const selectedBluetoothGroupId = ref("");
 
 const tabs = [
+  { key: "shared", label: "通用" },
   { key: "im", label: "IM" },
   { key: "bluetooth", label: "蓝牙" },
 ] as const;
@@ -128,9 +205,95 @@ const bluetoothRuleCount = computed(() =>
   draftRuleGroups.value.reduce((sum, group) => sum + group.rules.length, 0),
 );
 const waveformCount = computed(() =>
-  (bluetoothStore.studio?.ems_waveforms.length || 0) + (bluetoothStore.studio?.toy_waveforms.length || 0),
+  (bluetoothStore.studio?.ems_waveforms?.length || 0) + (bluetoothStore.studio?.toy_waveforms?.length || 0),
 );
 const priceFilterGroupIds = new Set(["gift", "super_chat", "guard_buy", "guard_renew"]);
+
+const sharedEventItems = computed<EventListItem[]>(() => [
+  {
+    key: "like",
+    label: "点赞触发",
+    enabled: true,
+    description: `当前倍率 ${sessionDraft.like_multiple || 1} 倍`,
+    toggleable: false,
+  },
+  {
+    key: "danmaku",
+    label: "弹幕触发",
+    enabled: sessionDraft.danmaku_enabled,
+    description: sessionDraft.danmaku_keywords ? `关键词：${sessionDraft.danmaku_keywords}` : "暂未配置关键词",
+    toggleable: true,
+  },
+]);
+const imEventItems = computed<EventListItem[]>(() =>
+  groupedRules.value.map((group) => ({
+    key: group.eventType,
+    label: group.label,
+    enabled: group.rules.length > 0 && group.rules.some((rule) => rule.enabled),
+    description: group.rules.length > 0 ? `${group.rules.length} 条档位规则` : "暂无档位规则",
+    toggleable: true,
+  })),
+);
+const bluetoothEventItems = computed<EventListItem[]>(() =>
+  draftRuleGroups.value.map((group) => ({
+    key: group.group_id,
+    label: group.group_label,
+    enabled: group.rules.length > 0 && group.rules.some((rule) => rule.enabled),
+    description: `${group.rules.length} 条波形规则`,
+    toggleable: true,
+  })),
+);
+const currentEventItems = computed(() => {
+  if (activeTab.value === "shared") {
+    return sharedEventItems.value;
+  }
+  return activeTab.value === "im" ? imEventItems.value : bluetoothEventItems.value;
+});
+const currentSelectedKey = computed(() => {
+  if (activeTab.value === "shared") {
+    return selectedSharedConfig.value;
+  }
+  return activeTab.value === "im" ? selectedImEventType.value : selectedBluetoothGroupId.value;
+});
+const currentImGroup = computed(() =>
+  groupedRules.value.find((group) => group.eventType === selectedImEventType.value) || null,
+);
+const currentBluetoothGroup = computed(() =>
+  draftRuleGroups.value.find((group) => group.group_id === selectedBluetoothGroupId.value) || null,
+);
+const currentSectionLabel = computed(() => {
+  if (activeTab.value === "shared") {
+    return "通用事件";
+  }
+  return activeTab.value === "im" ? "IM 事件" : "蓝牙事件";
+});
+const currentPanelTitle = computed(() => {
+  if (activeTab.value === "shared") {
+    return selectedSharedConfig.value === "like" ? "点赞触发配置" : "弹幕触发配置";
+  }
+  if (activeTab.value === "im") {
+    return currentImGroup.value?.label || "请选择 IM 事件";
+  }
+  return currentBluetoothGroup.value?.group_label || "请选择蓝牙事件";
+});
+const currentSaveLabel = computed(() => {
+  if (activeTab.value === "shared") {
+    return "保存通用配置";
+  }
+  return activeTab.value === "im" ? "保存 IM 规则" : "保存蓝牙规则";
+});
+const currentSaveButtonTestId = computed(() => {
+  if (activeTab.value === "shared") {
+    return "save-shared-config";
+  }
+  return activeTab.value === "im" ? "command-save" : "save-rules";
+});
+const currentSaveLoading = computed(() => {
+  if (activeTab.value === "shared") {
+    return savingSharedConfig.value;
+  }
+  return activeTab.value === "im" ? savingCommandRules.value : savingBluetoothRules.value;
+});
 
 watch(activeTab, (value) => {
   activeTabStorage.save(value);
@@ -154,7 +317,7 @@ watch(
       draftRuleGroups.value = [];
       return;
     }
-    draftRuleGroups.value = studio.rule_groups.map((group) => ({
+    draftRuleGroups.value = (studio.rule_groups || []).map((group) => ({
       ...group,
       rules: group.rules.map((rule) => ({
         ...rule,
@@ -165,8 +328,62 @@ watch(
   { immediate: true, deep: true },
 );
 
+watch(
+  groupedRules,
+  (groups) => {
+    // IM 配置改成单事件编辑后，需要保证左侧始终落在一个有效事件上。
+    if (groups.length === 0) {
+      selectedImEventType.value = "";
+      return;
+    }
+    if (!groups.some((group) => group.eventType === selectedImEventType.value)) {
+      selectedImEventType.value = groups[0].eventType;
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  draftRuleGroups,
+  (groups) => {
+    // 蓝牙事件切换后仍保持当前上下文，避免保存后回到空白页。
+    if (groups.length === 0) {
+      selectedBluetoothGroupId.value = "";
+      return;
+    }
+    if (!groups.some((group) => group.group_id === selectedBluetoothGroupId.value)) {
+      selectedBluetoothGroupId.value = groups[0].group_id;
+    }
+  },
+  { immediate: true, deep: true },
+);
+
 function normalizeNonNegative(value: number) {
   return Math.max(0, Math.round(Number(value || 0)));
+}
+
+function handleSelectEvent(key: string) {
+  if (activeTab.value === "shared") {
+    selectedSharedConfig.value = key as SharedConfigKey;
+    return;
+  }
+  if (activeTab.value === "im") {
+    selectedImEventType.value = key;
+    return;
+  }
+  selectedBluetoothGroupId.value = key;
+}
+
+function handleToggleEvent(key: string, enabled: boolean) {
+  if (activeTab.value === "shared") {
+    setSharedEventEnabled(key as SharedConfigKey, enabled);
+    return;
+  }
+  if (activeTab.value === "im") {
+    setImGroupEnabled(key, enabled);
+    return;
+  }
+  setBluetoothGroupEnabled(key, enabled);
 }
 
 function updateMaxPrice(rule: CommandStudioRule, value: number | null) {
@@ -260,6 +477,70 @@ function updateGuardWaveform(ruleId: string, guardLevel: string, field: string, 
   }
 }
 
+function setSharedEventEnabled(key: SharedConfigKey, enabled: boolean) {
+  // 通用配置里只有弹幕存在独立开关，点赞始终参与公共触发链路。
+  if (key === "danmaku") {
+    sessionDraft.danmaku_enabled = enabled;
+  }
+}
+
+function setImGroupEnabled(eventType: string, enabled: boolean) {
+  // 右侧开关控制整组 IM 规则，便于一次性启停同类事件。
+  draftRules.value = draftRules.value.map((rule) =>
+    rule.event_type === eventType
+      ? {
+          ...rule,
+          enabled,
+        }
+      : rule,
+  );
+}
+
+function setBluetoothGroupEnabled(groupId: string, enabled: boolean) {
+  // 蓝牙配置按事件组批量切换，保证一个事件下所有波形规则状态一致。
+  draftRuleGroups.value = draftRuleGroups.value.map((group) =>
+    group.group_id === groupId
+      ? {
+          ...group,
+          rules: group.rules.map((rule) => ({
+            ...rule,
+            enabled,
+          })),
+        }
+      : group,
+  );
+}
+
+async function handlePrimarySave() {
+  if (activeTab.value === "shared") {
+    await handleSaveSharedConfig();
+    return;
+  }
+  if (activeTab.value === "im") {
+    await handleSaveImRules();
+    return;
+  }
+  await handleSaveBluetoothRules();
+}
+
+async function handleSaveSharedConfig() {
+  savingSharedConfig.value = true;
+  try {
+    sessionDraft.mode = "third_party";
+    sessionDraft.like_multiple = Math.max(1, Math.round(Number(sessionDraft.like_multiple || 1)));
+    sessionDraft.danmaku_cooldown_seconds = normalizeNonNegative(sessionDraft.danmaku_cooldown_seconds);
+    sessionDraft.danmaku_user_limit_window_seconds = normalizeNonNegative(sessionDraft.danmaku_user_limit_window_seconds);
+    sessionDraft.danmaku_user_limit_max_triggers = normalizeNonNegative(sessionDraft.danmaku_user_limit_max_triggers);
+    sessionDraft.danmaku_min_guard_level = Number(sessionDraft.danmaku_min_guard_level || 0);
+    sessionDraftStorage.save({ ...sessionDraft });
+    message.value = "通用事件配置已保存，主控台启动监听时会复用这份草稿";
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : "保存通用事件配置失败";
+  } finally {
+    savingSharedConfig.value = false;
+  }
+}
+
 async function handleSaveImRules() {
   savingCommandRules.value = true;
   try {
@@ -321,24 +602,25 @@ onMounted(async () => {
 }
 
 .workspace-summary-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: flex-start;
+  display: grid;
+  gap: 8px;
 }
 
-.workspace-summary-header h1 {
+.workspace-summary-header h1,
+.editor-shell-header h2 {
   margin: 0;
-  font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
 
-.workspace-summary-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
+.workspace-summary-header h1 {
+  font-size: 28px;
+}
+
+.workspace-summary-header p,
+.editor-shell-eyebrow {
+  margin: 0;
+  color: #78716c;
 }
 
 .workspace-overview {
@@ -355,15 +637,15 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 6px;
 }
 
 .hero-metric {
   min-width: 88px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(120, 113, 108, 0.12);
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96));
+  border: 1px solid var(--app-border);
   display: grid;
   gap: 2px;
 }
@@ -375,20 +657,132 @@ onMounted(async () => {
 
 .hero-metric span {
   font-size: 12px;
-  color: #78716c;
+  color: var(--app-muted);
+}
+
+.event-config-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+}
+
+.event-config-main {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.editor-shell-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.editor-shell-eyebrow {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.event-config-sidebar {
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+}
+
+.event-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--app-muted);
+}
+
+.event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.event-list-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--app-border);
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96));
+  box-shadow: var(--app-shadow);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.event-list-item:hover {
+  transform: translateY(-1px);
+  border-color: var(--app-border-strong);
+}
+
+.event-list-item-active {
+  border-color: var(--app-border-strong);
+  box-shadow: 0 14px 28px rgba(217, 138, 168, 0.16);
+}
+
+.event-list-item-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.event-list-item-copy strong {
+  color: var(--app-text);
+}
+
+.event-list-item-copy span {
+  font-size: 12px;
+  color: var(--app-muted);
+}
+
+.event-list-static-tag {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(217, 138, 168, 0.14);
+  color: var(--app-accent-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.event-list-switch {
+  display: inline-flex;
+  align-items: center;
+}
+
+.event-config-page {
+  max-width: none;
+}
+
+@media (max-width: 1100px) {
+  .event-config-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .event-config-sidebar {
+    position: static;
+  }
 }
 
 @media (max-width: 900px) {
-  .workspace-summary-header {
-    flex-direction: column;
-  }
-
-  .workspace-summary-actions {
-    justify-content: flex-start;
-  }
-
   .workspace-overview {
     flex-direction: column;
+  }
+
+  .editor-shell-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

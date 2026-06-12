@@ -487,9 +487,9 @@ onBeforeUnmount(() => {
   align-items: stretch;
   min-height: 280px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,236,229,0.96));
-  border: 1px solid rgba(120, 113, 108, 0.12);
-  box-shadow: 0 10px 24px rgba(28, 25, 23, 0.04);
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96));
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow);
   overflow: hidden;
 }
 
@@ -500,13 +500,13 @@ onBeforeUnmount(() => {
 .timeline-segment {
   min-width: 0;
   flex-basis: 0;
-  border-right: 1px solid rgba(120, 113, 108, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   transition: opacity 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .timeline-segment.is-active {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(255, 247, 237, 0.98));
-  box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.14);
+  background: linear-gradient(180deg, rgba(48, 23, 53, 0.98), rgba(27, 15, 32, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(217, 138, 168, 0.22);
 }
 
 .timeline-segment:last-child {
@@ -526,8 +526,8 @@ onBeforeUnmount(() => {
   inset: 16px 14px 44px;
   border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(120, 113, 108, 0.06), rgba(120, 113, 108, 0) 1px) 0 0 / 100% 25%,
-    linear-gradient(90deg, rgba(120, 113, 108, 0.06), rgba(120, 113, 108, 0) 1px) 0 0 / 25% 100%;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 1px) 0 0 / 100% 25%,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 1px) 0 0 / 25% 100%;
   pointer-events: none;
 }
 
@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
   font-size: 11px;
   font-weight: 700;
   text-align: center;
-  color: rgba(68, 64, 60, 0.72);
+  color: rgba(255, 245, 255, 0.72);
   pointer-events: none;
 }
 
@@ -642,9 +642,9 @@ onBeforeUnmount(() => {
   min-height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(120, 113, 108, 0.16);
-  color: #44403c;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--app-text);
   font-size: 12px;
   font-weight: 700;
   transition: box-shadow 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
 
 .timeline-duration-handle.is-active {
   transform: scale(1.02);
-  border-color: rgba(249, 115, 22, 0.32);
+  border-color: var(--app-border-strong);
 }
 
 .stats-grid {
@@ -680,9 +680,9 @@ onBeforeUnmount(() => {
 .step-row {
   padding: 14px 16px;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 241, 235, 0.98));
-  border: 1px solid rgba(120, 113, 108, 0.12);
-  box-shadow: 0 10px 24px rgba(28, 25, 23, 0.04);
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96));
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow);
 }
 
 .stats-grid article {
@@ -714,7 +714,7 @@ onBeforeUnmount(() => {
   flex: 1 1 140px;
   font-size: 12px;
   font-weight: 600;
-  color: #57534e;
+  color: var(--app-muted);
 }
 
 .field :deep(.ant-input),

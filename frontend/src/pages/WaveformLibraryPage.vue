@@ -1,5 +1,5 @@
 <template>
-  <main class="studio-page">
+  <main class="studio-page waveform-library-page">
     <ACard :bordered="false" data-testid="workspace-summary-card">
       <div class="workspace-summary">
         <div class="workspace-summary-header">
@@ -117,19 +117,23 @@ watch(
       savedToySnapshots.value = {};
       return;
     }
-    draftEmsWaveforms.value = studio.ems_waveforms.map((waveform) => ({
+    // 测试桩和旧数据可能不会返回完整波形数组，这里统一兜底，避免页面因为 `undefined.map` 直接中断渲染。
+    const emsWaveforms = studio.ems_waveforms || studio.waveforms || [];
+    const toyWaveforms = studio.toy_waveforms || [];
+
+    draftEmsWaveforms.value = emsWaveforms.map((waveform) => ({
       ...waveform,
       steps: waveform.steps.map((step) => ({ ...step })),
     }));
     savedEmsSnapshots.value = Object.fromEntries(
-      studio.ems_waveforms.map((waveform) => [waveform.id, serializeWaveform(waveform)]),
+      emsWaveforms.map((waveform) => [waveform.id, serializeWaveform(waveform)]),
     );
-    draftToyWaveforms.value = studio.toy_waveforms.map((waveform) => ({
+    draftToyWaveforms.value = toyWaveforms.map((waveform) => ({
       ...waveform,
       steps: waveform.steps.map((step) => ({ ...step })),
     }));
     savedToySnapshots.value = Object.fromEntries(
-      studio.toy_waveforms.map((waveform) => [waveform.id, serializeToyWaveform(waveform)]),
+      toyWaveforms.map((waveform) => [waveform.id, serializeToyWaveform(waveform)]),
     );
     if (!selectedWaveformId.value || !currentWaveforms.value.some((item) => item.id === selectedWaveformId.value)) {
       selectedWaveformId.value = currentWaveforms.value[0]?.id || "";
@@ -422,8 +426,8 @@ onMounted(async () => {
   min-width: 88px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(120, 113, 108, 0.12);
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96));
+  border: 1px solid var(--app-border);
   display: grid;
   gap: 2px;
 }
@@ -435,13 +439,13 @@ onMounted(async () => {
 
 .hero-metric span {
   font-size: 12px;
-  color: #78716c;
+  color: var(--app-muted);
 }
 
 .waveform-tab-bar {
   display: flex;
   gap: 0;
-  border-bottom: 2px solid rgba(120, 113, 108, 0.12);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 4px;
 }
 
@@ -451,7 +455,7 @@ onMounted(async () => {
   background: transparent;
   font-size: 14px;
   font-weight: 600;
-  color: #78716c;
+  color: var(--app-muted);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
@@ -459,12 +463,16 @@ onMounted(async () => {
 }
 
 .waveform-tab:hover {
-  color: #44403c;
+  color: var(--app-text);
 }
 
 .waveform-tab.is-active {
-  color: #1c1917;
-  border-bottom-color: #1c1917;
+  color: var(--app-accent-soft);
+  border-bottom-color: var(--app-accent);
+}
+
+.waveform-library-page {
+  max-width: none;
 }
 
 @media (max-width: 900px) {

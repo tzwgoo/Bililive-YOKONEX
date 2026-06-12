@@ -67,22 +67,22 @@
                 </template>
               </AList>
             </ACollapsePanel>
-            <ACollapsePanel key="rules" header="蓝牙规则预览">
-              <AEmpty v-if="bluetoothStatus.rules.length === 0" description="暂无规则" />
-              <AList v-else :data-source="bluetoothStatus.rules">
-                <template #renderItem="{ item }">
-                  <AListItem>
-                    <div class="bluetooth-item-copy">
-                      <strong>{{ item.ruleLabel }}</strong>
-                      <small>{{ item.waveformName || item.waveformId || "-" }}</small>
-                    </div>
-                    <span class="status-chip" :class="{ active: item.enabled }">
-                      {{ item.enabled ? "已启用" : "未启用" }}
-                    </span>
-                  </AListItem>
-                </template>
-              </AList>
-            </ACollapsePanel>
+<!--            <ACollapsePanel key="rules" header="蓝牙规则预览">-->
+<!--              <AEmpty v-if="bluetoothStatus.rules.length === 0" description="暂无规则" />-->
+<!--              <AList v-else :data-source="bluetoothStatus.rules">-->
+<!--                <template #renderItem="{ item }">-->
+<!--                  <AListItem>-->
+<!--                    <div class="bluetooth-item-copy">-->
+<!--                      <strong>{{ item.ruleLabel }}</strong>-->
+<!--                      <small>{{ item.waveformName || item.waveformId || "-" }}</small>-->
+<!--                    </div>-->
+<!--                    <span class="status-chip" :class="{ active: item.enabled }">-->
+<!--                      {{ item.enabled ? "已启用" : "未启用" }}-->
+<!--                    </span>-->
+<!--                  </AListItem>-->
+<!--                </template>-->
+<!--              </AList>-->
+<!--            </ACollapsePanel>-->
           </ACollapse>
         </ACard>
       </ACol>
@@ -145,7 +145,7 @@ const ACollapsePanel = ACollapse.Panel;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #78716c;
+  color: var(--app-muted);
 }
 
 .section-head-inline {
@@ -161,9 +161,9 @@ const ACollapsePanel = ACollapse.Panel;
   min-height: 32px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(120, 113, 108, 0.12);
-  color: #57534e;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--app-text);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -179,13 +179,14 @@ const ACollapsePanel = ACollapse.Panel;
 .field {
   display: grid;
   gap: 8px;
-  color: #44403c;
+  color: var(--app-muted);
   font-size: 13px;
   font-weight: 600;
 }
 
 .field :deep(.ant-input),
-.field :deep(.ant-select-selector) {
+.field :deep(.ant-select-selector),
+.field :deep(.ant-input-affix-wrapper) {
   border-radius: 12px;
 }
 
@@ -216,13 +217,21 @@ const ACollapsePanel = ACollapse.Panel;
   margin-top: 16px;
 }
 
+.bluetooth-collapse :deep(.ant-list-item) {
+  color: var(--app-text);
+}
+
 .bluetooth-item-copy {
   display: grid;
   gap: 4px;
 }
 
+.bluetooth-item-copy strong {
+  color: var(--app-text);
+}
+
 .bluetooth-item-copy small {
-  color: #78716c;
+  color: var(--app-muted);
 }
 
 .status-chip {
@@ -231,17 +240,17 @@ const ACollapsePanel = ACollapse.Panel;
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(120, 113, 108, 0.12);
-  color: #57534e;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--app-text);
   font-size: 12px;
   font-weight: 700;
 }
 
 .status-chip.active {
-  background: rgba(28, 25, 23, 0.92);
-  border-color: #1c1917;
-  color: #fafaf9;
+  background: linear-gradient(180deg, rgba(217, 138, 168, 0.3), rgba(186, 104, 135, 0.24));
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
 }
 
 @media (max-width: 900px) {

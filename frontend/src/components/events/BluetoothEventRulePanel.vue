@@ -1,101 +1,97 @@
 <template>
-  <ACard title="蓝牙事件规则" :bordered="false">
-    <AEmpty v-if="ruleGroups.length === 0" description="暂无规则组" />
-    <ACollapse v-else :bordered="false" :default-active-key="ruleGroups.map((group) => group.group_id)">
-      <ACollapsePanel
-        v-for="group in ruleGroups"
-        :key="group.group_id"
-        :header="group.group_label"
-      >
-        <div class="rule-list">
-          <article v-for="rule in group.rules" :key="rule.id" class="rule-item">
-            <div class="rule-head">
-              <div>
-                <strong>{{ rule.rule_label }}</strong>
-                <p class="rule-caption">波形与价格过滤器会一并保存到当前蓝牙规则组。</p>
-              </div>
-              <Checkbox v-model:checked="rule.enabled">启用</Checkbox>
-            </div>
-            <div class="rule-grid">
-              <label class="field">
-                <span>EMS 波形</span>
-                <Select
-                  :data-testid="`rule-waveform-${rule.id}`"
-                  v-model:value="rule.waveform_id"
-                  :options="emsWaveformOptions"
-                />
-              </label>
-              <label class="field">
-                <span>Toy 波形</span>
-                <Select
-                  :data-testid="`rule-toy-waveform-${rule.id}`"
-                  v-model:value="rule.toy_waveform_id"
-                  :options="toyWaveformOptions"
-                  allow-clear
-                  placeholder="可选"
-                />
-              </label>
-              <template v-if="priceFilterGroupIds.has(group.group_id)">
-                <label class="field">
-                  <span>最低价格</span>
-                  <InputNumber
-                    :value="Number(rule.filters?.min_price || 0)"
-                    :min="0"
-                    :step="1"
-                    class="field-number"
-                    @update:value="emit('update-min-price', rule.id, Number($event ?? 0))"
-                  />
-                </label>
-                <label class="field">
-                  <span>最高价格</span>
-                  <InputNumber
-                    :value="rule.filters?.max_price ?? null"
-                    :min="0"
-                    :step="1"
-                    class="field-number"
-                    placeholder="留空表示无上限"
-                    @update:value="emit('update-max-price', rule.id, $event as number | null)"
-                  />
-                </label>
-              </template>
-              <template v-if="group.group_id === 'gift'">
-                <div class="guard-waveform-section">
-                  <ACollapse :bordered="false" :default-active-key="[]">
-                    <ACollapsePanel key="guard-waveforms" header="舰队专属波形（可选覆盖）">
-                      <div class="guard-grid">
-                        <div v-for="g in guardLevels" :key="g.level" class="guard-row">
-                          <span class="guard-label">{{ g.label }}</span>
-                          <label class="field guard-field">
-                            <span>EMS 波形</span>
-                            <Select
-                              :value="getGuardWaveformId(rule, g.level, 'ems')"
-                              :options="emsWaveformOptions"
-                              allow-clear
-                              placeholder="跟随默认"
-                              @update:value="emit('update-guard-waveform', rule.id, g.level, 'waveform_id', String($event ?? ''))"
-                            />
-                          </label>
-                          <label class="field guard-field">
-                            <span>Toy 波形</span>
-                            <Select
-                              :value="getGuardWaveformId(rule, g.level, 'toy')"
-                              :options="toyWaveformOptions"
-                              allow-clear
-                              placeholder="跟随默认"
-                              @update:value="emit('update-guard-waveform', rule.id, g.level, 'toy_waveform_id', String($event ?? ''))"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </ACollapsePanel>
-                  </ACollapse>
-                </div>
-              </template>
-            </div>
-          </article>
+  <ACard v-if="ruleGroup" :title="ruleGroup.group_label" :bordered="false">
+    <AEmpty v-if="ruleGroup.rules.length === 0" description="暂无规则组" />
+    <div v-else class="rule-list">
+      <article v-for="rule in ruleGroup.rules" :key="rule.id" class="rule-item">
+        <div class="rule-head">
+          <div>
+            <strong>{{ rule.rule_label }}</strong>
+            <p class="rule-caption">波形与价格过滤器会一并保存到当前蓝牙规则组。</p>
+          </div>
+          <Checkbox v-model:checked="rule.enabled">启用</Checkbox>
         </div>
-      </ACollapsePanel>
-    </ACollapse>
+        <div class="rule-grid">
+          <label class="field">
+            <span>EMS 波形</span>
+            <Select
+              :data-testid="`rule-waveform-${rule.id}`"
+              v-model:value="rule.waveform_id"
+              :options="emsWaveformOptions"
+            />
+          </label>
+          <label class="field">
+            <span>Toy 波形</span>
+            <Select
+              :data-testid="`rule-toy-waveform-${rule.id}`"
+              v-model:value="rule.toy_waveform_id"
+              :options="toyWaveformOptions"
+              allow-clear
+              placeholder="可选"
+            />
+          </label>
+          <template v-if="priceFilterGroupIds.has(ruleGroup.group_id)">
+            <label class="field">
+              <span>最低价格</span>
+              <InputNumber
+                :value="Number(rule.filters?.min_price || 0)"
+                :min="0"
+                :step="1"
+                class="field-number"
+                @update:value="emit('update-min-price', rule.id, Number($event ?? 0))"
+              />
+            </label>
+            <label class="field">
+              <span>最高价格</span>
+              <InputNumber
+                :value="rule.filters?.max_price ?? null"
+                :min="0"
+                :step="1"
+                class="field-number"
+                placeholder="留空表示无上限"
+                @update:value="emit('update-max-price', rule.id, $event as number | null)"
+              />
+            </label>
+          </template>
+          <template v-if="ruleGroup.group_id === 'gift'">
+            <div class="guard-waveform-section">
+              <ACollapse :bordered="false" :default-active-key="[]">
+                <ACollapsePanel key="guard-waveforms" header="舰队专属波形（可选覆盖）">
+                  <div class="guard-grid">
+                    <div v-for="g in guardLevels" :key="g.level" class="guard-row">
+                      <span class="guard-label">{{ g.label }}</span>
+                      <label class="field guard-field">
+                        <span>EMS 波形</span>
+                        <Select
+                          :value="getGuardWaveformId(rule, g.level, 'ems')"
+                          :options="emsWaveformOptions"
+                          allow-clear
+                          placeholder="跟随默认"
+                          @update:value="emit('update-guard-waveform', rule.id, g.level, 'waveform_id', String($event ?? ''))"
+                        />
+                      </label>
+                      <label class="field guard-field">
+                        <span>Toy 波形</span>
+                        <Select
+                          :value="getGuardWaveformId(rule, g.level, 'toy')"
+                          :options="toyWaveformOptions"
+                          allow-clear
+                          placeholder="跟随默认"
+                          @update:value="emit('update-guard-waveform', rule.id, g.level, 'toy_waveform_id', String($event ?? ''))"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </ACollapsePanel>
+              </ACollapse>
+            </div>
+          </template>
+        </div>
+      </article>
+    </div>
+  </ACard>
+
+  <ACard v-else :bordered="false">
+    <AEmpty description="请先从右侧选择蓝牙事件" />
   </ACard>
 </template>
 
@@ -111,7 +107,7 @@ import {
 import type { BluetoothRuleGroup } from "@/types/bluetooth";
 
 defineProps<{
-  ruleGroups: BluetoothRuleGroup[];
+  ruleGroup: BluetoothRuleGroup | null;
   emsWaveformOptions: Array<{
     label: string;
     value: string;
@@ -140,7 +136,9 @@ const guardLevels = [
 function getGuardWaveformId(rule: any, level: string, type: "ems" | "toy"): string {
   const guardWfMap = rule.filters?.guard_waveforms || {};
   const override = guardWfMap[level];
-  if (!override) return "";
+  if (!override) {
+    return "";
+  }
   return type === "toy" ? (override.toy_waveform_id || "") : (override.waveform_id || "");
 }
 </script>
@@ -195,10 +193,6 @@ function getGuardWaveformId(rule: any, level: string, type: "ems" | "toy"): stri
   width: 100%;
 }
 
-.field-span-2 {
-  grid-column: span 2;
-}
-
 .guard-waveform-section {
   margin-top: 4px;
 }
@@ -228,10 +222,6 @@ function getGuardWaveformId(rule: any, level: string, type: "ems" | "toy"): stri
 @media (max-width: 900px) {
   .rule-grid {
     grid-template-columns: 1fr;
-  }
-
-  .field-span-2 {
-    grid-column: span 1;
   }
 
   .guard-row {

@@ -60,7 +60,8 @@ function resolveDeviceMaxStrength(device) {
   if (isToyDevice(device)) {
     return 20;
   }
-  return Math.max(1, Number(device?.display_max_strength || 180) || 180);
+  // Keep EMS overlay scaling pinned to the real 180 ceiling.
+  return 180;
 }
 
 function resolveStrengthWidth(value, max) {
@@ -261,9 +262,6 @@ function renderOverlayNow(payload) {
   overlayRoot.dataset.connected = String(Boolean(overlayState.connected));
   overlayConnectionText.textContent = overlayState.connected ? "蓝牙已连接" : "蓝牙未连接";
   overlaySummaryTitle.textContent = overlayState.connected ? `已连接 ${devices.length} 台设备` : "待机中";
-  overlaySummarySubtitle.textContent = overlayState.connected
-    ? "同一叠加窗内展示所有已连接设备的实时强度、电量和波形曲线。"
-    : "当前没有已连接设备，连接后会自动显示每台设备的实时状态。";
   syncDeviceCards(devices);
 }
 

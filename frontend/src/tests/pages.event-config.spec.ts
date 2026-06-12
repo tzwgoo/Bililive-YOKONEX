@@ -11,7 +11,7 @@ describe("EventConfigPage", () => {
     window.localStorage.clear();
   });
 
-  it("renders IM and bluetooth tabs with IM rules loaded by default", async () => {
+  it("renders shared, IM and bluetooth event configuration views", async () => {
     vi.spyOn(commandService, "fetchCommandStudio").mockResolvedValue({
       rules: [
         {
@@ -33,7 +33,7 @@ describe("EventConfigPage", () => {
       danmaku_event_types: [{ value: "danmaku", label: "普通弹幕", guard_level: 0 }],
     });
     vi.spyOn(bluetoothService, "fetchBluetoothStudio").mockResolvedValue({
-      waveforms: [
+      ems_waveforms: [
         {
           id: "custom-wave-01",
           name: "自定义波形 01",
@@ -44,6 +44,7 @@ describe("EventConfigPage", () => {
           steps: [{ duration_ms: 200, channel_a: 20, channel_b: 40 }],
         },
       ],
+      toy_waveforms: [],
       rule_groups: [
         {
           group_id: "gift",
@@ -52,9 +53,10 @@ describe("EventConfigPage", () => {
             {
               id: "gift-tier-01",
               event_type: "gift",
-              rule_label: "礼物档位 01 · 0-99",
+              rule_label: "礼物档位 01 / 0-99",
               enabled: true,
               waveform_id: "custom-wave-01",
+              toy_waveform_id: "",
               waveform_name: "自定义波形 01",
               filters: { min_price: 0, max_price: 99 },
             },
@@ -67,9 +69,10 @@ describe("EventConfigPage", () => {
             {
               id: "super-chat-tier-01",
               event_type: "super_chat",
-              rule_label: "醒目留言档位 01 · 30-49",
+              rule_label: "醒目留言档位 01 / 30-49",
               enabled: true,
               waveform_id: "custom-wave-01",
+              toy_waveform_id: "",
               waveform_name: "自定义波形 01",
               filters: { min_price: 30, max_price: 49 },
             },
@@ -82,23 +85,28 @@ describe("EventConfigPage", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("事件配置");
+    expect(wrapper.text()).toContain("通用");
     expect(wrapper.text()).toContain("IM");
     expect(wrapper.text()).toContain("蓝牙");
-    expect(wrapper.text()).toContain("固定点赞指令 ID");
-    expect(wrapper.text()).toContain("固定互动指令 ID");
-    expect(wrapper.text()).toContain("互动事件");
-    expect(wrapper.text()).toContain("礼物");
-    expect(wrapper.findComponent({ name: "PageHeaderBar" }).exists()).toBe(false);
     expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("事件配置");
-    expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("保存 IM 规则");
+    expect(wrapper.get('[data-testid="save-shared-config"]').text()).toContain("保存通用配置");
+    expect(wrapper.get('[data-testid="event-item-like"]').text()).toContain("点赞触发");
+    expect(wrapper.get('[data-testid="event-item-danmaku"]').text()).toContain("弹幕触发");
+
+    await wrapper.get('[data-testid="event-tab-im"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="command-save"]').text()).toContain("保存 IM 规则");
+    expect(wrapper.text()).toContain("固定点赞指令 ID");
+    expect(wrapper.get('[data-testid="event-item-gift"]').text()).toContain("礼物");
 
     await wrapper.get('[data-testid="event-tab-bluetooth"]').trigger("click");
     await flushPromises();
 
-    expect(wrapper.text()).toContain("蓝牙事件规则");
-    expect(wrapper.text()).toContain("醒目留言档位 01 · 30-49");
+    expect(wrapper.text()).toContain("礼物事件");
     expect(wrapper.text()).toContain("最低价格");
     expect(wrapper.text()).toContain("最高价格");
+    expect(wrapper.get('[data-testid="event-item-super_chat"]').text()).toContain("醒目留言");
   });
 
   it("restores the last active event-config tab from localStorage", async () => {
@@ -116,7 +124,7 @@ describe("EventConfigPage", () => {
       danmaku_event_types: [{ value: "danmaku", label: "普通弹幕", guard_level: 0 }],
     });
     vi.spyOn(bluetoothService, "fetchBluetoothStudio").mockResolvedValue({
-      waveforms: [
+      ems_waveforms: [
         {
           id: "custom-wave-01",
           name: "自定义波形 01",
@@ -127,6 +135,7 @@ describe("EventConfigPage", () => {
           steps: [{ duration_ms: 200, channel_a: 20, channel_b: 40 }],
         },
       ],
+      toy_waveforms: [],
       rule_groups: [
         {
           group_id: "gift",
@@ -135,9 +144,10 @@ describe("EventConfigPage", () => {
             {
               id: "gift-tier-01",
               event_type: "gift",
-              rule_label: "礼物档位 01 · 0-99",
+              rule_label: "礼物档位 01 / 0-99",
               enabled: true,
               waveform_id: "custom-wave-01",
+              toy_waveform_id: "",
               waveform_name: "自定义波形 01",
               filters: { min_price: 0, max_price: 99 },
             },
@@ -149,7 +159,38 @@ describe("EventConfigPage", () => {
     const wrapper = mount(EventConfigPage);
     await flushPromises();
 
-    expect(wrapper.text()).toContain("蓝牙事件规则");
+    expect(wrapper.text()).toContain("礼物事件");
     expect(wrapper.text()).not.toContain("固定点赞指令 ID");
+  });
+
+  it("saves shared event settings back to the session draft", async () => {
+    vi.spyOn(commandService, "fetchCommandStudio").mockResolvedValue({
+      rules: [],
+      like_command_id: "like_trigger",
+      interact_command_id: "interact_trigger",
+      danmaku_command_ids: {},
+      command_slots: ["command_one"],
+      event_types: [],
+      danmaku_event_types: [],
+    });
+    vi.spyOn(bluetoothService, "fetchBluetoothStudio").mockResolvedValue({
+      ems_waveforms: [],
+      toy_waveforms: [],
+      rule_groups: [],
+    });
+
+    const wrapper = mount(EventConfigPage);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="event-item-danmaku"]').trigger("click");
+    const danmakuSwitch = wrapper.get(".ant-switch");
+    await danmakuSwitch.trigger("click");
+    await wrapper.get('[data-testid="save-shared-config"]').trigger("click");
+
+    expect(JSON.parse(window.localStorage.getItem("biliLive.sessionDraft") || "{}")).toMatchObject({
+      mode: "third_party",
+      danmaku_enabled: true,
+    });
+    expect(wrapper.text()).toContain("通用事件配置已保存");
   });
 });

@@ -69,7 +69,8 @@ const emit = defineEmits<{
 
 const isToy = computed(() => props.deviceType === "toy");
 
-const PREVIEW_HEIGHT_PX = 52;
+const PREVIEW_HEIGHT_PX = 64;
+const EMS_PREVIEW_MAX_STRENGTH = 180;
 const DESKTOP_PANEL_STYLE = {
   height: "clamp(560px, calc(100vh - 220px), 820px)",
 };
@@ -105,8 +106,10 @@ function resolveMaxToyStrength(waveform: ToyWaveform) {
 }
 
 function resolveEmsPreviewBarHeight(waveform: BluetoothWaveform, value: number) {
-  const waveformMaxStrength = Math.max(1, resolveMaxEmsStrength(waveform));
-  return Math.round((normalizeStrength(value) / waveformMaxStrength) * PREVIEW_HEIGHT_PX);
+  // Keep EMS preview cards scaled against the real 180 ceiling.
+  return Math.round((normalizeStrength(value) / EMS_PREVIEW_MAX_STRENGTH) * PREVIEW_HEIGHT_PX);
+  // EMS 列表预览固定按设备真实 180 上限缩放，避免低强度波形被拉满后产生误导。
+  return Math.round((normalizeStrength(value) / EMS_PREVIEW_MAX_STRENGTH) * PREVIEW_HEIGHT_PX);
 }
 
 function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
@@ -149,18 +152,18 @@ function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
   width: 100%;
   height: auto;
   padding: 0;
-  border: 1px solid rgba(120, 113, 108, 0.16);
+  border: 1px solid var(--app-border);
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 248, 244, 0.98));
-  box-shadow: 0 10px 24px rgba(28, 25, 23, 0.04);
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96));
+  box-shadow: var(--app-shadow);
   cursor: pointer;
   appearance: none;
   text-align: left;
 }
 
 .waveform-card.is-active {
-  border-color: #1c1917 !important;
-  box-shadow: 0 0 0 1px #1c1917 inset, 0 10px 24px rgba(28, 25, 23, 0.08);
+  border-color: var(--app-border-strong) !important;
+  box-shadow: 0 0 0 1px var(--app-border-strong) inset, var(--app-shadow);
 }
 
 .waveform-card-copy {
@@ -175,12 +178,12 @@ function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  min-height: 72px;
+  min-height: 86px;
   margin: 0 16px 16px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(250, 248, 244, 0.96), rgba(241, 236, 229, 0.98));
-  border: 1px solid rgba(120, 113, 108, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
@@ -196,8 +199,8 @@ function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
   align-items: flex-end;
   gap: 4px;
   width: 100%;
-  height: 52px;
-  min-height: 52px;
+  height: 64px;
+  min-height: 64px;
 }
 
 .waveform-preview-bar {
@@ -221,8 +224,12 @@ function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
 
 .waveform-card-copy small,
 .section-count {
-  color: #78716c;
+  color: var(--app-muted);
   font-size: 12px;
+}
+
+.waveform-card-copy strong {
+  color: var(--app-text);
 }
 
 .section-count {
@@ -231,8 +238,8 @@ function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
   padding: 0 10px;
   min-height: 28px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(120, 113, 108, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 @media (max-width: 1279px) {
