@@ -44,3 +44,5 @@ config/bluetooth_settings.json
 *.spec
 *.egg-info/
 pip-wheel-metadata/
+.tmp
+.build-venv-cpython
