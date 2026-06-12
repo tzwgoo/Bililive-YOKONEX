@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from app.bluetooth.ems_builtin_waveforms import is_preset_waveform_id
+from app.bluetooth.gcq_toy_builtin_waveforms import is_gcq_toy_preset_waveform_id
 from app.bluetooth.toy_builtin_waveforms import is_toy_preset_waveform_id
 from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
 from app.bluetooth.gift_tiers import build_default_gift_rules
@@ -67,7 +68,8 @@ class BluetoothSettingsStore:
         if normalized_input_toy_waveforms:
             custom_toy_waveforms = [
                 waveform for waveform in normalized_input_toy_waveforms
-                if not is_toy_preset_waveform_id(waveform.id)
+                # toy_waveforms 同时承载飞机杯和灌肠机两套预设，用户自定义波形要避开内置 ID。
+                if not is_toy_preset_waveform_id(waveform.id) and not is_gcq_toy_preset_waveform_id(waveform.id)
             ]
             toy_waveforms = [*custom_toy_waveforms, *defaults.toy_waveforms]
         else:
@@ -129,13 +131,15 @@ def _normalize_waveform(item: dict) -> EmsWaveform:
 
 
 def _normalize_toy_waveform(item: dict) -> ToyWaveform:
+    device_family = _normalize_toy_device_family(item.get("device_family", "toy"))
     steps = item.get("steps", [])
     normalized_steps = [
         ToyWaveformStep(
             duration_ms=max(1, int(step.get("duration_ms", 200))),
-            motor_a=_normalize_toy_speed(step.get("motor_a", 0)),
-            motor_b=_normalize_toy_speed(step.get("motor_b", 0)),
-            motor_c=_normalize_toy_speed(step.get("motor_c", 0)),
+            # 读取旧配置时也要按设备家族修正数值范围，避免历史 GCQ 数据继续保留 0-20 的旧语义。
+            motor_a=_normalize_toy_speed(step.get("motor_a", 0), device_family=device_family, field="motor_a"),
+            motor_b=_normalize_toy_speed(step.get("motor_b", 0), device_family=device_family, field="motor_b"),
+            motor_c=_normalize_toy_speed(step.get("motor_c", 0), device_family=device_family, field="motor_c"),
         )
         for step in steps
         if isinstance(step, dict)
@@ -147,13 +151,27 @@ def _normalize_toy_waveform(item: dict) -> ToyWaveform:
         name=str(item.get("name", "自定义波形")),
         builtin=bool(item.get("builtin", False)),
         editable=bool(item.get("editable", True)),
+        # 历史配置没有 device_family 时，默认仍按飞机杯波形处理，避免旧数据升级后出现在新标签页。
+        device_family=device_family,
         loop_count=max(1, int(item.get("loop_count", 1))),
         steps=normalized_steps,
     )
 
 
-def _normalize_toy_speed(value) -> int:
+def _normalize_toy_speed(value, *, device_family: str = "toy", field: str = "") -> int:
+    normalized_family = str(device_family or "toy").lower()
+    if normalized_family == "gcq":
+        if field == "motor_a":
+            return 1 if int(value) > 0 else 0
+        return max(0, min(int(value), 5))
     return max(0, min(int(value), 20))
+
+
+def _normalize_toy_device_family(value) -> str:
+    family = str(value or "toy").strip().lower()
+    if family == "gcq":
+        return "gcq"
+    return "toy"
 
 
 def _normalize_rule(item: dict) -> BluetoothEventRule:

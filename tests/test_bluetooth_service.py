@@ -144,6 +144,7 @@ async def test_service_overlay_payload_includes_battery_level(
 
     assert overlay["battery_level"] == 100
     assert overlay["display_max_strength"] == 50
+    assert overlay["protocol"] == "ems_v2"
 
 
 @pytest.mark.anyio
@@ -778,3 +779,54 @@ def test_service_save_rules_rejects_overlapping_enabled_super_chat_price_ranges(
                 },
             ]
         )
+
+
+def test_service_can_create_gcq_custom_waveform(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+
+    result = service.create_waveform(name="灌肠机自定义波形", device_type="gcq")
+
+    assert result["success"] is True
+    assert result["waveform"]["name"] == "灌肠机自定义波形"
+    assert result["waveform"]["device_family"] == "gcq"
+    assert result["waveform"]["steps"][0]["motor_a"] == 0
+    assert service.payload.toy_waveforms[0].device_family == "gcq"
+
+
+def test_service_duplicate_toy_waveform_keeps_device_family(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+    created = service.create_waveform(name="灌肠机自定义波形", device_type="gcq")
+
+    result = service.duplicate_waveform(source_waveform_id=created["waveform"]["id"], name="")
+
+    assert result["success"] is True
+    assert result["waveform"]["device_family"] == "gcq"
+    assert service.payload.toy_waveforms[0].device_family == "gcq"
+
+
+def test_service_updates_gcq_waveform_with_real_device_ranges(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.bluetooth.service.create_real_bluetooth_runtime",
+        lambda **kwargs: MemoryBluetoothRuntime(),
+    )
+    service = BluetoothService.create_default(config_path=tmp_path / "bluetooth.json")
+    created = service.create_waveform(name="灌肠机自定义波形", device_type="gcq")
+
+    result = service.update_waveform(
+        waveform_id=created["waveform"]["id"],
+        name="已编辑灌肠机波形",
+        steps=[{"duration_ms": 180, "motor_a": 12, "motor_b": 9, "motor_c": 7}],
+    )
+
+    assert result["success"] is True
+    assert result["waveform"]["steps"][0]["motor_a"] == 1
+    assert result["waveform"]["steps"][0]["motor_b"] == 5
+    assert result["waveform"]["steps"][0]["motor_c"] == 5

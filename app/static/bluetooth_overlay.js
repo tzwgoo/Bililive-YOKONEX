@@ -56,7 +56,35 @@ function isToyDevice(device) {
   return String(device?.device_type || "").toLowerCase() === "toy";
 }
 
+function isGcqToyDevice(device) {
+  return String(device?.protocol || "").toLowerCase() === "yiskj_gcq_toy_013";
+}
+
+function resolveToyChannelLabels(device) {
+  if (isGcqToyDevice(device)) {
+    return {
+      a: "气阀",
+      b: "气泵",
+      c: "水泵",
+      summaryA: "阀",
+      summaryB: "气",
+      summaryC: "水",
+    };
+  }
+  return {
+    a: "旋转",
+    b: "吮吸",
+    c: "震动",
+    summaryA: "R",
+    summaryB: "S",
+    summaryC: "V",
+  };
+}
+
 function resolveDeviceMaxStrength(device) {
+  if (isGcqToyDevice(device)) {
+    return 5;
+  }
   if (isToyDevice(device)) {
     return 20;
   }
@@ -70,41 +98,57 @@ function resolveStrengthWidth(value, max) {
 }
 
 function resolveDeviceStrengthSummary(device) {
+  if (isGcqToyDevice(device)) {
+    return `阀 ${Number(device.motor_a) > 0 ? "开" : "关"} · 气 ${clampStrength(device.motor_b, 5)} 档 · 水 ${clampStrength(device.motor_c, 5)} 档`;
+  }
   const max = resolveDeviceMaxStrength(device);
   if (isToyDevice(device)) {
-    return `R ${clampStrength(device.motor_a, max)} 路 S ${clampStrength(device.motor_b, max)} 路 V ${clampStrength(device.motor_c, max)}`;
+    const labels = resolveToyChannelLabels(device);
+    return `${labels.summaryA} ${clampStrength(device.motor_a, max)} 路 ${labels.summaryB} ${clampStrength(device.motor_b, max)} 路 ${labels.summaryC} ${clampStrength(device.motor_c, max)}`;
   }
   return `A ${clampStrength(device.channel_a, max)} 路 B ${clampStrength(device.channel_b, max)}`;
 }
 
 function buildChannelRows(device) {
-  const max = resolveDeviceMaxStrength(device);
-  if (isToyDevice(device)) {
+  if (isGcqToyDevice(device)) {
+    const labels = resolveToyChannelLabels(device);
+    const valveOpen = Number(device.motor_a) > 0;
     return [
-      { label: "旋转", value: clampStrength(device.motor_a, max), className: "overlay-bar-fill-a" },
-      { label: "吮吸", value: clampStrength(device.motor_b, max), className: "overlay-bar-fill-b" },
-      { label: "震动", value: clampStrength(device.motor_c, max), className: "overlay-bar-fill-c" },
+      { label: labels.a, value: valveOpen ? 1 : 0, textValue: valveOpen ? "开" : "关", max: 1, className: "overlay-bar-fill-a" },
+      { label: labels.b, value: clampStrength(device.motor_b, 5), textValue: `${clampStrength(device.motor_b, 5)} 档`, max: 5, className: "overlay-bar-fill-b" },
+      { label: labels.c, value: clampStrength(device.motor_c, 5), textValue: `${clampStrength(device.motor_c, 5)} 档`, max: 5, className: "overlay-bar-fill-c" },
     ];
   }
+
+  const max = resolveDeviceMaxStrength(device);
+  if (isToyDevice(device)) {
+    const labels = resolveToyChannelLabels(device);
+    return [
+      { label: labels.a, value: clampStrength(device.motor_a, max), textValue: clampStrength(device.motor_a, max), max, className: "overlay-bar-fill-a" },
+      { label: labels.b, value: clampStrength(device.motor_b, max), textValue: clampStrength(device.motor_b, max), max, className: "overlay-bar-fill-b" },
+      { label: labels.c, value: clampStrength(device.motor_c, max), textValue: clampStrength(device.motor_c, max), max, className: "overlay-bar-fill-c" },
+    ];
+  }
+
   return [
-    { label: "A 通道", value: clampStrength(device.channel_a, max), className: "overlay-bar-fill-a" },
-    { label: "B 通道", value: clampStrength(device.channel_b, max), className: "overlay-bar-fill-b" },
+    { label: "A 通道", value: clampStrength(device.channel_a, max), textValue: clampStrength(device.channel_a, max), max, className: "overlay-bar-fill-a" },
+    { label: "B 通道", value: clampStrength(device.channel_b, max), textValue: clampStrength(device.channel_b, max), max, className: "overlay-bar-fill-b" },
   ];
 }
 
 function renderDeviceCard(device) {
   const waveformName = device.waveform_name || "待机中";
   const batteryText = formatBatteryLevel(device.battery_level);
-  const protocolLabel = isToyDevice(device) ? "Toy" : "EMS";
+  const protocolLabel = isGcqToyDevice(device) ? "灌肠机" : (isToyDevice(device) ? "Toy" : "EMS");
   const channelRows = buildChannelRows(device)
     .map((channel) => `
       <article class="overlay-channel">
         <div class="overlay-channel-head">
           <span>${escapeOverlayHtml(channel.label)}</span>
-          <strong>${escapeOverlayHtml(channel.value)}</strong>
+          <strong>${escapeOverlayHtml(channel.textValue)}</strong>
         </div>
         <div class="overlay-bar-track">
-          <div class="overlay-bar-fill ${escapeOverlayHtml(channel.className)}" style="width:${resolveStrengthWidth(channel.value, resolveDeviceMaxStrength(device))}"></div>
+          <div class="overlay-bar-fill ${escapeOverlayHtml(channel.className)}" style="width:${resolveStrengthWidth(channel.value, channel.max)}"></div>
         </div>
       </article>
     `)
@@ -115,7 +159,7 @@ function renderDeviceCard(device) {
       <div class="overlay-device-head">
         <div>
           <h2 class="overlay-device-name">${escapeOverlayHtml(device.device_name || "未命名设备")}</h2>
-          <div class="overlay-device-meta">${escapeOverlayHtml(protocolLabel)} 路 ${escapeOverlayHtml(device.device_id || "")}</div>
+          <div class="overlay-device-meta">${escapeOverlayHtml(protocolLabel)} · ${escapeOverlayHtml(device.device_id || "")}</div>
         </div>
         <div class="overlay-device-tags">
           <span class="overlay-chip">${escapeOverlayHtml(device.connected ? "已连接" : "未连接")}</span>
@@ -178,7 +222,8 @@ function drawDeviceHistory(canvas, device) {
   const max = resolveDeviceMaxStrength(device);
   const lines = isToyDevice(device)
     ? [
-        { key: "motor_a", color: "#ff8a4c" },
+        // 灌肠机气阀只有开/关，历史图里把“开”拉满显示，避免在 0-5 量程下几乎看不见。
+        { key: "motor_a", color: "#ff8a4c", normalize: (value) => (isGcqToyDevice(device) ? (Number(value) > 0 ? max : 0) : value) },
         { key: "motor_b", color: "#51a8ff" },
         { key: "motor_c", color: "#a78bfa" },
       ]
@@ -194,7 +239,8 @@ function drawDeviceHistory(canvas, device) {
   lines.forEach((line) => {
     context.beginPath();
     history.forEach((item, index) => {
-      const value = clampStrength(item?.[line.key], max);
+      const rawValue = typeof line.normalize === "function" ? line.normalize(item?.[line.key]) : item?.[line.key];
+      const value = clampStrength(rawValue, max);
       const ratio = max <= 0 ? 0 : value / max;
       const x = padding + (index / Math.max(1, history.length - 1)) * (width - padding * 2);
       const y = height - padding - ratio * (height - padding * 2);

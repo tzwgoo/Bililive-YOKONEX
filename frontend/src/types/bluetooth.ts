@@ -9,6 +9,7 @@ export interface BluetoothStudioResponse {
   ems_waveforms: BluetoothWaveform[];
   toy_waveforms: ToyWaveform[];
   rule_groups: BluetoothRuleGroup[];
+  waveforms?: BluetoothWaveform[];
 }
 
 export interface BluetoothDeviceResponse {
@@ -84,6 +85,7 @@ export interface ToyWaveform {
   name: string;
   builtin: boolean;
   editable: boolean;
+  device_family?: string;
   loop_count?: number;
   steps: ToyWaveformStep[];
 }

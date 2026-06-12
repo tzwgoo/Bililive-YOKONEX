@@ -223,4 +223,26 @@ describe("WaveformEditorPanel", () => {
     expect(panel.attributes("style")).toContain("height:");
     expect(scrollContainer.style.overflowY).toBe("auto");
   });
+
+  it("uses gcq-specific axis labels for gcq waveforms", () => {
+    const wrapper = mount(WaveformEditorPanel, {
+      props: {
+        waveform: {
+          id: "custom-gcq-wave",
+          name: "灌肠机波形",
+          builtin: false,
+          editable: true,
+          device_family: "gcq",
+          steps: [{ duration_ms: 200, motor_a: 1, motor_b: 4, motor_c: 3 }],
+        },
+        savingWaveform: false,
+        deviceType: "gcq",
+      },
+    });
+
+    expect(wrapper.findAll(".timeline-axis-label").map((item) => item.text())).toEqual(["气阀", "气泵", "水泵"]);
+    expect(wrapper.get('[data-testid="waveform-bar-motor-a-0"]').attributes("style")).toContain("height: 100%");
+    expect(wrapper.get('[data-testid="waveform-bar-motor-b-0"]').attributes("style")).toContain("height: 80%");
+    expect(wrapper.get('[data-testid="waveform-bar-motor-c-0"]').attributes("style")).toContain("height: 60%");
+  });
 });

@@ -129,4 +129,26 @@ describe("WaveformListPanel", () => {
 
     expect(getComputedStyle(wrapper.get(".waveform-card").element as HTMLElement).overflow).not.toBe("hidden");
   });
+
+  it("shows gcq-specific max labels for gcq waveforms", () => {
+    const wrapper = mount(WaveformListPanel, {
+      props: {
+        waveforms: [
+          {
+            id: "custom-gcq-wave",
+            name: "灌肠机波形",
+            builtin: false,
+            editable: true,
+            device_family: "gcq",
+            loop_count: 1,
+            steps: [{ duration_ms: 200, motor_a: 12, motor_b: 8, motor_c: 4 }],
+          },
+        ],
+        selectedWaveformId: "custom-gcq-wave",
+        deviceType: "gcq",
+      },
+    });
+
+    expect(wrapper.text()).toContain("最大档位 12");
+  });
 });

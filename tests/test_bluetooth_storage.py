@@ -349,3 +349,70 @@ def test_store_migrates_legacy_single_special_rules_to_price_tiers(tmp_path) -> 
     assert len(guard_buy_rules) == 3
     assert all(rule.enabled is False for rule in guard_buy_rules)
     assert all(rule.waveform_id == "custom-wave-guard" for rule in guard_buy_rules)
+
+
+def test_store_default_payload_includes_gcq_builtin_waveforms(tmp_path) -> None:
+    store = BluetoothSettingsStore(tmp_path / "bluetooth.json")
+
+    payload = store.load()
+
+    gcq_waveforms = [waveform for waveform in payload.toy_waveforms if waveform.device_family == "gcq"]
+
+    assert len(gcq_waveforms) == 10
+    assert gcq_waveforms[0].id == "gcq-toy-preset-01"
+    assert gcq_waveforms[0].builtin is True
+    assert gcq_waveforms[0].editable is False
+
+
+def test_store_loads_gcq_custom_waveforms_and_keeps_builtin_gcq_presets_out_of_custom_list(tmp_path) -> None:
+    path = tmp_path / "bluetooth.json"
+    path.write_text(
+        json.dumps(
+            {
+                "toy_waveforms": [
+                    {
+                        "id": "custom-gcq-wave",
+                        "name": "灌肠机自定义波形",
+                        "builtin": False,
+                        "editable": True,
+                        "device_family": "gcq",
+                        "steps": [
+                            {
+                                "duration_ms": 200,
+                                "motor_a": 12,
+                                "motor_b": 8,
+                                "motor_c": 6,
+                            }
+                        ],
+                    },
+                    {
+                        "id": "gcq-toy-preset-01",
+                        "name": "旧缓存内置波形",
+                        "builtin": True,
+                        "editable": False,
+                        "device_family": "gcq",
+                        "steps": [
+                            {
+                                "duration_ms": 200,
+                                "motor_a": 1,
+                                "motor_b": 1,
+                                "motor_c": 1,
+                            }
+                        ],
+                    },
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    store = BluetoothSettingsStore(path)
+
+    payload = store.load()
+
+    assert payload.toy_waveforms[0].id == "custom-gcq-wave"
+    assert payload.toy_waveforms[0].device_family == "gcq"
+    assert payload.toy_waveforms[0].steps[0].motor_a == 1
+    assert payload.toy_waveforms[0].steps[0].motor_b == 5
+    assert payload.toy_waveforms[0].steps[0].motor_c == 5
+    assert len([waveform for waveform in payload.toy_waveforms if waveform.id == "gcq-toy-preset-01"]) == 1

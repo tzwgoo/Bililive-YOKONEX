@@ -445,12 +445,14 @@ class BluetoothService:
         }
 
     def create_waveform(self, *, name: str, device_type: str = "ems") -> dict:
-        if device_type == "toy":
+        if device_type in {"toy", "gcq"}:
             waveform = ToyWaveform(
                 id=_generate_custom_waveform_id(self.payload),
                 name=str(name or "").strip() or "自定义波形",
                 builtin=False,
                 editable=True,
+                # 灌肠机与三通道飞机杯共用 ToyWaveform 结构，通过 device_family 区分前端标签页和预设集合。
+                device_family="gcq" if device_type == "gcq" else "toy",
                 loop_count=1,
                 steps=[ToyWaveformStep(duration_ms=200, motor_a=0, motor_b=0, motor_c=0)],
             )
@@ -477,6 +479,7 @@ class BluetoothService:
                 name=str(name or "").strip() or f"{source.name} - 副本",
                 builtin=False,
                 editable=True,
+                device_family=source.device_family,
                 loop_count=source.loop_count,
                 steps=[_clone_toy_waveform_step(step) for step in source.steps],
             )
@@ -503,7 +506,11 @@ class BluetoothService:
         if not normalized_name:
             raise ValueError("波形名称不能为空")
         if isinstance(waveform, ToyWaveform):
-            normalized_steps = _merge_toy_editable_steps(existing_steps=waveform.steps, incoming_steps=steps)
+            normalized_steps = _merge_toy_editable_steps(
+                existing_steps=waveform.steps,
+                incoming_steps=steps,
+                device_family=waveform.device_family,
+            )
         else:
             normalized_steps = _merge_editable_steps(existing_steps=waveform.steps, incoming_steps=steps)
         waveform.name = normalized_name
@@ -886,6 +893,11 @@ class BluetoothService:
             "connected_count": len(overlay_devices),
             "device_name": str(payload.get("device_name", "") or ""),
             "device_type": str(payload.get("device_type", "") or ""),
+            "protocol": str(
+                payload.get("protocol", "")
+                or ("" if status.device is None else status.device.protocol)
+                or ""
+            ),
             "waveform_name": str(payload.get("waveform_name", "") or ""),
             "battery_level": _normalize_battery_level(
                 payload.get("battery_level", status.battery_level),
@@ -1000,6 +1012,7 @@ class BluetoothService:
             "device_id": device.device_id,
             "device_name": str(payload.get("device_name", device.name) or device.name),
             "device_type": str(payload.get("device_type", device.device_type) or device.device_type),
+            "protocol": str(payload.get("protocol", device.protocol) or device.protocol),
             "waveform_name": str(payload.get("waveform_name", "") or ""),
             "battery_level": _normalize_battery_level(
                 payload.get("battery_level", status.battery_level),
@@ -1177,7 +1190,12 @@ def _merge_editable_steps(*, existing_steps: list[EmsWaveformStep], incoming_ste
     return normalized_steps
 
 
-def _merge_toy_editable_steps(*, existing_steps: list[ToyWaveformStep], incoming_steps: list[dict]) -> list[ToyWaveformStep]:
+def _merge_toy_editable_steps(
+    *,
+    existing_steps: list[ToyWaveformStep],
+    incoming_steps: list[dict],
+    device_family: str = "toy",
+) -> list[ToyWaveformStep]:
     if not incoming_steps:
         raise ValueError("波形至少需要一个分段")
     normalized_steps: list[ToyWaveformStep] = []
@@ -1186,15 +1204,22 @@ def _merge_toy_editable_steps(*, existing_steps: list[ToyWaveformStep], incoming
         normalized_steps.append(
             ToyWaveformStep(
                 duration_ms=max(1, int(step.get("duration_ms", base_step.duration_ms) or base_step.duration_ms)),
-                motor_a=_normalize_toy_speed(step.get("motor_a", base_step.motor_a)),
-                motor_b=_normalize_toy_speed(step.get("motor_b", base_step.motor_b)),
-                motor_c=_normalize_toy_speed(step.get("motor_c", base_step.motor_c)),
+                # 灌肠机和普通 Toy 共用存储结构，但数值语义不同：
+                # GCQ 的气阀只能开/关，气泵和水泵只能取 0-5 档。
+                motor_a=_normalize_toy_speed(step.get("motor_a", base_step.motor_a), device_family=device_family, field="motor_a"),
+                motor_b=_normalize_toy_speed(step.get("motor_b", base_step.motor_b), device_family=device_family, field="motor_b"),
+                motor_c=_normalize_toy_speed(step.get("motor_c", base_step.motor_c), device_family=device_family, field="motor_c"),
             )
         )
     return normalized_steps
 
 
-def _normalize_toy_speed(value) -> int:
+def _normalize_toy_speed(value, *, device_family: str = "toy", field: str = "") -> int:
+    normalized_family = str(device_family or "toy").lower()
+    if normalized_family == "gcq":
+        if field == "motor_a":
+            return 1 if int(value) > 0 else 0
+        return max(0, min(int(value), 5))
     return max(0, min(int(value), 20))
 
 
@@ -1214,7 +1239,10 @@ def _resolve_waveform_max_strength(waveform: EmsWaveform | ToyWaveform) -> int:
 def _resolve_overlay_display_max_strength(*, payload: dict[str, Any], active_waveform_strength: int) -> int:
     """给 OBS 小窗一个更贴近当前波形的显示量程，只影响视觉比例，不改变设备输出。"""
     device_type = str(payload.get("device_type", "") or "").lower()
-    if device_type == "toy":
+    protocol = str(payload.get("protocol", "") or "").lower()
+    if protocol == "yiskj_gcq_toy_013":
+        return 5
+    if device_type in {"toy", "gcq"}:
         return 20
 
     if active_waveform_strength > 0:

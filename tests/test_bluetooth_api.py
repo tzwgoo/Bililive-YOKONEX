@@ -363,6 +363,7 @@ def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:
     fake_service.overlay_payload = {
         **fake_service.overlay_payload,
         "connected": True,
+        "protocol": "yiskj_gcq_toy_013",
         "waveform_name": "EMS 预设 06 - 心跳节奏",
         "battery_level": 63,
         "channel_a": 48,
@@ -372,6 +373,7 @@ def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:
                 "device_id": "ems-demo-001",
                 "device_name": "YYC-DJ-DEMO",
                 "device_type": "ems",
+                "protocol": "yiskj_gcq_toy_013",
                 "waveform_name": "EMS 预设 06 - 心跳节奏",
                 "battery_level": 63,
                 "display_max_strength": 50,
@@ -396,8 +398,10 @@ def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:
     assert response.json()["waveform_name"] == "EMS 预设 06 - 心跳节奏"
     assert response.json()["display_max_strength"] == 50
     assert response.json()["battery_level"] == 63
+    assert response.json()["protocol"] == "yiskj_gcq_toy_013"
     assert response.json()["channel_a"] == 48
     assert response.json()["channel_b"] == 45
+    assert response.json()["devices"][0]["protocol"] == "yiskj_gcq_toy_013"
     assert response.json()["devices"][0]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
 
 

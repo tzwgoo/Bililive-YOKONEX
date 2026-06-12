@@ -13,7 +13,7 @@
           <div class="hero-metrics">
             <article class="hero-metric">
               <strong>{{ currentWaveforms.length }}</strong>
-              <span>{{ activeTab === "ems" ? "EMS 波形" : "Toy 波形" }}</span>
+              <span>{{ currentTabLabel }}</span>
             </article>
             <article class="hero-metric">
               <strong>{{ editableWaveformCount }}</strong>
@@ -35,12 +35,23 @@
         class="waveform-tab"
         :class="{ 'is-active': activeTab === 'ems' }"
         @click="switchTab('ems')"
-      >EMS 波形</button>
+      >
+        EMS 波形
+      </button>
       <button
         class="waveform-tab"
         :class="{ 'is-active': activeTab === 'toy' }"
         @click="switchTab('toy')"
-      >Toy 波形</button>
+      >
+        飞机杯波形
+      </button>
+      <button
+        class="waveform-tab"
+        :class="{ 'is-active': activeTab === 'gcq' }"
+        @click="switchTab('gcq')"
+      >
+        灌肠机波形
+      </button>
     </div>
 
     <ARow :gutter="[18, 18]">
@@ -84,27 +95,35 @@ import WaveformListPanel from "@/components/waveforms/WaveformListPanel.vue";
 import { useBluetoothStore } from "@/stores/bluetooth";
 import type { BluetoothWaveform, BluetoothWaveformStep, ToyWaveform, ToyWaveformStep } from "@/types/bluetooth";
 
+type WaveformTab = "ems" | "toy" | "gcq";
+
 const bluetoothStore = useBluetoothStore();
 
 const message = ref('修改完成后点击"保存波形"。');
 const savingWaveform = ref(false);
 const previewingWaveform = ref(false);
 const selectedWaveformId = ref("");
-const activeTab = ref<"ems" | "toy">("ems");
+const activeTab = ref<WaveformTab>("ems");
 
 const draftEmsWaveforms = ref<BluetoothWaveform[]>([]);
 const draftToyWaveforms = ref<ToyWaveform[]>([]);
 const savedEmsSnapshots = ref<Record<string, string>>({});
 const savedToySnapshots = ref<Record<string, string>>({});
 
-const currentWaveforms = computed(() =>
-  activeTab.value === "toy" ? draftToyWaveforms.value : draftEmsWaveforms.value,
-);
+const currentWaveforms = computed(() => {
+  if (activeTab.value === "ems") {
+    return draftEmsWaveforms.value;
+  }
+  return draftToyWaveforms.value.filter((waveform) => resolveToyWaveformFamily(waveform) === activeTab.value);
+});
 
-const selectedWaveform = computed(() =>
-  currentWaveforms.value.find((waveform) => waveform.id === selectedWaveformId.value) || null,
+const currentTabLabel = computed(() => resolveWaveformTabLabel(activeTab.value));
+const selectedWaveform = computed(
+  () => currentWaveforms.value.find((waveform) => waveform.id === selectedWaveformId.value) || null,
 );
-const editableWaveformCount = computed(() => currentWaveforms.value.filter((waveform) => !waveform.builtin).length);
+const editableWaveformCount = computed(
+  () => currentWaveforms.value.filter((waveform) => !waveform.builtin).length,
+);
 
 watch(
   () => bluetoothStore.studio,
@@ -117,24 +136,20 @@ watch(
       savedToySnapshots.value = {};
       return;
     }
-    // 测试桩和旧数据可能不会返回完整波形数组，这里统一兜底，避免页面因为 `undefined.map` 直接中断渲染。
-    const emsWaveforms = studio.ems_waveforms || studio.waveforms || [];
+
+    // 兼容旧接口和测试桩里的 waveforms 字段，避免页面因为 undefined.map 直接中断。
+    const emsWaveforms = studio.ems_waveforms?.length ? studio.ems_waveforms : studio.waveforms || [];
     const toyWaveforms = studio.toy_waveforms || [];
 
-    draftEmsWaveforms.value = emsWaveforms.map((waveform) => ({
-      ...waveform,
-      steps: waveform.steps.map((step) => ({ ...step })),
-    }));
+    draftEmsWaveforms.value = emsWaveforms.map((waveform) => cloneWaveform(waveform));
+    draftToyWaveforms.value = toyWaveforms.map((waveform) => cloneToyWaveform(waveform));
     savedEmsSnapshots.value = Object.fromEntries(
       emsWaveforms.map((waveform) => [waveform.id, serializeWaveform(waveform)]),
     );
-    draftToyWaveforms.value = toyWaveforms.map((waveform) => ({
-      ...waveform,
-      steps: waveform.steps.map((step) => ({ ...step })),
-    }));
     savedToySnapshots.value = Object.fromEntries(
       toyWaveforms.map((waveform) => [waveform.id, serializeToyWaveform(waveform)]),
     );
+
     if (!selectedWaveformId.value || !currentWaveforms.value.some((item) => item.id === selectedWaveformId.value)) {
       selectedWaveformId.value = currentWaveforms.value[0]?.id || "";
     }
@@ -142,11 +157,15 @@ watch(
   { immediate: true, deep: true },
 );
 
-function switchTab(tab: "ems" | "toy") {
-  if (activeTab.value === tab) return;
+function switchTab(tab: WaveformTab) {
+  if (activeTab.value === tab) {
+    return;
+  }
   if (selectedWaveformId.value && isWaveformDirty(selectedWaveformId.value)) {
-    const shouldDiscard = window.confirm("当前波形还有未保存更改，是否放弃修改并切换？");
-    if (!shouldDiscard) return;
+    const shouldDiscard = window.confirm("当前波形还有未保存修改，是否放弃修改并切换？");
+    if (!shouldDiscard) {
+      return;
+    }
     restoreWaveformDraft(selectedWaveformId.value);
   }
   activeTab.value = tab;
@@ -161,8 +180,33 @@ function normalizeStrength(value: number) {
   return Math.max(0, Math.min(180, Math.round(Number(value || 0))));
 }
 
-function normalizeToySpeed(value: number) {
-  return Math.max(0, Math.min(20, Math.round(Number(value || 0))));
+function normalizeToySpeed(
+  value: number,
+  deviceFamily: "toy" | "gcq" = "toy",
+  field: keyof ToyWaveformStep = "motor_a",
+) {
+  const normalized = Math.round(Number(value || 0));
+  if (deviceFamily === "gcq") {
+    if (field === "motor_a") {
+      return normalized > 0 ? 1 : 0;
+    }
+    return Math.max(0, Math.min(5, normalized));
+  }
+  return Math.max(0, Math.min(20, normalized));
+}
+
+function resolveToyWaveformFamily(waveform: ToyWaveform) {
+  return waveform.device_family === "gcq" ? "gcq" : "toy";
+}
+
+function resolveWaveformTabLabel(tab: WaveformTab) {
+  if (tab === "gcq") {
+    return "灌肠机波形";
+  }
+  if (tab === "toy") {
+    return "飞机杯波形";
+  }
+  return "EMS 波形";
 }
 
 function cloneWaveform(waveform: BluetoothWaveform): BluetoothWaveform {
@@ -175,6 +219,7 @@ function cloneWaveform(waveform: BluetoothWaveform): BluetoothWaveform {
 function cloneToyWaveform(waveform: ToyWaveform): ToyWaveform {
   return {
     ...waveform,
+    device_family: resolveToyWaveformFamily(waveform),
     steps: waveform.steps.map((step) => ({ ...step })),
   };
 }
@@ -196,142 +241,186 @@ function serializeWaveform(waveform: BluetoothWaveform) {
 }
 
 function serializeToyWaveform(waveform: ToyWaveform) {
+  const deviceFamily = resolveToyWaveformFamily(waveform);
   return JSON.stringify({
     id: waveform.id,
     name: waveform.name,
     builtin: Boolean(waveform.builtin),
     editable: Boolean(waveform.editable),
+    device_family: deviceFamily,
     loop_count: Number(waveform.loop_count || 1),
     steps: waveform.steps.map((step) => ({
       duration_ms: normalizeDuration(step.duration_ms),
-      motor_a: normalizeToySpeed(step.motor_a),
-      motor_b: normalizeToySpeed(step.motor_b),
-      motor_c: normalizeToySpeed(step.motor_c),
+      motor_a: normalizeToySpeed(step.motor_a, deviceFamily, "motor_a"),
+      motor_b: normalizeToySpeed(step.motor_b, deviceFamily, "motor_b"),
+      motor_c: normalizeToySpeed(step.motor_c, deviceFamily, "motor_c"),
     })),
   });
 }
 
 function restoreWaveformDraft(waveformId: string) {
-  if (activeTab.value === "toy") {
-    const saved = bluetoothStore.studio?.toy_waveforms.find((w) => w.id === waveformId);
-    if (!saved) return;
-    const idx = draftToyWaveforms.value.findIndex((w) => w.id === waveformId);
-    if (idx === -1) return;
+  if (activeTab.value !== "ems") {
+    const saved = bluetoothStore.studio?.toy_waveforms.find((waveform) => waveform.id === waveformId);
+    if (!saved) {
+      return;
+    }
+    const idx = draftToyWaveforms.value.findIndex((waveform) => waveform.id === waveformId);
+    if (idx === -1) {
+      return;
+    }
     draftToyWaveforms.value.splice(idx, 1, cloneToyWaveform(saved));
-  } else {
-    const saved = bluetoothStore.studio?.ems_waveforms.find((w) => w.id === waveformId);
-    if (!saved) return;
-    const idx = draftEmsWaveforms.value.findIndex((w) => w.id === waveformId);
-    if (idx === -1) return;
-    draftEmsWaveforms.value.splice(idx, 1, cloneWaveform(saved));
+    return;
   }
+
+  const saved = bluetoothStore.studio?.ems_waveforms.find((waveform) => waveform.id === waveformId);
+  if (!saved) {
+    return;
+  }
+  const idx = draftEmsWaveforms.value.findIndex((waveform) => waveform.id === waveformId);
+  if (idx === -1) {
+    return;
+  }
+  draftEmsWaveforms.value.splice(idx, 1, cloneWaveform(saved));
 }
 
 function isWaveformDirty(waveformId: string) {
-  const isToy = activeTab.value === "toy";
-  const draft = isToy
-    ? draftToyWaveforms.value.find((w) => w.id === waveformId)
-    : draftEmsWaveforms.value.find((w) => w.id === waveformId);
-  if (!draft || draft.builtin) return false;
-  const snapshot = isToy ? savedToySnapshots.value[waveformId] : savedEmsSnapshots.value[waveformId];
-  const serialized = isToy ? serializeToyWaveform(draft as ToyWaveform) : serializeWaveform(draft as BluetoothWaveform);
+  const isToyFamily = activeTab.value !== "ems";
+  const draft = isToyFamily
+    ? draftToyWaveforms.value.find((waveform) => waveform.id === waveformId)
+    : draftEmsWaveforms.value.find((waveform) => waveform.id === waveformId);
+  if (!draft || draft.builtin) {
+    return false;
+  }
+  const snapshot = isToyFamily ? savedToySnapshots.value[waveformId] : savedEmsSnapshots.value[waveformId];
+  const serialized = isToyFamily
+    ? serializeToyWaveform(draft as ToyWaveform)
+    : serializeWaveform(draft as BluetoothWaveform);
   return serialized !== snapshot;
 }
 
 function updateWaveformName(name: string) {
-  if (!selectedWaveform.value || selectedWaveform.value.builtin) return;
+  if (!selectedWaveform.value || selectedWaveform.value.builtin) {
+    return;
+  }
   selectedWaveform.value.name = name;
 }
 
 function updateStep(index: number, field: keyof BluetoothWaveformStep | keyof ToyWaveformStep, value: number) {
-  if (!selectedWaveform.value || selectedWaveform.value.builtin) return;
+  if (!selectedWaveform.value || selectedWaveform.value.builtin) {
+    return;
+  }
   const step = selectedWaveform.value.steps[index];
-  if (!step) return;
+  if (!step) {
+    return;
+  }
   if (field === "duration_ms") {
     step.duration_ms = normalizeDuration(value);
     return;
   }
-  if (activeTab.value === "toy") {
-    (step as ToyWaveformStep)[field as keyof ToyWaveformStep] = normalizeToySpeed(value);
-  } else {
-    (step as BluetoothWaveformStep)[field as keyof BluetoothWaveformStep] = normalizeStrength(value);
+  if (activeTab.value !== "ems") {
+    const toyWaveform = selectedWaveform.value as ToyWaveform;
+    const toyField = field as keyof ToyWaveformStep;
+    (step as ToyWaveformStep)[toyField] = normalizeToySpeed(
+      value,
+      resolveToyWaveformFamily(toyWaveform),
+      toyField,
+    );
+    return;
   }
+  (step as BluetoothWaveformStep)[field as keyof BluetoothWaveformStep] = normalizeStrength(value);
 }
 
 function addStep() {
-  if (!selectedWaveform.value || selectedWaveform.value.builtin) return;
-  if (activeTab.value === "toy") {
-    (selectedWaveform.value as ToyWaveform).steps.push({ duration_ms: 200, motor_a: 0, motor_b: 0, motor_c: 0 });
-  } else {
-    (selectedWaveform.value as BluetoothWaveform).steps.push({ duration_ms: 200, channel_a: 0, channel_b: 0 });
+  if (!selectedWaveform.value || selectedWaveform.value.builtin) {
+    return;
   }
+  if (activeTab.value !== "ems") {
+    (selectedWaveform.value as ToyWaveform).steps.push({ duration_ms: 200, motor_a: 0, motor_b: 0, motor_c: 0 });
+    return;
+  }
+  (selectedWaveform.value as BluetoothWaveform).steps.push({ duration_ms: 200, channel_a: 0, channel_b: 0 });
 }
 
 function duplicateStep(index: number) {
-  if (!selectedWaveform.value || selectedWaveform.value.builtin) return;
+  if (!selectedWaveform.value || selectedWaveform.value.builtin) {
+    return;
+  }
   const step = selectedWaveform.value.steps[index];
-  if (!step) return;
+  if (!step) {
+    return;
+  }
   selectedWaveform.value.steps.splice(index + 1, 0, { ...step });
 }
 
 function removeStep(index: number) {
-  if (!selectedWaveform.value || selectedWaveform.value.builtin || selectedWaveform.value.steps.length === 1) return;
+  if (!selectedWaveform.value || selectedWaveform.value.builtin || selectedWaveform.value.steps.length === 1) {
+    return;
+  }
   selectedWaveform.value.steps.splice(index, 1);
 }
 
 function handleSelectWaveform(nextWaveformId: string) {
-  if (!nextWaveformId || nextWaveformId === selectedWaveformId.value) return;
+  if (!nextWaveformId || nextWaveformId === selectedWaveformId.value) {
+    return;
+  }
   if (selectedWaveformId.value && isWaveformDirty(selectedWaveformId.value)) {
-    const shouldDiscard = window.confirm("当前波形还有未保存更改，是否放弃修改并切换？");
-    if (!shouldDiscard) return;
+    const shouldDiscard = window.confirm("当前波形还有未保存修改，是否放弃修改并切换？");
+    if (!shouldDiscard) {
+      return;
+    }
     restoreWaveformDraft(selectedWaveformId.value);
-    message.value = "已放弃当前波形的未保存修改";
+    message.value = "已放弃当前波形的未保存修改。";
   }
   selectedWaveformId.value = nextWaveformId;
 }
 
 async function handleCreateWaveform() {
   try {
-    const deviceType = activeTab.value;
-    const response = await bluetoothStore.createWaveform("自定义波形", deviceType);
+    const response = await bluetoothStore.createWaveform("自定义波形", activeTab.value);
     selectedWaveformId.value = response.waveform.id;
-    message.value = `已新建空白${deviceType === "toy" ? " Toy" : ""}波形`;
+    message.value = `已新建空白${resolveWaveformTabLabel(activeTab.value)}。`;
   } catch (error) {
     message.value = error instanceof Error ? error.message : "新建波形失败";
   }
 }
 
 async function handleDuplicateWaveform() {
-  if (!selectedWaveform.value) return;
+  if (!selectedWaveform.value) {
+    return;
+  }
   try {
     const response = await bluetoothStore.duplicateWaveform(
       selectedWaveform.value.id,
       `${selectedWaveform.value.name} - 副本`,
     );
     selectedWaveformId.value = response.waveform.id;
-    message.value = "已复制为自定义波形";
+    message.value = "已复制为自定义波形。";
   } catch (error) {
     message.value = error instanceof Error ? error.message : "复制波形失败";
   }
 }
 
 async function handleDeleteWaveform() {
-  if (!selectedWaveform.value || selectedWaveform.value.builtin) return;
+  if (!selectedWaveform.value || selectedWaveform.value.builtin) {
+    return;
+  }
   try {
     await bluetoothStore.deleteWaveform(selectedWaveform.value.id);
     selectedWaveformId.value = currentWaveforms.value[0]?.id || "";
-    message.value = "波形已删除";
+    message.value = "波形已删除。";
   } catch (error) {
     message.value = error instanceof Error ? error.message : "删除波形失败";
   }
 }
 
 async function handlePreviewWaveform() {
-  if (!selectedWaveform.value) return;
+  if (!selectedWaveform.value) {
+    return;
+  }
   previewingWaveform.value = true;
   try {
     const result = await bluetoothStore.previewWaveform(selectedWaveform.value.id);
-    message.value = result.message || "试播已发送";
+    message.value = result.message || "试播命令已发送。";
   } catch (error) {
     message.value = error instanceof Error ? error.message : "试播失败";
   } finally {
@@ -340,32 +429,35 @@ async function handlePreviewWaveform() {
 }
 
 async function handleSaveWaveform() {
-  if (!selectedWaveform.value || selectedWaveform.value.builtin) return;
+  if (!selectedWaveform.value || selectedWaveform.value.builtin) {
+    return;
+  }
   savingWaveform.value = true;
   try {
-    if (activeTab.value === "toy") {
-      const toyWf = selectedWaveform.value as ToyWaveform;
-      await bluetoothStore.updateWaveform(toyWf.id, {
-        name: toyWf.name.trim(),
-        steps: toyWf.steps.map((step) => ({
+    if (activeTab.value !== "ems") {
+      const toyWaveform = selectedWaveform.value as ToyWaveform;
+      const deviceFamily = resolveToyWaveformFamily(toyWaveform);
+      await bluetoothStore.updateWaveform(toyWaveform.id, {
+        name: toyWaveform.name.trim(),
+        steps: toyWaveform.steps.map((step) => ({
           duration_ms: normalizeDuration(step.duration_ms),
-          motor_a: normalizeToySpeed(step.motor_a),
-          motor_b: normalizeToySpeed(step.motor_b),
-          motor_c: normalizeToySpeed(step.motor_c),
+          motor_a: normalizeToySpeed(step.motor_a, deviceFamily, "motor_a"),
+          motor_b: normalizeToySpeed(step.motor_b, deviceFamily, "motor_b"),
+          motor_c: normalizeToySpeed(step.motor_c, deviceFamily, "motor_c"),
         })),
       });
     } else {
-      const emsWf = selectedWaveform.value as BluetoothWaveform;
-      await bluetoothStore.updateWaveform(emsWf.id, {
-        name: emsWf.name.trim(),
-        steps: emsWf.steps.map((step) => ({
+      const emsWaveform = selectedWaveform.value as BluetoothWaveform;
+      await bluetoothStore.updateWaveform(emsWaveform.id, {
+        name: emsWaveform.name.trim(),
+        steps: emsWaveform.steps.map((step) => ({
           duration_ms: normalizeDuration(step.duration_ms),
           channel_a: normalizeStrength(step.channel_a),
           channel_b: normalizeStrength(step.channel_b),
         })),
       });
     }
-    message.value = "波形已保存";
+    message.value = "波形已保存。";
   } catch (error) {
     message.value = error instanceof Error ? error.message : "保存波形失败";
   } finally {
@@ -447,6 +539,7 @@ onMounted(async () => {
   gap: 0;
   border-bottom: 2px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 4px;
+  overflow-x: auto;
 }
 
 .waveform-tab {
@@ -460,6 +553,7 @@ onMounted(async () => {
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: color 0.18s ease, border-color 0.18s ease;
+  white-space: nowrap;
 }
 
 .waveform-tab:hover {

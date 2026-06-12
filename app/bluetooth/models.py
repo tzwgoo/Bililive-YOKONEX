@@ -53,7 +53,12 @@ class EmsWaveform:
 
 @dataclass
 class ToyWaveformStep:
-    """飞机杯/跳蛋波形步进 — 最多 3 路马达 (A/B/C)，速度 0-20。"""
+    """Toy 类波形步进，最多包含 3 路控制值。
+
+    普通 Toy 使用 0-20 速度值；GCQ 灌肠机复用该结构，但 motor_a 只表示气阀开/关，
+    motor_b / motor_c 分别表示气泵和水泵的 0-5 档位。
+    """
+
     duration_ms: int = 200
     motor_a: int = 0
     motor_b: int = 0
@@ -62,11 +67,13 @@ class ToyWaveformStep:
 
 @dataclass
 class ToyWaveform:
-    """飞机杯/跳蛋波形 — 由多个 ToyWaveformStep 组成。"""
+    """Toy 类波形，可按 device_family 区分三通道飞机杯和灌肠机。"""
+
     id: str
     name: str
     builtin: bool = False
     editable: bool = True
+    device_family: str = "toy"
     loop_count: int = 1
     steps: list[ToyWaveformStep] = field(default_factory=list)
 
@@ -113,6 +120,7 @@ BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS = [
 
 def build_default_danmaku_rules(*, enabled: bool = True) -> list[BluetoothEventRule]:
     """构建默认弹幕蓝牙规则。"""
+
     return [
         BluetoothEventRule(
             id=str(item["id"]),
@@ -128,7 +136,8 @@ def build_default_danmaku_rules(*, enabled: bool = True) -> list[BluetoothEventR
 
 
 def build_default_special_event_rules(*, enabled: bool = True) -> list[BluetoothEventRule]:
-    """构建默认 SC、舰队和互动蓝牙规则。"""
+    """构建默认 SC、上舰和互动蓝牙规则。"""
+
     from app.bluetooth.price_tiers import build_default_special_price_rules
 
     return [
@@ -145,27 +154,30 @@ def build_default_special_event_rules(*, enabled: bool = True) -> list[Bluetooth
             for item in build_default_special_price_rules(enabled=enabled)
         ),
         *(
-        BluetoothEventRule(
-            id=str(item["id"]),
-            enabled=bool(enabled),
-            event_type=str(item["event_type"]),
-            waveform_id=str(item["waveform_id"]),
-            toy_waveform_id=str(item.get("toy_waveform_id", "")),
-            cooldown_seconds=0,
-            filters=dict(item["filters"]),
-        )
-        for item in BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS
+            BluetoothEventRule(
+                id=str(item["id"]),
+                enabled=bool(enabled),
+                event_type=str(item["event_type"]),
+                waveform_id=str(item["waveform_id"]),
+                toy_waveform_id=str(item.get("toy_waveform_id", "")),
+                cooldown_seconds=0,
+                filters=dict(item["filters"]),
+            )
+            for item in BLUETOOTH_SPECIAL_EVENT_RULE_DEFINITIONS
         ),
     ]
 
 
 def build_default_payload() -> BluetoothConfigPayload:
-    from app.bluetooth.gift_tiers import build_default_gift_rules
     from app.bluetooth.ems_builtin_waveforms import create_defaults
+    from app.bluetooth.gcq_toy_builtin_waveforms import create_gcq_toy_defaults
+    from app.bluetooth.gift_tiers import build_default_gift_rules
     from app.bluetooth.toy_builtin_waveforms import create_toy_defaults
 
     default_ems_waveforms = create_defaults()
-    default_toy_waveforms = create_toy_defaults()
+    # Toy 和灌肠机继续共用 toy_waveforms 存储通道，
+    # 通过 device_family 区分前端标签页和默认预设集合，避免重构规则字段。
+    default_toy_waveforms = [*create_toy_defaults(), *create_gcq_toy_defaults()]
     return BluetoothConfigPayload(
         bluetooth_settings=BluetoothSettings(),
         ems_waveforms=default_ems_waveforms,
@@ -200,4 +212,5 @@ def build_default_payload() -> BluetoothConfigPayload:
 
 def payload_to_dict(payload: BluetoothConfigPayload) -> dict[str, Any]:
     """把蓝牙配置对象转换成可 JSON 序列化字典。"""
+
     return asdict(payload)

@@ -1,13 +1,9 @@
 <template>
   <ACard :bordered="false" class="waveform-library-panel" :style="DESKTOP_PANEL_STYLE">
     <template #extra>
-      <span class="section-count">{{ waveforms.length }} 个</span>
+      <span class="section-count">{{ waveforms.length }} 项</span>
     </template>
-    <div
-      data-testid="waveform-library-scroll"
-      class="waveform-library"
-      :style="SCROLL_CONTAINER_STYLE"
-    >
+    <div data-testid="waveform-library-scroll" class="waveform-library" :style="SCROLL_CONTAINER_STYLE">
       <div
         v-for="waveform in waveforms"
         :key="waveform.id"
@@ -24,7 +20,7 @@
         <span class="waveform-card-copy">
           <strong>{{ waveform.name }}</strong>
           <small>{{ waveform.builtin ? "内置" : "自定义" }} · {{ waveform.steps.length }} 步</small>
-          <small v-if="isToy">{{ resolveMaxToyStrength(waveform as ToyWaveform) }}</small>
+          <small v-if="isToyFamily">{{ resolveMaxToyStrength(waveform as ToyWaveform) }}</small>
           <small v-else>最大强度 {{ resolveMaxEmsStrength(waveform as BluetoothWaveform) }}</small>
         </span>
         <span :data-testid="`waveform-preview-${waveform.id}`" class="waveform-card-preview">
@@ -35,14 +31,29 @@
             :style="{ flexGrow: normalizeDuration(step.duration_ms) }"
           >
             <span class="waveform-preview-bars" :style="{ height: `${PREVIEW_HEIGHT_PX}px` }">
-              <template v-if="isToy">
-                <span class="waveform-preview-bar is-a" :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_a)}px` }"></span>
-                <span class="waveform-preview-bar is-b" :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_b)}px` }"></span>
-                <span class="waveform-preview-bar is-c" :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_c)}px` }"></span>
+              <template v-if="isToyFamily">
+                <span
+                  class="waveform-preview-bar is-a"
+                  :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_a)}px` }"
+                ></span>
+                <span
+                  class="waveform-preview-bar is-b"
+                  :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_b)}px` }"
+                ></span>
+                <span
+                  class="waveform-preview-bar is-c"
+                  :style="{ height: `${resolveToyPreviewBarHeight(waveform as ToyWaveform, (step as ToyWaveformStep).motor_c)}px` }"
+                ></span>
               </template>
               <template v-else>
-                <span class="waveform-preview-bar is-a" :style="{ height: `${resolveEmsPreviewBarHeight(waveform as BluetoothWaveform, (step as BluetoothWaveformStep).channel_a)}px` }"></span>
-                <span class="waveform-preview-bar is-b" :style="{ height: `${resolveEmsPreviewBarHeight(waveform as BluetoothWaveform, (step as BluetoothWaveformStep).channel_b)}px` }"></span>
+                <span
+                  class="waveform-preview-bar is-a"
+                  :style="{ height: `${resolveEmsPreviewBarHeight((step as BluetoothWaveformStep).channel_a)}px` }"
+                ></span>
+                <span
+                  class="waveform-preview-bar is-b"
+                  :style="{ height: `${resolveEmsPreviewBarHeight((step as BluetoothWaveformStep).channel_b)}px` }"
+                ></span>
               </template>
             </span>
           </span>
@@ -57,17 +68,20 @@ import { computed } from "vue";
 import { Card as ACard } from "ant-design-vue";
 import type { BluetoothWaveform, BluetoothWaveformStep, ToyWaveform, ToyWaveformStep } from "@/types/bluetooth";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   waveforms: (BluetoothWaveform | ToyWaveform)[];
   selectedWaveformId: string;
-  deviceType: "ems" | "toy";
-}>();
+  deviceType?: "ems" | "toy" | "gcq";
+}>(), {
+  deviceType: "ems",
+});
 
 const emit = defineEmits<{
   select: [waveformId: string];
 }>();
 
-const isToy = computed(() => props.deviceType === "toy");
+const isToyFamily = computed(() => props.deviceType !== "ems");
+const toyMaxLabel = computed(() => (props.deviceType === "gcq" ? "最大档位" : "最大速度"));
 
 const PREVIEW_HEIGHT_PX = 64;
 const EMS_PREVIEW_MAX_STRENGTH = 180;
@@ -102,21 +116,22 @@ function resolveMaxToyStrength(waveform: ToyWaveform) {
     (maxValue, step) => Math.max(maxValue, normalizeToySpeed(step.motor_a), normalizeToySpeed(step.motor_b), normalizeToySpeed(step.motor_c)),
     0,
   );
-  return `最大速度 ${maxSpeed}`;
+  return `${toyMaxLabel.value} ${maxSpeed}`;
 }
 
-function resolveEmsPreviewBarHeight(waveform: BluetoothWaveform, value: number) {
-  // Keep EMS preview cards scaled against the real 180 ceiling.
-  return Math.round((normalizeStrength(value) / EMS_PREVIEW_MAX_STRENGTH) * PREVIEW_HEIGHT_PX);
-  // EMS 列表预览固定按设备真实 180 上限缩放，避免低强度波形被拉满后产生误导。
+function resolveEmsPreviewBarHeight(value: number) {
+  // EMS 预览图始终按设备真实 180 上限缩放，避免低强度波形被视觉放大。
   return Math.round((normalizeStrength(value) / EMS_PREVIEW_MAX_STRENGTH) * PREVIEW_HEIGHT_PX);
 }
 
 function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
-  const maxSpeed = Math.max(1, waveform.steps.reduce(
-    (maxValue, step) => Math.max(maxValue, normalizeToySpeed(step.motor_a), normalizeToySpeed(step.motor_b), normalizeToySpeed(step.motor_c)),
-    0,
-  ));
+  const maxSpeed = Math.max(
+    1,
+    waveform.steps.reduce(
+      (maxValue, step) => Math.max(maxValue, normalizeToySpeed(step.motor_a), normalizeToySpeed(step.motor_b), normalizeToySpeed(step.motor_c)),
+      0,
+    ),
+  );
   return Math.round((normalizeToySpeed(value) / maxSpeed) * PREVIEW_HEIGHT_PX);
 }
 </script>
@@ -207,7 +222,7 @@ function resolveToyPreviewBarHeight(waveform: ToyWaveform, value: number) {
   flex: 1 1 0;
   border-radius: 999px;
   min-height: 6px;
-  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.10);
+  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.1);
 }
 
 .waveform-preview-bar.is-a {
