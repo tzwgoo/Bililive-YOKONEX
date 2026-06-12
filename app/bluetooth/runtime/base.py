@@ -17,17 +17,17 @@ class BluetoothRuntime(Protocol):
     async def connect(self, device_id: str) -> BluetoothConnectionStatus:
         ...
 
-    async def disconnect(self) -> BluetoothConnectionStatus:
+    async def disconnect(self, device_id: str | None = None) -> BluetoothConnectionStatus:
         ...
 
-    def get_status(self) -> BluetoothConnectionStatus:
+    def get_status(self, device_id: str | None = None) -> BluetoothConnectionStatus:
         ...
 
     def get_devices(self) -> list[BluetoothDevice]:
         ...
 
-    def get_overlay_payload(self) -> dict:
+    def get_overlay_payload(self, device_id: str | None = None) -> dict:
         ...
 
-    async def play_waveform(self, waveform: EmsWaveform | ToyWaveform) -> None:
+    async def play_waveform(self, device_id: str, waveform: EmsWaveform | ToyWaveform) -> None:
         ...

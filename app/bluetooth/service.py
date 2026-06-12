@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 import time
 import uuid
+from typing import Any
 
 from app.bluetooth.gift_tiers import GIFT_TIER_BY_RULE_ID
 from app.bluetooth.models import BluetoothConnectionStatus
@@ -42,6 +43,15 @@ RULE_GROUP_LABELS = {
 PRICE_FILTER_EVENT_TYPES = {"gift", "super_chat", "guard_buy", "guard_renew"}
 
 
+@dataclass
+class _ActiveWaveformState:
+    task: asyncio.Task[None] | None = None
+    request_id: str = ""
+    waveform_id: str = ""
+    strength: int = -1
+    deadline: float = 0.0
+
+
 class BluetoothService:
     def __init__(
         self,
@@ -61,11 +71,7 @@ class BluetoothService:
         self.event_hub = event_hub
         # 波形执行锁，用于保证同一时刻只保留一个有效波形任务。
         self._waveform_lock = asyncio.Lock()
-        self._active_waveform_task: asyncio.Task[None] | None = None
-        self._active_waveform_request_id = ""
-        self._active_waveform_id = ""
-        self._active_waveform_strength = -1
-        self._active_waveform_deadline = 0.0
+        self._active_waveforms: dict[str, _ActiveWaveformState] = {}
 
     @classmethod
     def create_default(cls, *, config_path: Path, event_hub: Any | None = None) -> "BluetoothService":
@@ -120,8 +126,8 @@ class BluetoothService:
         )
         return status
 
-    async def disconnect(self) -> BluetoothConnectionStatus:
-        return await self.runtime.disconnect()
+    async def disconnect(self, device_id: str | None = None) -> BluetoothConnectionStatus:
+        return await self.runtime.disconnect(device_id)
 
     async def trigger_waveform(self, *, event_type: str, waveform_id: str) -> dict:
         waveform = self._find_waveform_any(waveform_id)
@@ -602,6 +608,471 @@ class BluetoothService:
                 remaining_seconds = self._active_waveform_deadline - time.monotonic()
             if remaining_seconds <= 0:
                 return
+
+    async def disconnect(self, device_id: str | None = None) -> BluetoothConnectionStatus:
+        return await self.runtime.disconnect(device_id)
+
+    def get_connected_devices(self) -> list[BluetoothDevice]:
+        return [
+            item
+            for item in self.runtime.get_devices()
+            if getattr(item, "connected", False)
+        ]
+
+    async def trigger_waveform(
+        self,
+        *,
+        event_type: str,
+        waveform_id: str,
+        device_id: str | None = None,
+        publish: bool = True,
+    ) -> dict:
+        resolved_device_id = self._resolve_runtime_waveform_device_id(device_id)
+        waveform = self._find_waveform_any(waveform_id)
+        waveform_strength = _resolve_waveform_max_strength(waveform)
+        waveform_duration_seconds = _resolve_waveform_duration_seconds(waveform)
+        request_id = uuid.uuid4().hex
+        task_to_await: asyncio.Task[None] | None = None
+        async with self._waveform_lock:
+            state = self._get_active_waveform_state(resolved_device_id)
+            self._cleanup_finished_waveform_task(resolved_device_id)
+            now = time.monotonic()
+            if state.task is not None:
+                if waveform_strength <= state.strength:
+                    if waveform_id == state.waveform_id:
+                        state.deadline = max(state.deadline, now) + waveform_duration_seconds
+                        result = self._build_trigger_result(
+                            event_type=event_type,
+                            waveform=waveform,
+                            waveform_id=waveform_id,
+                            waveform_strength=waveform_strength,
+                            success=True,
+                            message=f"{event_type} 已为当前波形追加 {waveform_duration_seconds:.2f} 秒时长",
+                            device_id=resolved_device_id,
+                        )
+                        if publish:
+                            self._publish_bluetooth_control(result)
+                        return result
+                    result = self._build_trigger_result(
+                        event_type=event_type,
+                        waveform=waveform,
+                        waveform_id=waveform_id,
+                        waveform_strength=waveform_strength,
+                        success=True,
+                        message=f"当前设备已有更高强度波形执行中，已忽略 {event_type} 触发",
+                        device_id=resolved_device_id,
+                    )
+                    if publish:
+                        self._publish_bluetooth_control(result)
+                    return result
+                previous_task = state.task
+                state.request_id = request_id
+                state.waveform_id = waveform_id
+                state.strength = waveform_strength
+                state.deadline = now + waveform_duration_seconds
+                task_to_await = asyncio.create_task(
+                    self._run_waveform_until_deadline(
+                        waveform,
+                        device_id=resolved_device_id,
+                        request_id=request_id,
+                    )
+                )
+                state.task = task_to_await
+                previous_task.cancel()
+            else:
+                state.request_id = request_id
+                state.waveform_id = waveform_id
+                state.strength = waveform_strength
+                state.deadline = now + waveform_duration_seconds
+                task_to_await = asyncio.create_task(
+                    self._run_waveform_until_deadline(
+                        waveform,
+                        device_id=resolved_device_id,
+                        request_id=request_id,
+                    )
+                )
+                state.task = task_to_await
+        try:
+            await task_to_await
+        except asyncio.CancelledError:
+            async with self._waveform_lock:
+                state = self._get_active_waveform_state(resolved_device_id)
+                if state.request_id != request_id:
+                    result = self._build_trigger_result(
+                        event_type=event_type,
+                        waveform=waveform,
+                        waveform_id=waveform_id,
+                        waveform_strength=waveform_strength,
+                        success=True,
+                        message=f"{event_type} 波形已被更高强度事件抢占",
+                        device_id=resolved_device_id,
+                    )
+                    if publish:
+                        self._publish_bluetooth_control(result)
+                    return result
+            raise
+        except Exception as exc:
+            result = self._build_trigger_result(
+                event_type=event_type,
+                waveform=waveform,
+                waveform_id=waveform_id,
+                waveform_strength=waveform_strength,
+                success=False,
+                message=f"波形执行失败: {exc}",
+                device_id=resolved_device_id,
+            )
+            if publish:
+                self._publish_bluetooth_control(result)
+            return result
+        finally:
+            async with self._waveform_lock:
+                state = self._get_active_waveform_state(resolved_device_id)
+                if state.request_id == request_id:
+                    self._reset_active_waveform_state(resolved_device_id)
+        result = self._build_trigger_result(
+            event_type=event_type,
+            waveform=waveform,
+            waveform_id=waveform_id,
+            waveform_strength=waveform_strength,
+            success=True,
+            message=f"{event_type} 已触发波形 {waveform.name}",
+            device_id=resolved_device_id,
+        )
+        if publish:
+            self._publish_bluetooth_control(result)
+        return result
+
+    async def trigger_waveforms(
+        self,
+        *,
+        event_type: str,
+        targets: list[dict[str, str]],
+    ) -> dict:
+        if not targets:
+            return {
+                "matched": False,
+                "success": False,
+                "message": "当前没有可触发的已连接设备",
+                "targets": [],
+            }
+        results = await asyncio.gather(
+            *[
+                self.trigger_waveform(
+                    event_type=event_type,
+                    waveform_id=target["waveform_id"],
+                    device_id=target["device_id"],
+                    publish=False,
+                )
+                for target in targets
+            ]
+        )
+        first_result = results[0]
+        aggregate = {
+            "matched": True,
+            "success": any(item.get("success", False) for item in results),
+            "event_type": event_type,
+            "waveform_id": first_result.get("waveform_id", ""),
+            "waveform_name": first_result.get("waveform_name", ""),
+            "max_strength": max((int(item.get("max_strength", 0) or 0) for item in results), default=0),
+            "device_id": first_result.get("device_id", ""),
+            "device_ids": [item.get("device_id", "") for item in results],
+            "targets": results,
+            "message": f"{event_type} 已向 {len(results)} 台设备分发波形",
+        }
+        self._publish_bluetooth_control(aggregate)
+        return aggregate
+
+    async def preview_waveform(self, waveform_id: str, device_id: str | None = None) -> dict:
+        waveform = self._find_waveform_any(waveform_id)
+        target_device_id = self._resolve_runtime_waveform_device_id(device_id)
+        try:
+            await self._play_waveform_with_runtime_compat(target_device_id, waveform)
+        except Exception as exc:
+            result = self._build_trigger_result(
+                event_type="waveform_preview",
+                waveform=waveform,
+                waveform_id=waveform_id,
+                waveform_strength=_resolve_waveform_max_strength(waveform),
+                success=False,
+                message=f"测试播放失败: {exc}",
+                device_id=target_device_id,
+            )
+            self._publish_bluetooth_control(result)
+            return result
+        result = self._build_trigger_result(
+            event_type="waveform_preview",
+            waveform=waveform,
+            waveform_id=waveform_id,
+            waveform_strength=_resolve_waveform_max_strength(waveform),
+            success=True,
+            message=f"已测试播放波形 {waveform.name}",
+            device_id=target_device_id,
+        )
+        self._publish_bluetooth_control(result)
+        return result
+
+    def get_status_payload(self) -> dict:
+        devices = self.runtime.get_devices()
+        connected_devices = [item for item in devices if getattr(item, "connected", False)]
+        primary_device_id = self._resolve_target_device_id()
+        primary_status = self.runtime.get_status(primary_device_id)
+        waveform_name_map = {
+            item.id: item.name
+            for item in self.payload.ems_waveforms
+        }
+        waveform_name_map.update({
+            item.id: item.name
+            for item in self.payload.toy_waveforms
+        })
+        payload_dict = payload_to_dict(self.payload)
+        return {
+            "runtime_backend": getattr(self.runtime, "backend_name", "unknown"),
+            "enabled": self.payload.bluetooth_settings.enabled,
+            "connected": bool(connected_devices),
+            "connected_count": len(connected_devices),
+            "connected_device_ids": [item.device_id for item in connected_devices],
+            "battery_level": primary_status.battery_level,
+            "message": self._resolve_status_message(primary_status=primary_status, connected_devices=connected_devices),
+            "device": None if primary_status.device is None else {
+                "device_id": primary_status.device.device_id,
+                "name": primary_status.device.name,
+                "device_type": primary_status.device.device_type,
+                "protocol": primary_status.device.protocol,
+                "rssi": primary_status.device.rssi,
+            },
+            "devices": [
+                self._build_device_status_payload(item)
+                for item in devices
+            ],
+            "ems_waveforms": payload_dict["ems_waveforms"],
+            "toy_waveforms": payload_dict["toy_waveforms"],
+            "rules": [
+                {
+                    **item,
+                    "event_label": RULE_GROUP_LABELS.get(str(item.get("event_type", "")), str(item.get("event_type", "unknown"))),
+                    "rule_label": _build_rule_label(item),
+                    "waveform_name": waveform_name_map.get(str(item.get("waveform_id", "")), str(item.get("waveform_id", "-") or "-")),
+                    "toy_waveform_name": waveform_name_map.get(str(item.get("toy_waveform_id", "")), str(item.get("toy_waveform_id", "-") or "-")),
+                }
+                for item in payload_dict["bluetooth_event_rules"]
+            ],
+        }
+
+    def get_overlay_payload(self, device_id: str | None = None) -> dict:
+        connected_devices = self.get_connected_devices()
+        filtered_devices = connected_devices
+        if device_id:
+            filtered_devices = [
+                item
+                for item in connected_devices
+                if item.device_id == device_id
+            ]
+        overlay_devices = [
+            self._build_overlay_device_payload(item)
+            for item in filtered_devices
+        ]
+        target_device_id = "" if not overlay_devices else overlay_devices[0]["device_id"]
+        payload = self.runtime.get_overlay_payload(target_device_id)
+        status = self.runtime.get_status(target_device_id) if target_device_id else self.runtime.get_status()
+        active_state = self._active_waveforms.get(target_device_id or "")
+        active_strength = -1 if active_state is None else active_state.strength
+        # 聚合 revision，保证多设备任意一台变更都能驱动叠加窗刷新。
+        overlay_revision = sum(max(0, int(item.get("revision", 0) or 0)) for item in overlay_devices)
+        if overlay_revision <= 0:
+            overlay_revision = max(0, int(payload.get("revision", 0) or 0))
+        return {
+            "device_id": str(target_device_id or ""),
+            "connected": bool(overlay_devices),
+            "connected_count": len(overlay_devices),
+            "device_name": str(payload.get("device_name", "") or ""),
+            "device_type": str(payload.get("device_type", "") or ""),
+            "waveform_name": str(payload.get("waveform_name", "") or ""),
+            "battery_level": _normalize_battery_level(
+                payload.get("battery_level", status.battery_level),
+            ),
+            "display_max_strength": _resolve_overlay_display_max_strength(
+                payload=payload,
+                active_waveform_strength=active_strength,
+            ),
+            "devices": overlay_devices,
+            "channel_a": max(0, int(payload.get("channel_a", 0) or 0)),
+            "channel_b": max(0, int(payload.get("channel_b", 0) or 0)),
+            "motor_a": max(0, int(payload.get("motor_a", 0) or 0)),
+            "motor_b": max(0, int(payload.get("motor_b", 0) or 0)),
+            "motor_c": max(0, int(payload.get("motor_c", 0) or 0)),
+            "step_index": max(0, int(payload.get("step_index", 0) or 0)),
+            "step_count": max(0, int(payload.get("step_count", 0) or 0)),
+            "updated_at": float(payload.get("updated_at", 0) or 0),
+            "history": [
+                {
+                    **item,
+                    "channel_a": max(0, int(item.get("channel_a", 0) or 0)),
+                    "channel_b": max(0, int(item.get("channel_b", 0) or 0)),
+                    "motor_a": max(0, int(item.get("motor_a", 0) or 0)),
+                    "motor_b": max(0, int(item.get("motor_b", 0) or 0)),
+                    "motor_c": max(0, int(item.get("motor_c", 0) or 0)),
+                }
+                for item in payload.get("history", [])
+                if isinstance(item, dict)
+            ][-90:],
+            "recent_events": _build_overlay_recent_events(self.event_hub),
+            "revision": overlay_revision,
+        }
+
+    def _cleanup_finished_waveform_task(self, device_id: str) -> None:
+        state = self._active_waveforms.get(device_id)
+        if state is None or state.task is None or not state.task.done():
+            return
+        self._reset_active_waveform_state(device_id)
+
+    async def _run_waveform_until_deadline(
+        self,
+        waveform: EmsWaveform | ToyWaveform,
+        *,
+        device_id: str,
+        request_id: str,
+    ) -> None:
+        while True:
+            await self._play_waveform_with_runtime_compat(device_id, waveform)
+            async with self._waveform_lock:
+                state = self._get_active_waveform_state(device_id)
+                if state.request_id != request_id:
+                    return
+                remaining_seconds = state.deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                return
+
+    def _get_active_waveform_state(self, device_id: str) -> _ActiveWaveformState:
+        return self._active_waveforms.setdefault(device_id, _ActiveWaveformState())
+
+    def _reset_active_waveform_state(self, device_id: str) -> None:
+        self._active_waveforms[device_id] = _ActiveWaveformState()
+
+    def _resolve_target_device_id(self, device_id: str | None = None) -> str:
+        connected_devices = self.get_connected_devices()
+        connected_device_ids = {item.device_id for item in connected_devices}
+        if device_id and device_id in connected_device_ids:
+            return device_id
+        default_device_id = str(self.payload.bluetooth_settings.default_target_device_id or "")
+        if default_device_id in connected_device_ids:
+            return default_device_id
+        return "" if not connected_devices else connected_devices[0].device_id
+
+    def _resolve_runtime_waveform_device_id(self, device_id: str | None = None) -> str:
+        resolved_device_id = self._resolve_target_device_id(device_id)
+        if resolved_device_id:
+            return resolved_device_id
+        return str(device_id or "__default__")
+
+    def _resolve_status_message(
+        self,
+        *,
+        primary_status: BluetoothConnectionStatus,
+        connected_devices: list[BluetoothDevice],
+    ) -> str:
+        if not connected_devices:
+            return primary_status.message
+        if len(connected_devices) == 1:
+            return primary_status.message
+        return f"已连接 {len(connected_devices)} 台设备"
+
+    def _build_device_status_payload(self, device: BluetoothDevice) -> dict:
+        status = self.runtime.get_status(device.device_id)
+        active_state = self._active_waveforms.get(device.device_id)
+        return {
+            "device_id": device.device_id,
+            "name": device.name,
+            "device_type": device.device_type,
+            "protocol": device.protocol,
+            "rssi": device.rssi,
+            "connected": device.connected,
+            "battery_level": status.battery_level,
+            "active_waveform_id": "" if active_state is None else active_state.waveform_id,
+            "active_waveform_strength": -1 if active_state is None else active_state.strength,
+        }
+
+    def _build_overlay_device_payload(self, device: BluetoothDevice) -> dict:
+        payload = self.runtime.get_overlay_payload(device.device_id)
+        status = self.runtime.get_status(device.device_id)
+        active_state = self._active_waveforms.get(device.device_id)
+        active_strength = -1 if active_state is None else active_state.strength
+        return {
+            "device_id": device.device_id,
+            "device_name": str(payload.get("device_name", device.name) or device.name),
+            "device_type": str(payload.get("device_type", device.device_type) or device.device_type),
+            "waveform_name": str(payload.get("waveform_name", "") or ""),
+            "battery_level": _normalize_battery_level(
+                payload.get("battery_level", status.battery_level),
+            ),
+            "display_max_strength": _resolve_overlay_display_max_strength(
+                payload=payload,
+                active_waveform_strength=active_strength,
+            ),
+            "channel_a": max(0, int(payload.get("channel_a", 0) or 0)),
+            "channel_b": max(0, int(payload.get("channel_b", 0) or 0)),
+            "motor_a": max(0, int(payload.get("motor_a", 0) or 0)),
+            "motor_b": max(0, int(payload.get("motor_b", 0) or 0)),
+            "motor_c": max(0, int(payload.get("motor_c", 0) or 0)),
+            "step_index": max(0, int(payload.get("step_index", 0) or 0)),
+            "step_count": max(0, int(payload.get("step_count", 0) or 0)),
+            "updated_at": float(payload.get("updated_at", 0) or 0),
+            "connected": bool(device.connected),
+            "revision": max(0, int(payload.get("revision", 0) or 0)),
+            "history": [
+                {
+                    **item,
+                    "channel_a": max(0, int(item.get("channel_a", 0) or 0)),
+                    "channel_b": max(0, int(item.get("channel_b", 0) or 0)),
+                    "motor_a": max(0, int(item.get("motor_a", 0) or 0)),
+                    "motor_b": max(0, int(item.get("motor_b", 0) or 0)),
+                    "motor_c": max(0, int(item.get("motor_c", 0) or 0)),
+                }
+                for item in payload.get("history", [])
+                if isinstance(item, dict)
+            ][-90:],
+        }
+
+    def _build_trigger_result(
+        self,
+        *,
+        event_type: str,
+        waveform: EmsWaveform | ToyWaveform,
+        waveform_id: str,
+        waveform_strength: int,
+        success: bool,
+        message: str,
+        device_id: str,
+    ) -> dict:
+        return {
+            "matched": True,
+            "event_type": event_type,
+            "waveform_id": waveform_id,
+            "waveform_name": waveform.name,
+            "max_strength": waveform_strength,
+            "success": success,
+            "message": message,
+            "device_id": device_id,
+        }
+
+    async def _play_waveform_with_runtime_compat(
+        self,
+        device_id: str,
+        waveform: EmsWaveform | ToyWaveform,
+    ) -> None:
+        try:
+            await self.runtime.play_waveform(device_id, waveform)
+        except RuntimeError:
+            if getattr(self.runtime, "backend_name", "") != "memory":
+                raise
+            devices = self.runtime.get_devices()
+            if not devices:
+                devices = await self.runtime.scan()
+            if not devices:
+                raise
+            await self.runtime.connect(devices[0].device_id)
+            await self.runtime.play_waveform(devices[0].device_id, waveform)
+        except TypeError:
+            await self.runtime.play_waveform(waveform)
 
 
 def create_real_bluetooth_runtime(

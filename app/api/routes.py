@@ -179,12 +179,10 @@ async def waveforms_page(request: Request) -> HTMLResponse:
 
 @router.get("/bluetooth/overlay", response_class=HTMLResponse)
 async def bluetooth_overlay(request: Request) -> HTMLResponse:
-    requested_style = str(request.query_params.get("style", "event") or "event").lower()
-    overlay_style = requested_style if requested_style in {"event", "panel"} else "event"
     return templates.TemplateResponse(
         request=request,
         name="bluetooth_overlay.html",
-        context={"overlay_style": overlay_style},
+        context={"overlay_style": "panel"},
     )
 
 
@@ -214,7 +212,9 @@ async def get_command_studio_data(request: Request) -> dict:
 
 
 @router.get("/api/bluetooth/overlay/status")
-async def get_bluetooth_overlay_status(request: Request) -> dict:
+async def get_bluetooth_overlay_status(request: Request, device_id: str | None = None) -> dict:
+    if device_id:
+        return request.app.state.bluetooth_service.get_overlay_payload(device_id)
     return request.app.state.bluetooth_service.get_overlay_payload()
 
 
@@ -324,8 +324,11 @@ async def duplicate_bluetooth_waveform(
 async def preview_bluetooth_waveform(
     request: Request,
     waveform_id: str,
+    device_id: str | None = None,
 ) -> dict:
     try:
+        if device_id:
+            return await request.app.state.bluetooth_service.preview_waveform(waveform_id, device_id=device_id)
         return await request.app.state.bluetooth_service.preview_waveform(waveform_id)
     except (ValueError, RuntimeError, TimeoutError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -358,15 +361,24 @@ async def delete_bluetooth_waveform(request: Request, waveform_id: str) -> dict:
 
 
 @router.get("/api/bluetooth/overlay/stream")
-async def bluetooth_overlay_stream(request: Request, once: bool = False) -> StreamingResponse:
+async def bluetooth_overlay_stream(
+    request: Request,
+    once: bool = False,
+    device_id: str | None = None,
+) -> StreamingResponse:
     bluetooth_service = request.app.state.bluetooth_service
 
     async def generate():
+        last_revision: int | None = None
         while True:
             if await request.is_disconnected():
                 break
-            payload = bluetooth_service.get_overlay_payload()
-            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            payload = bluetooth_service.get_overlay_payload(device_id) if device_id else bluetooth_service.get_overlay_payload()
+            current_revision = max(0, int(payload.get("revision", 0) or 0))
+            # 只在状态实际变化时推送，避免多设备叠加窗被高频全量重绘拖慢。
+            if last_revision != current_revision or once:
+                last_revision = current_revision
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             if once:
                 break
             await asyncio.sleep(0.12)

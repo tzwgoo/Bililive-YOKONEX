@@ -72,12 +72,12 @@ describe("DashboardPage", () => {
     const wrapper = mount(DashboardPage);
     await flushPromises();
 
-    await wrapper.get('[data-testid="session-value-input"]').setValue("主播身份码123");
+    await wrapper.get('[data-testid="session-value-input"]').setValue("123456");
     await wrapper.get('[data-testid="start-session"]').trigger("click");
 
     expect(startSessionSpy).toHaveBeenCalledWith({
-      mode: "open_live",
-      value: "主播身份码123",
+      mode: "third_party",
+      value: "123456",
       trigger_mode: "by_quantity",
       like_multiple: 100,
       danmaku_enabled: false,
@@ -89,7 +89,7 @@ describe("DashboardPage", () => {
     });
   });
 
-  it("does not render the old connection mode selector in the trigger card", async () => {
+  it("fixes the dashboard session source to third-party stream", async () => {
     vi.spyOn(sessionService, "fetchSessionStatus").mockResolvedValue({
       status: "idle",
       can_start: true,
@@ -107,11 +107,12 @@ describe("DashboardPage", () => {
     const wrapper = mount(DashboardPage);
     await flushPromises();
 
-    expect(wrapper.text()).toContain("礼物触发模式");
-    expect(wrapper.text()).not.toContain("连接方式");
+    expect(wrapper.text()).toContain("消息源");
+    expect(wrapper.get('[data-testid="session-source-input"]').element).toHaveProperty("value", "第三方消息流");
+    expect(wrapper.text()).not.toContain("主播身份码");
   });
 
-  it("renders explicit OBS overlay entries for both supported styles", async () => {
+  it("renders only the panel overlay entry on dashboard", async () => {
     vi.spyOn(sessionService, "fetchSessionStatus").mockResolvedValue({
       status: "idle",
       can_start: true,
@@ -131,14 +132,11 @@ describe("DashboardPage", () => {
     const wrapper = mount(DashboardPage);
     await flushPromises();
 
-    const eventOverlayLink = wrapper.get('[data-testid="open-bluetooth-overlay-event"]');
     const panelOverlayLink = wrapper.get('[data-testid="open-bluetooth-overlay-panel"]');
-    expect(eventOverlayLink.attributes("href")).toBe("/bluetooth/overlay?style=event");
     expect(panelOverlayLink.attributes("href")).toBe("/bluetooth/overlay?style=panel");
-    expect(eventOverlayLink.attributes("target")).toBe("_blank");
     expect(panelOverlayLink.attributes("target")).toBe("_blank");
-    expect(eventOverlayLink.text()).toContain("弹幕演出");
     expect(panelOverlayLink.text()).toContain("仪表盘");
+    expect(wrapper.find('[data-testid="open-bluetooth-overlay-event"]').exists()).toBe(false);
   });
 
   it("submits command connect payload from dashboard form", async () => {
@@ -216,12 +214,12 @@ describe("DashboardPage", () => {
     await flushPromises();
 
     expect(openSpy).toHaveBeenCalledWith(
-      "/bluetooth/overlay?style=event",
+      "/bluetooth/overlay?style=panel",
       "biliLiveBluetoothOverlay",
       "popup=yes,width=1080,height=260,resizable=yes,scrollbars=no",
     );
     expect(connectBluetoothSpy).toHaveBeenCalledWith("device-01");
-    expect(overlayWindow.location.replace).toHaveBeenCalledWith("/bluetooth/overlay?style=event");
+    expect(overlayWindow.location.replace).toHaveBeenCalledWith("/bluetooth/overlay?style=panel");
     expect(overlayWindow.focus).toHaveBeenCalled();
   });
 });

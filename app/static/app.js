@@ -102,6 +102,32 @@ const danmakuGuardDisplayOptions = {
 };
 const danmakuEventTypes = new Set(["danmaku", "danmaku_captain", "danmaku_commander", "danmaku_governor"]);
 
+function lockSessionModeField() {
+  if (!(sessionModeSelect instanceof HTMLSelectElement)) {
+    return;
+  }
+  // 首页监听模式已经固定，直接展示只读文案，避免用户误以为这里还能切换。
+  let sessionModeDisplay = document.getElementById("session-mode-display");
+  if (!(sessionModeDisplay instanceof HTMLInputElement)) {
+    sessionModeDisplay = document.createElement("input");
+    sessionModeDisplay.id = "session-mode-display";
+    sessionModeDisplay.type = "text";
+    sessionModeDisplay.readOnly = true;
+    sessionModeSelect.insertAdjacentElement("beforebegin", sessionModeDisplay);
+  }
+  sessionModeSelect.value = "third_party";
+  sessionModeSelect.hidden = true;
+  sessionModeSelect.setAttribute("aria-hidden", "true");
+  sessionModeSelect.tabIndex = -1;
+  sessionModeSelect.style.display = "none";
+  sessionModeDisplay.value = sessionModeOptions.third_party.modeLabel;
+  const sessionModeLabel = document.querySelector('label[for="session-mode"]');
+  if (sessionModeLabel instanceof HTMLLabelElement) {
+    sessionModeLabel.htmlFor = "session-mode-display";
+    sessionModeLabel.textContent = "消息源";
+  }
+}
+
 function activateDashboardTab(tabId) {
   if (!tabId) {
     return;
@@ -195,6 +221,7 @@ function restoreSessionDraft() {
   if (savedDanmakuMinGuardLevel && Object.hasOwn(guardLevelOptions, savedDanmakuMinGuardLevel)) {
     danmakuMinGuardLevelSelect.value = savedDanmakuMinGuardLevel;
   }
+  sessionModeSelect.value = "third_party";
 }
 
 function persistSessionDraft() {
@@ -671,9 +698,65 @@ bluetoothDevices.addEventListener("click", async (event) => {
     return;
   }
   target.setAttribute("disabled", "disabled");
-  const overlayWindow = openBluetoothOverlayWindow();
+  const overlayWindow = openBluetoothOverlayWindow(deviceId);
   await connectBluetoothDevice(deviceId, overlayWindow);
 });
+
+function renderBluetoothDevices(devices) {
+  if (!Array.isArray(devices) || devices.length === 0) {
+    bluetoothDevices.innerHTML = '<p class="mini-empty">暂时没有扫描到设备，请先执行扫描。</p>';
+    return;
+  }
+  bluetoothDevices.innerHTML = devices
+    .map((device) => {
+      const batteryText =
+        device.battery_level !== null && device.battery_level !== undefined
+          ? ` · ${escapeHtml(device.battery_level)}%`
+          : "";
+      const action = device.connected
+        ? `<span class="mini-chip">已连接${batteryText}</span>`
+        : `<button class="mini-action" data-device-id="${escapeHtml(device.device_id)}">连接</button>`;
+      return `<article class="mini-item"><div><strong>${escapeHtml(device.name)}</strong><small>${escapeHtml(device.protocol)} · RSSI ${escapeHtml(device.rssi)}</small></div>${action}</article>`;
+    })
+    .join("");
+}
+
+function openBluetoothOverlayWindow(_deviceId = "") {
+  return window.open("/bluetooth/overlay?style=panel", bluetoothOverlayWindowName, "popup=yes,width=1280,height=420,resizable=yes,scrollbars=no");
+}
+
+async function connectBluetoothDevice(deviceId, overlayWindow = null) {
+  const response = await fetch("/api/bluetooth/connect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (overlayWindow && !overlayWindow.closed) {
+      overlayWindow.close();
+    }
+    bluetoothMessageText.textContent = payload.detail || "蓝牙连接失败";
+    await refreshBluetoothStatus();
+    return;
+  }
+  if (overlayWindow && !overlayWindow.closed) {
+    overlayWindow.location.replace("/bluetooth/overlay?style=panel");
+    overlayWindow.focus();
+  }
+  await refreshBluetoothStatus();
+}
+
+async function refreshBluetoothStatus() {
+  const response = await fetch("/api/bluetooth/status");
+  const data = await response.json();
+  bluetoothStatusPill.textContent = data.connected ? (data.connected_count > 1 ? `connected x${data.connected_count}` : "connected") : "idle";
+  updateStatusTone(bluetoothStatusPill, data.connected ? "connected" : "idle");
+  bluetoothMessageText.textContent = data.message || "未连接";
+  bluetoothDisconnectBtn.disabled = !data.connected;
+  renderBluetoothDevices(data.devices || []);
+  renderBluetoothRules(data.rules || []);
+}
 
 sessionModeSelect.addEventListener("change", () => {
   persistSessionDraft();
@@ -791,6 +874,7 @@ async function refreshDashboard() {
 
 restoreCommandForm();
 restoreSessionDraft();
+lockSessionModeField();
 updateSessionModeForm();
 updateConnectionModeForm();
 updateEventCounts();

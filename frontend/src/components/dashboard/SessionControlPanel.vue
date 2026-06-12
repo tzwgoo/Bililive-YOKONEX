@@ -10,8 +10,8 @@
         <ACard title="监听主参数" :bordered="false">
           <div class="form-grid two-columns">
             <label class="field">
-              <span>监听模式</span>
-              <Select v-model:value="sessionForm.mode" :options="sessionModeSelectOptions" />
+              <span>消息源</span>
+              <Input data-testid="session-source-input" :value="fixedSessionModeLabel" readonly />
             </label>
             <label class="field">
               <span>{{ sessionValueLabel }}</span>
@@ -33,7 +33,7 @@
               <Select v-model:value="sessionForm.trigger_mode" :options="triggerModeOptions" />
             </label>
             <label class="field">
-              <span>点赞倍数</span>
+              <span>点赞倍率</span>
               <InputNumber v-model:value="sessionForm.like_multiple" :min="1" :step="1" class="field-number" />
             </label>
           </div>
@@ -53,11 +53,21 @@
         </label>
         <label class="field">
           <span>每用户限流窗口</span>
-          <InputNumber v-model:value="sessionForm.danmaku_user_limit_window_seconds" :min="0" :step="1" class="field-number" />
+          <InputNumber
+            v-model:value="sessionForm.danmaku_user_limit_window_seconds"
+            :min="0"
+            :step="1"
+            class="field-number"
+          />
         </label>
         <label class="field">
           <span>窗口内最大触发次数</span>
-          <InputNumber v-model:value="sessionForm.danmaku_user_limit_max_triggers" :min="0" :step="1" class="field-number" />
+          <InputNumber
+            v-model:value="sessionForm.danmaku_user_limit_max_triggers"
+            :min="0"
+            :step="1"
+            class="field-number"
+          />
         </label>
         <label class="field">
           <span>最低舰队等级</span>
@@ -65,7 +75,7 @@
         </label>
         <label class="field field-span-2">
           <span>弹幕关键词</span>
-          <Input v-model:value="sessionForm.danmaku_keywords" placeholder="多个关键词用逗号分隔，例如 游戏,意思,玩" />
+          <Input v-model:value="sessionForm.danmaku_keywords" placeholder="多个关键词用逗号分隔，例如：游戏,互动,测试" />
         </label>
       </div>
       <AAlert v-if="message" class="section-alert" :message="message" type="info" show-icon />
@@ -102,10 +112,10 @@ defineEmits<{
   stop: [];
 }>();
 
-const sessionModeSelectOptions = [
-  { label: "官方 open-live", value: "open_live" },
-  { label: "第三方房间消息流", value: "third_party" },
-];
+const fixedSessionModeLabel = "第三方消息流";
+// 首页只保留第三方消息流接入，组件初始化时强制纠正旧草稿里的历史模式值。
+props.sessionForm.mode = "third_party";
+
 const triggerModeOptions = [
   { label: "按礼物数量触发", value: "by_quantity" },
   { label: "单次触发", value: "single" },
@@ -121,9 +131,9 @@ const guardLevelOptions = [
   { label: "总督", value: 1 },
 ];
 
-const sessionValueLabel = computed(() => (props.sessionForm.mode === "third_party" ? "房间长 ID" : "主播身份码"));
+const sessionValueLabel = computed(() => (props.sessionForm.mode === "third_party" ? "房间号 ID" : "主播身份码"));
 const sessionValuePlaceholder = computed(() =>
-  props.sessionForm.mode === "third_party" ? "请输入直播间房间长 ID room_id" : "请输入主播身份码 code",
+  props.sessionForm.mode === "third_party" ? "请输入直播间房间号 ID room_id" : "请输入主播身份码 code",
 );
 const danmakuEnabledValue = computed({
   get: () => (props.sessionForm.danmaku_enabled ? "true" : "false"),

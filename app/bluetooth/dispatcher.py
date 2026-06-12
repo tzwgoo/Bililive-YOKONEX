@@ -263,6 +263,158 @@ class BluetoothDispatcher:
             user_id,
         )
 
+    async def dispatch(self, event: dict[str, Any]) -> dict[str, Any]:
+        if self.bluetooth_service is None:
+            return {
+                "matched": False,
+                "success": False,
+                "message": "蓝牙服务不可用",
+            }
+
+        payload = getattr(self.bluetooth_service, "payload", None)
+        if payload is None:
+            return {
+                "matched": False,
+                "success": False,
+                "message": "蓝牙配置不可用",
+            }
+
+        payload_data = event.get("payload", {})
+        raw_event_type = normalize_event_type_value(event.get("event_type", ""))
+        original_event_type = (
+            resolve_incoming_danmaku_event_type(raw_event_type, payload_data.get("guard_level"))
+            if is_danmaku_event_type(raw_event_type)
+            else raw_event_type
+        )
+        if is_danmaku_event_type(original_event_type):
+            session_match_result = self._match_session_danmaku_keywords(event, payload_data)
+            if session_match_result is not None:
+                return session_match_result
+
+        connected_devices = self._get_connected_devices()
+        if not connected_devices:
+            return {
+                "matched": False,
+                "success": False,
+                "message": "当前没有已连接的蓝牙设备",
+            }
+
+        for rule in self._iter_matching_rules(payload.bluetooth_event_rules, original_event_type):
+            if not rule.enabled or not self._rule_matches_event_type(rule.event_type, original_event_type):
+                continue
+            if original_event_type in PRICE_FILTER_EVENT_TYPES and not self._match_price_rule(
+                event_type=original_event_type,
+                filters=rule.filters,
+                payload=payload_data,
+            ):
+                continue
+            if is_danmaku_event_type(original_event_type):
+                danmaku_rule_result = self._match_danmaku_rule(rule.filters, payload_data)
+                if danmaku_rule_result is not None:
+                    return danmaku_rule_result
+
+            targets = self._build_dispatch_targets(
+                rule=rule,
+                event_type=original_event_type,
+                payload_data=payload_data,
+                connected_devices=connected_devices,
+            )
+            if not targets:
+                return {
+                    "matched": False,
+                    "success": False,
+                    "message": "当前已连接设备没有可用的目标波形",
+                }
+            trigger_waveforms = getattr(self.bluetooth_service, "trigger_waveforms", None)
+            if callable(trigger_waveforms):
+                return await trigger_waveforms(
+                    event_type=original_event_type,
+                    targets=targets,
+                )
+            if len(targets) == 1:
+                return await self.bluetooth_service.trigger_waveform(
+                    event_type=original_event_type,
+                    waveform_id=targets[0]["waveform_id"],
+                )
+            results = []
+            for target in targets:
+                trigger_result = await self.bluetooth_service.trigger_waveform(
+                    event_type=original_event_type,
+                    waveform_id=target["waveform_id"],
+                )
+                if isinstance(trigger_result, dict):
+                    trigger_result = {
+                        **trigger_result,
+                        "device_id": target["device_id"],
+                    }
+                results.append(trigger_result)
+            first_result = results[0] if results else {}
+            return {
+                "matched": True,
+                "success": any(bool(item.get("success", False)) for item in results if isinstance(item, dict)),
+                "event_type": original_event_type,
+                "waveform_id": first_result.get("waveform_id", ""),
+                "waveform_name": first_result.get("waveform_name", ""),
+                "targets": results,
+                "device_ids": [item.get("device_id", "") for item in results if isinstance(item, dict)],
+                "message": f"{original_event_type} 已向 {len(results)} 台设备分发波形",
+            }
+
+        return {
+            "matched": False,
+            "success": False,
+            "message": "未命中蓝牙规则",
+        }
+
+    def _get_connected_devices(self) -> list[dict[str, Any]]:
+        get_connected_devices = getattr(self.bluetooth_service, "get_connected_devices", None)
+        if callable(get_connected_devices):
+            return [
+                {
+                    "device_id": item.device_id,
+                    "device_type": item.device_type,
+                }
+                for item in get_connected_devices()
+            ]
+        get_status_payload = getattr(self.bluetooth_service, "get_status_payload", None)
+        if not callable(get_status_payload):
+            return [{"device_id": "default", "device_type": "ems"}]
+        status_payload = get_status_payload()
+        return [
+            item
+            for item in status_payload.get("devices", [])
+            if isinstance(item, dict) and item.get("connected", False)
+        ]
+
+    def _build_dispatch_targets(
+        self,
+        *,
+        rule: Any,
+        event_type: str,
+        payload_data: dict[str, Any],
+        connected_devices: list[dict[str, Any]],
+    ) -> list[dict[str, str]]:
+        targets: list[dict[str, str]] = []
+        guard_level = self._coerce_int(payload_data.get("guard_level")) or 0
+        for device in connected_devices:
+            device_id = str(device.get("device_id", "") or "")
+            device_type = str(device.get("device_type", "") or "").lower()
+            if not device_id or device_type not in {"ems", "toy"}:
+                continue
+            if event_type == "gift":
+                selected_waveform_id = _select_guard_waveform(rule, guard_level, device_type)
+            else:
+                selected_waveform_id = _select_waveform_id(rule, device_type)
+            if not selected_waveform_id:
+                continue
+            targets.append(
+                {
+                    "device_id": device_id,
+                    "waveform_id": selected_waveform_id,
+                }
+            )
+        return targets
+
 
 def _meets_min_guard_level(*, guard_level: int, min_guard_level: int) -> bool:
     normalized_min_guard_level = max(0, int(min_guard_level or 0))

@@ -344,7 +344,8 @@ def test_bluetooth_overlay_page_is_available() -> None:
     assert response.status_code == 200
     assert "蓝牙实时叠加窗" in response.text
     assert "overlay-root" in response.text
-    assert 'data-style="event"' in response.text
+    assert 'data-style="panel"' in response.text
+    assert "overlay-devices" in response.text
 
 
 def test_bluetooth_overlay_page_accepts_panel_style() -> None:
@@ -366,6 +367,23 @@ def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:
         "battery_level": 63,
         "channel_a": 48,
         "channel_b": 45,
+        "devices": [
+            {
+                "device_id": "ems-demo-001",
+                "device_name": "YYC-DJ-DEMO",
+                "device_type": "ems",
+                "waveform_name": "EMS 预设 06 - 心跳节奏",
+                "battery_level": 63,
+                "display_max_strength": 50,
+                "channel_a": 48,
+                "channel_b": 45,
+                "motor_a": 0,
+                "motor_b": 0,
+                "motor_c": 0,
+                "history": [{"channel_a": 48, "channel_b": 45}],
+                "connected": True,
+            }
+        ],
         "history": [{"channel_a": 48, "channel_b": 45}],
     }
     app.state.bluetooth_service = fake_service
@@ -380,6 +398,7 @@ def test_bluetooth_overlay_status_endpoint_returns_telemetry() -> None:
     assert response.json()["battery_level"] == 63
     assert response.json()["channel_a"] == 48
     assert response.json()["channel_b"] == 45
+    assert response.json()["devices"][0]["waveform_name"] == "EMS 预设 06 - 心跳节奏"
 
 
 def test_bluetooth_overlay_status_endpoint_includes_recent_events() -> None:

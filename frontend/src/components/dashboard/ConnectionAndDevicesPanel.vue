@@ -43,14 +43,6 @@
             <Button type="primary" :loading="scanningBluetooth" @click="$emit('scan-bluetooth')">扫描设备</Button>
             <Button :disabled="scanningBluetooth" @click="$emit('disconnect-bluetooth')">断开设备</Button>
             <Button
-              data-testid="open-bluetooth-overlay-event"
-              href="/bluetooth/overlay?style=event"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              OBS 小窗 · 弹幕演出
-            </Button>
-            <Button
               data-testid="open-bluetooth-overlay-panel"
               href="/bluetooth/overlay?style=panel"
               target="_blank"

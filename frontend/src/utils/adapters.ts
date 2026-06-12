@@ -16,7 +16,7 @@ export function adaptSessionStatus(payload: SessionStatusResponse): SessionStatu
     lastEventAt: Number(payload.last_event_at || 0),
     canStart: Boolean(payload.can_start),
     canStop: Boolean(payload.can_stop),
-    mode: payload.mode || "open_live",
+    mode: payload.mode || "third_party",
     connectionMode: payload.connection_mode || payload.output_mode || "im",
     triggerMode: payload.trigger_mode || "by_quantity",
     likeMultiple: Number(payload.like_multiple || 100),

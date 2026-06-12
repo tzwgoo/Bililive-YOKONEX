@@ -196,7 +196,8 @@ async def test_bleak_runtime_updates_battery_level_from_notify_packet() -> None:
     await runtime.scan()
     await runtime.connect("AA:BB:CC:DD:EE:01")
     notify_callback = created_clients[-1].notify_callbacks["0000ff32-0000-1000-8000-00805f9b34fb"]
-    await notify_callback("0000ff32-0000-1000-8000-00805f9b34fb", bytearray([0x35, 0x71, 0x04, 88, 0x00]))
+    notify_callback("0000ff32-0000-1000-8000-00805f9b34fb", bytearray([0x35, 0x71, 0x04, 88, 0x00]))
+    await asyncio.sleep(0)
 
     status = runtime.get_status()
     overlay = runtime.get_overlay_payload()
@@ -231,13 +232,52 @@ async def test_bleak_runtime_updates_battery_level_from_notify_packet_for_ems_v1
     await runtime.scan()
     await runtime.connect("AA:BB:CC:DD:EE:02")
     notify_callback = created_clients[-1].notify_callbacks["0000ff32-0000-1000-8000-00805f9b34fb"]
-    await notify_callback("0000ff32-0000-1000-8000-00805f9b34fb", bytearray([0x35, 0x71, 0x04, 76, 0x00]))
+    notify_callback("0000ff32-0000-1000-8000-00805f9b34fb", bytearray([0x35, 0x71, 0x04, 76, 0x00]))
+    await asyncio.sleep(0)
 
     status = runtime.get_status()
     overlay = runtime.get_overlay_payload()
 
     assert status.battery_level == 76
     assert overlay["battery_level"] == 76
+
+
+@pytest.mark.anyio
+async def test_bleak_runtime_notify_callback_schedules_async_battery_update() -> None:
+    created_clients: list[FakeBleakClient] = []
+
+    async def fake_discover(*, timeout: float, return_adv: bool):
+        return {
+            "AA:BB:CC:DD:EE:01": (
+                SimpleNamespace(address="AA:BB:CC:DD:EE:01", name="YYC-DJ-V2-001", rssi=-41),
+                SimpleNamespace(local_name="YYC-DJ-V2-001", service_uuids=[EMS_SERVICE_UUID]),
+            ),
+        }
+
+    def client_factory(*args, **kwargs):
+        client = FakeBleakClient(*args, **kwargs)
+        created_clients.append(client)
+        return client
+
+    runtime = BleakBluetoothRuntime(
+        scan_timeout_seconds=5,
+        scanner_discover=fake_discover,
+        client_factory=client_factory,
+    )
+
+    await runtime.scan()
+    await runtime.connect("AA:BB:CC:DD:EE:01")
+    notify_callback = created_clients[-1].notify_callbacks["0000ff32-0000-1000-8000-00805f9b34fb"]
+
+    # 模拟真实 Bleak 的同步回调调用方式，确保电量处理协程会被正确调度。
+    notify_callback("0000ff32-0000-1000-8000-00805f9b34fb", bytearray([0x35, 0x71, 0x04, 66, 0x00]))
+    await asyncio.sleep(0)
+
+    status = runtime.get_status()
+    overlay = runtime.get_overlay_payload()
+
+    assert status.battery_level == 66
+    assert overlay["battery_level"] == 66
 
 
 @pytest.mark.anyio

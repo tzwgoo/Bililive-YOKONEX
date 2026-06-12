@@ -81,7 +81,7 @@ const commandStore = useCommandStore();
 const bluetoothStore = useBluetoothStore();
 
 const sessionStorage = useLocalDraft<SessionStartPayload>("biliLive.sessionDraft", {
-  mode: "open_live",
+  mode: "third_party",
   value: "",
   trigger_mode: "by_quantity",
   like_multiple: 100,
@@ -100,6 +100,8 @@ const commandStorage = useLocalDraft<CommandConnectPayload>("biliLive.commandDra
 
 const sessionForm = reactive(sessionStorage.load());
 const commandForm = reactive(commandStorage.load());
+// 首页只保留第三方消息流，进入页面时统一纠正旧草稿里的历史模式值。
+sessionForm.mode = "third_party";
 
 const startingSession = ref(false);
 const connectingCommand = ref(false);
@@ -139,7 +141,7 @@ watch(
   (status) => {
     sessionMessage.value = status.message || (status.canStop ? "监听运行中" : "等待启动");
     if (status.canStop) {
-      sessionForm.mode = status.mode;
+      sessionForm.mode = "third_party";
       sessionForm.trigger_mode = status.triggerMode;
       sessionForm.like_multiple = status.likeMultiple;
       sessionForm.danmaku_enabled = status.danmakuEnabled;
@@ -180,7 +182,7 @@ async function refreshDashboard() {
 
 const polling = usePolling(refreshDashboard, 5000);
 
-function openBluetoothOverlayWindow(style: "event" | "panel" = "event") {
+function openBluetoothOverlayWindow(style: "event" | "panel" = "panel") {
   return window.open(
     `/bluetooth/overlay?style=${style}`,
     "biliLiveBluetoothOverlay",
@@ -262,11 +264,12 @@ async function handleScanBluetooth() {
 
 async function handleConnectBluetooth(deviceId: string) {
   scanningBluetooth.value = true;
-  const overlayWindow = openBluetoothOverlayWindow("event");
+  // 连接蓝牙时优先打开仪表盘样式，避免再弹出已经下线的旧演出小窗。
+  const overlayWindow = openBluetoothOverlayWindow("panel");
   try {
     await bluetoothStore.connectDevice(deviceId);
     if (overlayWindow && !overlayWindow.closed) {
-      overlayWindow.location.replace("/bluetooth/overlay?style=event");
+      overlayWindow.location.replace("/bluetooth/overlay?style=panel");
       overlayWindow.focus();
     }
     bluetoothMessage.value = "蓝牙连接成功";

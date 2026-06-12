@@ -313,32 +313,20 @@ def test_frontend_contains_bluetooth_overlay_template_and_script() -> None:
 
     assert 'id="overlay-root"' in overlay_html
     assert 'data-style="{{ overlay_style }}"' in overlay_html
-    assert 'data-layout="wide"' in overlay_html
-    assert 'id="overlay-waveform-name"' in overlay_html
-    assert 'id="overlay-battery-value"' in overlay_html
-    assert 'id="overlay-channel-a-bar"' in overlay_html
-    assert 'id="overlay-channel-b-bar"' in overlay_html
-    assert 'id="overlay-waveform-canvas"' in overlay_html
-    assert 'id="overlay-danmaku-list"' in overlay_html
-    assert 'id="overlay-event-side"' in overlay_html
-    assert 'id="overlay-highlight-label"' in overlay_html
-    assert 'id="overlay-highlight-guard"' in overlay_html
-    assert 'id="overlay-highlight-battery-chip"' in overlay_html
-    assert 'id="overlay-event-waveform-name"' in overlay_html
+    assert 'id="overlay-devices"' in overlay_html
+    assert 'id="overlay-summary-title"' in overlay_html
+    assert 'id="overlay-summary-subtitle"' in overlay_html
+    assert 'class="overlay-shell"' in overlay_html
     assert 'fetch("/api/bluetooth/overlay/status")' in overlay_js
     assert 'new EventSource("/api/bluetooth/overlay/stream")' in overlay_js
-    assert 'overlayState.battery_level' in overlay_js
-    assert "recent_events" in overlay_js
-    assert "function renderOverlayDanmaku" in overlay_js
-    assert "function renderOverlayHighlight" in overlay_js
-    assert "function resolveRecentEventLimit()" in overlay_js
-    assert "function resolveOverlayLayout()" in overlay_js
-    assert "function applyOverlayViewportMode()" in overlay_js
-    assert "function resolveVisualStrengthRatio(" in overlay_js
-    assert "function formatOverlayStrengthSummary(" in overlay_js
-    assert "function renderStrengthBar(" in overlay_js
+    assert "devices: []" in overlay_js
+    assert "function renderDeviceCard(" in overlay_js
+    assert "function drawDeviceHistory(" in overlay_js
+    assert "function resolveDeviceStrengthSummary(" in overlay_js
+    assert "function buildChannelRows(" in overlay_js
+    assert 'overlayDevices.innerHTML = devices' in overlay_js
     assert 'overlayHighlightWaveform.textContent = `当前强度 · ${formatOverlayStrengthSummary(maxVal)}`' in overlay_js
-    assert 'item.waveform_name || item.waveform_id || ""' in overlay_js
+    assert 'device.waveform_name || "' in overlay_js
 
 
 def test_frontend_contains_control_log_panel_and_stream() -> None:
