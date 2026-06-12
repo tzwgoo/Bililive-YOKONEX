@@ -275,21 +275,31 @@
 
       .overlay-bar-fill {
         height: 100%;
-        width: 0%;
+        width: 100%;
         border-radius: inherit;
-        transition: width 120ms linear;
+        transform: scaleX(0);
+        transform-origin: left center;
+        opacity: 0.52;
+        will-change: transform, filter, opacity;
+        transition:
+          transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+          filter 260ms ease-out,
+          opacity 180ms ease-out;
       }
 
       .overlay-bar-fill-a {
         background: linear-gradient(90deg, rgba(255, 138, 76, 0.24), var(--channel-a));
+        box-shadow: 0 0 18px rgba(255, 138, 76, 0.22);
       }
 
       .overlay-bar-fill-b {
         background: linear-gradient(90deg, rgba(81, 168, 255, 0.24), var(--channel-b));
+        box-shadow: 0 0 18px rgba(81, 168, 255, 0.22);
       }
 
       .overlay-bar-fill-c {
         background: linear-gradient(90deg, rgba(167, 139, 250, 0.24), var(--channel-c));
+        box-shadow: 0 0 18px rgba(167, 139, 250, 0.22);
       }
 
       .overlay-canvas-wrap {
