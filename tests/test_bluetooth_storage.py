@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from app.bluetooth.gcq_toy_builtin_waveforms import create_gcq_toy_defaults
 from app.bluetooth.storage import BluetoothSettingsStore
 
 
@@ -362,6 +363,16 @@ def test_store_default_payload_includes_gcq_builtin_waveforms(tmp_path) -> None:
     assert gcq_waveforms[0].id == "gcq-toy-preset-01"
     assert gcq_waveforms[0].builtin is True
     assert gcq_waveforms[0].editable is False
+
+
+def test_gcq_builtin_waveforms_open_valve_only_in_last_step() -> None:
+    waveforms = create_gcq_toy_defaults()
+
+    for waveform in waveforms:
+        assert waveform.steps[-1].motor_a == 1
+        assert waveform.steps[-1].motor_b == 0
+        assert waveform.steps[-1].motor_c == 0
+        assert all(step.motor_a == 0 for step in waveform.steps[:-1])
 
 
 def test_store_loads_gcq_custom_waveforms_and_keeps_builtin_gcq_presets_out_of_custom_list(tmp_path) -> None:
