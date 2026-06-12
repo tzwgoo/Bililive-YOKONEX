@@ -11,7 +11,7 @@ from app.bluetooth.service import BluetoothService
 from app.command_gateway.mapping import GiftCommandMapper
 from app.config import Settings, load_settings
 from app.logging_config import setup_logging
-from app.runtime import resolve_bundle_path, resolve_runtime_path
+from app.runtime import ensure_persistent_file, resolve_bundle_path, resolve_persistent_path
 from app.services.command_session import CommandSessionService
 from app.services.command_rule_service import CommandRuleService
 from app.services.danmaku_dispatcher import DanmakuCommandDispatcher
@@ -33,11 +33,14 @@ def create_app() -> FastAPI:
     event_hub = EventHub()
     mapping_path = Path(settings.gift_mapping_path)
     if not mapping_path.is_absolute():
-        mapping_path = resolve_runtime_path(str(mapping_path))
+        mapping_path = ensure_persistent_file(
+            str(mapping_path),
+            default_source_path=resolve_bundle_path("config/gift_command_mappings.json"),
+        )
     mapper = GiftCommandMapper.from_file(mapping_path)
     command_session = CommandSessionService(event_hub=event_hub)
     bluetooth_service = BluetoothService.create_default(
-        config_path=resolve_runtime_path("config/bluetooth_settings.json"),
+        config_path=resolve_persistent_path("config/bluetooth_settings.json"),
         event_hub=event_hub,
     )
     gift_dispatcher = GiftCommandDispatcher(

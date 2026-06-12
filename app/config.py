@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import os
 
 from dotenv import load_dotenv
-from app.runtime import resolve_runtime_path
+from app.runtime import resolve_persistent_path
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,8 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    load_dotenv(dotenv_path=resolve_runtime_path(".env"))
+    # .env 也放入用户数据目录，避免安装包更新时把本地连接配置覆盖掉。
+    load_dotenv(dotenv_path=resolve_persistent_path(".env"))
     return Settings(
         # 当前运行态只依赖第三方消息流配置，不再读取开放平台凭据。
         command_ws_url=os.getenv("COMMAND_WS_URL"),

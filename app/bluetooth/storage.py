@@ -30,7 +30,11 @@ class BluetoothSettingsStore:
 
     def load(self) -> BluetoothConfigPayload:
         if not self.path.exists():
-            return build_default_payload()
+            payload = build_default_payload()
+            # 首次分发运行且外部配置不存在时，立即落默认文件，
+            # 避免后续更新程序目录后用户波形和规则仍然只停留在内存默认值。
+            self.save(payload)
+            return payload
 
         payload = json.loads(self.path.read_text(encoding="utf-8"))
         defaults = build_default_payload()

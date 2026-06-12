@@ -11,6 +11,7 @@ def test_store_returns_default_payload_when_file_missing(tmp_path) -> None:
 
     payload = store.load()
 
+    assert (tmp_path / "bluetooth.json").exists()
     assert payload.bluetooth_settings.enabled is False
     assert payload.bluetooth_settings.scan_timeout_seconds == 15
     assert payload.bluetooth_settings.connect_timeout_seconds == 20
