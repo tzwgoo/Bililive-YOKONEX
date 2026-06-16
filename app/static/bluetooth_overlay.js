@@ -13,6 +13,10 @@ let overlayState = {
 let overlayDeviceNodes = new Map();
 let pendingOverlayPayload = null;
 let overlayRenderFrameId = 0;
+let overlayAnimationFrameId = 0;
+let overlayAnimationLastTime = 0;
+const overlayBarAnimations = new Map();
+const overlayHistoryAnimations = new Map();
 
 const overlayQuery = new URLSearchParams(window.location.search);
 const overlayDeviceId = overlayQuery.get("device_id") || "";
@@ -97,6 +101,119 @@ function resolveDeviceMaxStrength(device) {
 function resolveStrengthRatio(value, max) {
   const ratio = max <= 0 ? 0 : clampStrength(value, max) / max;
   return Math.max(0, Math.min(1, ratio));
+}
+
+function easeAnimatedValue(current, target, deltaMs, riseDurationMs, fallDurationMs) {
+  const duration = target >= current ? riseDurationMs : fallDurationMs;
+  const factor = 1 - Math.exp(-Math.max(0, deltaMs) / Math.max(1, duration));
+  return current + (target - current) * factor;
+}
+
+function resolveBarOpacity(ratio) {
+  if (ratio <= 0.001) {
+    return 0.38;
+  }
+  return Math.min(1, 0.58 + ratio * 0.42);
+}
+
+function resolveBarHighlight(ratio) {
+  if (ratio <= 0.62) {
+    return 0;
+  }
+  return Math.min(1, (ratio - 0.62) / 0.38);
+}
+
+function writeBarAnimationState(state) {
+  const { element, currentRatio, currentOpacity, currentHighlight } = state;
+  element.style.transform = `scaleX(${currentRatio})`;
+  element.style.opacity = String(currentOpacity);
+  element.style.filter =
+    currentHighlight <= 0.01
+      ? "none"
+      : `brightness(${(1 + currentHighlight * 0.08).toFixed(3)}) saturate(${(1 + currentHighlight * 0.05).toFixed(3)})`;
+}
+
+function ensureOverlayAnimationLoop() {
+  if (overlayAnimationFrameId) {
+    return;
+  }
+  overlayAnimationFrameId = window.requestAnimationFrame(stepOverlayAnimations);
+}
+
+function stepOverlayAnimations(timestamp) {
+  const deltaMs = overlayAnimationLastTime ? Math.min(48, Math.max(12, timestamp - overlayAnimationLastTime)) : 16;
+  overlayAnimationLastTime = timestamp;
+  overlayAnimationFrameId = 0;
+
+  let keepAnimating = false;
+
+  overlayBarAnimations.forEach((state, element) => {
+    if (!(element instanceof HTMLElement) || !element.isConnected) {
+      overlayBarAnimations.delete(element);
+      return;
+    }
+
+    state.currentRatio = easeAnimatedValue(state.currentRatio, state.targetRatio, deltaMs, 120, 170);
+    state.currentOpacity = easeAnimatedValue(state.currentOpacity, state.targetOpacity, deltaMs, 120, 150);
+    state.currentHighlight = easeAnimatedValue(state.currentHighlight, state.targetHighlight, deltaMs, 140, 180);
+    writeBarAnimationState(state);
+
+    const settled =
+      Math.abs(state.currentRatio - state.targetRatio) < 0.002 &&
+      Math.abs(state.currentOpacity - state.targetOpacity) < 0.01 &&
+      Math.abs(state.currentHighlight - state.targetHighlight) < 0.02;
+
+    if (settled) {
+      state.currentRatio = state.targetRatio;
+      state.currentOpacity = state.targetOpacity;
+      state.currentHighlight = state.targetHighlight;
+      writeBarAnimationState(state);
+      return;
+    }
+
+    keepAnimating = true;
+  });
+
+  overlayHistoryAnimations.forEach((state, deviceId) => {
+    if (!(state.canvas instanceof HTMLCanvasElement) || !state.canvas.isConnected) {
+      overlayHistoryAnimations.delete(deviceId);
+      return;
+    }
+
+    let historyChanged = false;
+    state.lines.forEach((line) => {
+      const targetValues = Array.isArray(line.targetValues) ? line.targetValues : [];
+      if (line.currentValues.length !== targetValues.length) {
+        line.currentValues = targetValues.slice();
+        historyChanged = true;
+        return;
+      }
+      line.currentValues = line.currentValues.map((value, index) => {
+        const nextValue = easeAnimatedValue(value, targetValues[index] || 0, deltaMs, 130, 190);
+        if (Math.abs(nextValue - (targetValues[index] || 0)) > 0.08) {
+          historyChanged = true;
+        }
+        return nextValue;
+      });
+    });
+
+    drawHistoryAnimationState(state);
+    if (!historyChanged) {
+      state.lines.forEach((line) => {
+        line.currentValues = line.targetValues.slice();
+      });
+      drawHistoryAnimationState(state);
+      return;
+    }
+
+    keepAnimating = true;
+  });
+
+  if (keepAnimating) {
+    ensureOverlayAnimationLoop();
+  } else {
+    overlayAnimationLastTime = 0;
+  }
 }
 
 function resolveDeviceStrengthSummary(device) {
@@ -211,10 +328,29 @@ function applyStrengthFill(fillElement, value, max) {
     return;
   }
   const ratio = resolveStrengthRatio(value, max);
-  fillElement.style.transform = `scaleX(${ratio})`;
-  fillElement.style.opacity = ratio <= 0 ? "0.52" : "1";
-  // 高强度时补一点高光，减轻快速刷新时“生硬截断”的感觉。
-  fillElement.style.filter = ratio >= 0.82 ? "brightness(1.08) saturate(1.04)" : "none";
+  const nextOpacity = resolveBarOpacity(ratio);
+  const nextHighlight = resolveBarHighlight(ratio);
+  const animationState = overlayBarAnimations.get(fillElement);
+
+  if (!animationState) {
+    const initialState = {
+      element: fillElement,
+      currentRatio: ratio,
+      targetRatio: ratio,
+      currentOpacity: nextOpacity,
+      targetOpacity: nextOpacity,
+      currentHighlight: nextHighlight,
+      targetHighlight: nextHighlight,
+    };
+    overlayBarAnimations.set(fillElement, initialState);
+    writeBarAnimationState(initialState);
+    return;
+  }
+
+  animationState.targetRatio = ratio;
+  animationState.targetOpacity = nextOpacity;
+  animationState.targetHighlight = nextHighlight;
+  ensureOverlayAnimationLoop();
 }
 
 function updateChannelRows(telemetryElement, device) {
@@ -307,25 +443,8 @@ function resizeCanvas(canvas) {
   canvas.height = Math.max(48, Math.round(rect.height * pixelRatio));
 }
 
-function drawDeviceHistory(canvas, device) {
-  const context = canvas.getContext("2d");
-  if (!context) {
-    return;
-  }
-  resizeCanvas(canvas);
-  const width = canvas.width;
-  const height = canvas.height;
-  context.clearRect(0, 0, width, height);
-
-  const history = Array.isArray(device.history) ? device.history.slice(-60) : [];
-  if (!history.length) {
-    return;
-  }
-
-  const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
-  const padding = 8 * pixelRatio;
-  const max = resolveDeviceMaxStrength(device);
-  const lines = isToyDevice(device)
+function resolveHistoryLineConfigs(device, max) {
+  return isToyDevice(device)
     ? [
         // 灌肠机气阀只有开/关，历史图里把“开”拉满显示，避免在 0-5 量程下几乎看不见。
         { key: "motor_a", color: "#ff8a4c", normalize: (value) => (isGcqToyDevice(device) ? (Number(value) > 0 ? max : 0) : value) },
@@ -336,31 +455,176 @@ function drawDeviceHistory(canvas, device) {
         { key: "channel_a", color: "#ff8a4c" },
         { key: "channel_b", color: "#51a8ff" },
       ];
+}
 
-  context.lineWidth = Math.max(2, Math.round(pixelRatio * 2));
+function buildHistorySeries(device) {
+  const history = Array.isArray(device.history) ? device.history.slice(-60) : [];
+  const max = resolveDeviceMaxStrength(device);
+  return {
+    max,
+    lines: resolveHistoryLineConfigs(device, max).map((line) => ({
+      color: line.color,
+      values: history.map((item) => {
+        const rawValue = typeof line.normalize === "function" ? line.normalize(item?.[line.key]) : item?.[line.key];
+        return clampStrength(rawValue, max);
+      }),
+    })),
+  };
+}
+
+function createHistoryPoints(values, width, height, padding, max) {
+  return values.map((value, index) => {
+    const ratio = max <= 0 ? 0 : clampStrength(value, max) / max;
+    return {
+      x: padding + (index / Math.max(1, values.length - 1)) * (width - padding * 2),
+      y: height - padding - ratio * (height - padding * 2),
+    };
+  });
+}
+
+function strokeSmoothHistoryLine(context, points, color, pixelRatio, height) {
+  if (!points.length) {
+    return;
+  }
+
+  const solidColor = color;
+  const glowColor = `${color}aa`;
+  const fillColor = `${color}26`;
+
+  context.save();
+
+  // 主折线改为圆角平滑曲线，避免历史值高频切换时出现明显“折断感”。
+  const buildSmoothPath = () => {
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    if (points.length === 1) {
+      return;
+    }
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const currentPoint = points[index];
+      const nextPoint = points[index + 1];
+      const midPointX = (currentPoint.x + nextPoint.x) / 2;
+      const midPointY = (currentPoint.y + nextPoint.y) / 2;
+      context.quadraticCurveTo(currentPoint.x, currentPoint.y, midPointX, midPointY);
+    }
+    const tail = points[points.length - 1];
+    context.lineTo(tail.x, tail.y);
+  };
+
+  buildSmoothPath();
+  context.lineTo(points[points.length - 1].x, height);
+  context.lineTo(points[0].x, height);
+  context.closePath();
+  context.fillStyle = fillColor;
+  context.fill();
+
+  buildSmoothPath();
+  context.lineWidth = Math.max(3, Math.round(pixelRatio * 3));
+  context.strokeStyle = glowColor;
+  context.shadowBlur = 12 * pixelRatio;
+  context.shadowColor = solidColor;
+  context.stroke();
+
+  buildSmoothPath();
+  context.lineWidth = Math.max(1.5, pixelRatio * 1.65);
+  context.strokeStyle = solidColor;
+  context.shadowBlur = 0;
+  context.stroke();
+  context.restore();
+}
+
+function drawHistoryAnimationState(state) {
+  const { canvas, max, lines } = state;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  resizeCanvas(canvas);
+  const width = canvas.width;
+  const height = canvas.height;
+  context.clearRect(0, 0, width, height);
+
+  const hasValues = lines.some((line) => Array.isArray(line.currentValues) && line.currentValues.length > 0);
+  if (!hasValues) {
+    return;
+  }
+
+  const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+  const padding = 8 * pixelRatio;
   context.lineCap = "round";
   context.lineJoin = "round";
 
   lines.forEach((line) => {
-    context.beginPath();
-    history.forEach((item, index) => {
-      const rawValue = typeof line.normalize === "function" ? line.normalize(item?.[line.key]) : item?.[line.key];
-      const value = clampStrength(rawValue, max);
-      const ratio = max <= 0 ? 0 : value / max;
-      const x = padding + (index / Math.max(1, history.length - 1)) * (width - padding * 2);
-      const y = height - padding - ratio * (height - padding * 2);
-      if (index === 0) {
-        context.moveTo(x, y);
-      } else {
-        context.lineTo(x, y);
-      }
-    });
-    context.strokeStyle = line.color;
-    context.shadowBlur = 10 * pixelRatio;
-    context.shadowColor = line.color;
-    context.stroke();
-    context.shadowBlur = 0;
+    const points = createHistoryPoints(line.currentValues, width, height, padding, max);
+    strokeSmoothHistoryLine(context, points, line.color, pixelRatio, height - padding * 0.35);
   });
+}
+
+function drawDeviceHistory(canvas, device) {
+  if (!(canvas instanceof HTMLCanvasElement)) {
+    return;
+  }
+
+  const deviceId = String(device?.device_id || "");
+  const nextSeries = buildHistorySeries(device);
+  const canAnimate =
+    deviceId &&
+    nextSeries.lines.length > 0 &&
+    nextSeries.lines.every((line) => line.values.length > 0);
+
+  if (!canAnimate) {
+    overlayHistoryAnimations.delete(deviceId);
+    const fallbackState = {
+      canvas,
+      max: nextSeries.max,
+      lines: nextSeries.lines.map((line) => ({
+        color: line.color,
+        currentValues: line.values.slice(),
+        targetValues: line.values.slice(),
+      })),
+    };
+    drawHistoryAnimationState(fallbackState);
+    return;
+  }
+
+  let animationState = overlayHistoryAnimations.get(deviceId);
+  const shouldReset =
+    !animationState ||
+    animationState.lines.length !== nextSeries.lines.length ||
+    animationState.lines.some((line, index) => line.color !== nextSeries.lines[index]?.color);
+
+  if (shouldReset) {
+    animationState = {
+      canvas,
+      max: nextSeries.max,
+      lines: nextSeries.lines.map((line) => ({
+        color: line.color,
+        currentValues: line.values.slice(),
+        targetValues: line.values.slice(),
+      })),
+    };
+    overlayHistoryAnimations.set(deviceId, animationState);
+    drawHistoryAnimationState(animationState);
+    return;
+  }
+
+  animationState.canvas = canvas;
+  animationState.max = nextSeries.max;
+  animationState.lines = animationState.lines.map((line, index) => {
+    const nextLine = nextSeries.lines[index];
+    const nextValues = nextLine.values.slice();
+    const currentValues = line.currentValues.length === nextValues.length ? line.currentValues : nextValues.slice();
+    return {
+      color: nextLine.color,
+      currentValues,
+      targetValues: nextValues,
+    };
+  });
+
+  drawHistoryAnimationState(animationState);
+  overlayHistoryAnimations.set(deviceId, animationState);
+  ensureOverlayAnimationLoop();
 }
 
 function resolveOverlaySubtitle(devices) {
@@ -379,6 +643,7 @@ function resolveOverlaySubtitle(devices) {
 function syncDeviceCards(devices) {
   if (!devices.length) {
     overlayDeviceNodes = new Map();
+    overlayHistoryAnimations.clear();
     overlayDevices.innerHTML = '<div class="overlay-empty">等待蓝牙设备连接</div>';
     return;
   }
@@ -404,6 +669,13 @@ function syncDeviceCards(devices) {
 
   overlayDevices.replaceChildren(fragment);
   overlayDeviceNodes = nextNodes;
+
+  const activeDeviceIds = new Set(devices.map((device) => String(device.device_id || "")));
+  overlayHistoryAnimations.forEach((_, deviceId) => {
+    if (!activeDeviceIds.has(deviceId)) {
+      overlayHistoryAnimations.delete(deviceId);
+    }
+  });
 
   devices.forEach((device) => {
     const canvas = overlayDevices.querySelector(`[data-device-canvas="${CSS.escape(device.device_id)}"]`);
