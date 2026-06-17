@@ -482,6 +482,65 @@ function createHistoryPoints(values, width, height, padding, max) {
   });
 }
 
+function areHistoryValuesEqual(leftValues, rightValues) {
+  if (!Array.isArray(leftValues) || !Array.isArray(rightValues) || leftValues.length !== rightValues.length) {
+    return false;
+  }
+  return leftValues.every((value, index) => Number(value || 0) === Number(rightValues[index] || 0));
+}
+
+function detectHistoryShift(previousValues, nextValues) {
+  if (!Array.isArray(previousValues) || !Array.isArray(nextValues) || !previousValues.length || !nextValues.length) {
+    return -1;
+  }
+
+  // 新历史通常只会“左移若干点 + 在尾部追加新采样”，这里只匹配这个场景，
+  // 命中后就能保留已绘制区的实际形状，避免整段曲线被重新补间。
+  const maxShift = Math.min(6, previousValues.length, nextValues.length);
+  for (let shift = 0; shift <= maxShift; shift += 1) {
+    const comparableLength = Math.min(previousValues.length - shift, nextValues.length);
+    if (comparableLength <= 0) {
+      continue;
+    }
+    const previousComparable = previousValues.slice(shift, shift + comparableLength);
+    const nextComparable = nextValues.slice(0, comparableLength);
+    if (areHistoryValuesEqual(previousComparable, nextComparable)) {
+      return shift;
+    }
+  }
+
+  return -1;
+}
+
+function alignHistoryCurrentValues(previousCurrentValues, previousTargetValues, nextValues) {
+  if (!Array.isArray(nextValues) || !nextValues.length) {
+    return [];
+  }
+
+  const shift = detectHistoryShift(previousTargetValues, nextValues);
+  if (shift < 0) {
+    if (Array.isArray(previousCurrentValues) && previousCurrentValues.length === nextValues.length) {
+      return previousCurrentValues.slice();
+    }
+    return nextValues.slice();
+  }
+
+  const alignedValues = Array.isArray(previousCurrentValues)
+    ? previousCurrentValues.slice(shift, shift + nextValues.length)
+    : [];
+  const fallbackTailValue = alignedValues[alignedValues.length - 1]
+    ?? previousTargetValues?.[previousTargetValues.length - 1]
+    ?? nextValues[0]
+    ?? 0;
+
+  while (alignedValues.length < nextValues.length) {
+    // 尾部新增采样先沿用上一帧末端值起步，只对新增区做过渡，避免历史主体被拉形。
+    alignedValues.push(fallbackTailValue);
+  }
+
+  return alignedValues.slice(0, nextValues.length);
+}
+
 function strokeSmoothHistoryLine(context, points, color, pixelRatio, height) {
   if (!points.length) {
     return;
@@ -614,7 +673,11 @@ function drawDeviceHistory(canvas, device) {
   animationState.lines = animationState.lines.map((line, index) => {
     const nextLine = nextSeries.lines[index];
     const nextValues = nextLine.values.slice();
-    const currentValues = line.currentValues.length === nextValues.length ? line.currentValues : nextValues.slice();
+    const currentValues = alignHistoryCurrentValues(
+      line.currentValues,
+      line.targetValues,
+      nextValues,
+    );
     return {
       color: nextLine.color,
       currentValues,
