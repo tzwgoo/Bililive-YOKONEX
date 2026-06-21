@@ -6,17 +6,19 @@ import webbrowser
 import uvicorn
 
 from app.main import create_app
-
+from app.server_settings import load_server_settings
 
 def main() -> None:
-    url = "http://127.0.0.1:8000"
+    settings = load_server_settings()
+
+    url = f"http://127.0.0.1:{settings.port}"
     threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run(
         create_app(),
         host="127.0.0.1",
-        port=8000,
+        port=settings.port,
         reload=False,
-        log_level="info",
+        log_level=settings.log_level,
     )
 
 
