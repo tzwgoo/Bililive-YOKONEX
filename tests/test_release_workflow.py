@@ -31,6 +31,8 @@ def test_release_workflow_publishes_windows_exe_on_version_tag() -> None:
     assert "BiliLive-YOKONEX.exe" in workflow
     assert "Bililive-YOKONEX-" in workflow
     assert '--add-data", "frontend/dist;frontend/dist"' in workflow
+    assert '--add-data", "vendor/douyinLive;vendor/douyinLive"' in workflow
+    assert 'vendor/douyinLive/windows-amd64/douyinLive.exe' in workflow
     assert 'Copy-Item "config/bluetooth_settings.json"' not in workflow
     assert 'Copy-Item "config/gift_command_mappings.json"' in workflow
     assert '$requiredPackageFiles = @(' in workflow
