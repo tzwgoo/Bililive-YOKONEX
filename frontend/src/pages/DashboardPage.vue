@@ -84,6 +84,7 @@ const sessionStorage = useLocalDraft<SessionStartPayload>("biliLive.sessionDraft
   mode: "third_party",
   value: "",
   douyin_ws_base_url: "ws://127.0.0.1:1088",
+  douyin_executable_path: "",
   trigger_mode: "by_quantity",
   like_multiple: 100,
   danmaku_enabled: false,
@@ -142,6 +143,7 @@ watch(
     if (status.canStop) {
       sessionForm.mode = status.mode;
       sessionForm.douyin_ws_base_url = status.douyinWsBaseUrl;
+      sessionForm.douyin_executable_path = status.douyinExecutablePath;
       sessionForm.trigger_mode = status.triggerMode;
       sessionForm.like_multiple = status.likeMultiple;
       sessionForm.danmaku_enabled = status.danmakuEnabled;

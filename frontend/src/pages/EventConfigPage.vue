@@ -90,6 +90,14 @@
                 placeholder="live.douyin.com 后面的那段 ID"
               />
             </label>
+            <label class="douyin-field douyin-field-full">
+              <span>douyinLive.exe 路径</span>
+              <Input
+                v-model:value="sessionDraft.douyin_executable_path"
+                data-testid="douyin-executable-path"
+                placeholder="留空使用项目内置 douyinLive.exe，也可填写自定义路径"
+              />
+            </label>
           </div>
           <div class="douyin-event-map">
             <article>
@@ -183,6 +191,7 @@ const defaultSessionDraft: SessionStartPayload = {
   mode: "third_party",
   value: "",
   douyin_ws_base_url: "ws://127.0.0.1:1088",
+  douyin_executable_path: "",
   trigger_mode: "by_quantity",
   like_multiple: 100,
   danmaku_enabled: false,
@@ -291,7 +300,7 @@ const douyinEventItems = computed<EventListItem[]>(() => [
     key: "connection",
     label: "连接服务",
     enabled: Boolean(sessionDraft.douyin_ws_base_url && sessionDraft.value),
-    description: sessionDraft.douyin_ws_base_url || "默认 ws://127.0.0.1:1088",
+    description: sessionDraft.douyin_executable_path ? "使用自定义 exe 自动拉起" : "使用内置 exe 自动拉起",
     toggleable: false,
   },
   {
@@ -636,6 +645,7 @@ async function handleSaveDouyinConfig() {
   try {
     sessionDraft.mode = "douyin";
     sessionDraft.douyin_ws_base_url = (sessionDraft.douyin_ws_base_url || "ws://127.0.0.1:1088").trim();
+    sessionDraft.douyin_executable_path = String(sessionDraft.douyin_executable_path || "").trim();
     sessionDraft.value = String(sessionDraft.value || "").trim();
     sessionDraftStorage.save({ ...sessionDraft });
     message.value = "抖音配置已保存，主控台启动监听时会使用这份配置";
@@ -891,6 +901,10 @@ onMounted(async () => {
 
 .douyin-field :deep(.ant-input) {
   border-radius: 12px;
+}
+
+.douyin-field-full {
+  grid-column: 1 / -1;
 }
 
 .douyin-event-map {

@@ -85,6 +85,7 @@ describe("DashboardPage", () => {
       mode: "third_party",
       value: "123456",
       douyin_ws_base_url: "ws://127.0.0.1:1088",
+      douyin_executable_path: "",
       trigger_mode: "by_quantity",
       like_multiple: 100,
       danmaku_enabled: false,

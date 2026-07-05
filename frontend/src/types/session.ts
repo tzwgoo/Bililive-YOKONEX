@@ -8,6 +8,7 @@ export interface SessionStatusResponse {
   can_stop?: boolean;
   mode?: string;
   douyin_ws_base_url?: string;
+  douyin_executable_path?: string;
   connection_mode?: string;
   output_mode?: string;
   trigger_mode?: string;
@@ -30,6 +31,7 @@ export interface SessionStatusModel {
   canStop: boolean;
   mode: string;
   douyinWsBaseUrl: string;
+  douyinExecutablePath: string;
   connectionMode: string;
   triggerMode: string;
   likeMultiple: number;
@@ -45,6 +47,7 @@ export interface SessionStartPayload {
   mode: string;
   value: string;
   douyin_ws_base_url?: string;
+  douyin_executable_path?: string;
   trigger_mode: string;
   like_multiple: number;
   danmaku_enabled: boolean;

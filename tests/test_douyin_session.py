@@ -49,6 +49,24 @@ class FakeGiftDispatcher:
         return None
 
 
+class FakeManagedProcess:
+    def __init__(self) -> None:
+        self.terminated = False
+        self.killed = False
+
+    def poll(self):
+        return None
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+    def wait(self, timeout: int = 0) -> None:
+        return None
+
+    def kill(self) -> None:
+        self.killed = True
+
+
 @pytest.mark.anyio
 async def test_douyin_session_consumes_like_and_dispatches_command() -> None:
     event_hub = EventHub()
@@ -82,3 +100,41 @@ async def test_douyin_session_consumes_like_and_dispatches_command() -> None:
 
     await service.stop()
     assert ws_client.disconnect_called is True
+
+
+@pytest.mark.anyio
+async def test_douyin_session_launches_configured_executable_when_local_port_is_closed(tmp_path) -> None:
+    event_hub = EventHub()
+    ws_client = FakeDouyinWsClient([])
+    executable_path = tmp_path / "douyinLive.exe"
+    executable_path.write_text("fake exe", encoding="utf-8")
+    launched: list[tuple[str, int]] = []
+    process = FakeManagedProcess()
+    checks = iter([False, True, True])
+
+    def fake_port_checker(host: str, port: int) -> bool:
+        return next(checks, True)
+
+    def fake_process_launcher(path, port: int):
+        launched.append((str(path), port))
+        return process
+
+    service = DouyinLiveSessionService(
+        event_hub=event_hub,
+        ws_client=ws_client,
+        port_checker=fake_port_checker,
+        process_launcher=fake_process_launcher,
+    )
+
+    await service.start(
+        value="516466932480",
+        douyin_ws_base_url="ws://127.0.0.1:1088",
+        douyin_executable_path=str(executable_path),
+    )
+    await asyncio.sleep(0.05)
+
+    assert launched == [(str(executable_path), 1088)]
+    assert ws_client.connected_room_id == "516466932480"
+
+    await service.stop()
+    assert process.terminated is True

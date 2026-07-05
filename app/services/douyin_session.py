@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+from pathlib import Path
+import socket
+import subprocess
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from app.douyin.event_mapper import map_douyin_message
 from app.douyin.ws_client import DEFAULT_DOUYIN_WS_BASE_URL
 from app.douyin.ws_client import DouyinWsClient
 from app.models import SessionStatus
+from app.runtime import resolve_bundle_path
 from app.models import is_danmaku_event_type
 from app.models import normalize_event_type_value
 from app.services.event_hub import EventHub
@@ -27,15 +33,20 @@ class DouyinLiveSessionService:
         danmaku_dispatcher: Any | None = None,
         bluetooth_dispatcher: Any | None = None,
         ws_client: Any | None = None,
+        port_checker: Any | None = None,
+        process_launcher: Any | None = None,
     ) -> None:
         self.event_hub = event_hub
         self.gift_dispatcher = gift_dispatcher
         self.danmaku_dispatcher = danmaku_dispatcher
         self.bluetooth_dispatcher = bluetooth_dispatcher
         self.ws_client = ws_client or DouyinWsClient()
+        self.port_checker = port_checker or self._can_connect_to_service
+        self.process_launcher = process_launcher or self._launch_process
         self.status = SessionStatus.IDLE
         self.room_id = ""
         self.ws_base_url = DEFAULT_DOUYIN_WS_BASE_URL
+        self.executable_path = ""
         self.anchor_name = ""
         self.last_error = ""
         self.last_event_at = 0
@@ -45,6 +56,7 @@ class DouyinLiveSessionService:
         self.output_mode = "im"
         self.trigger_mode = "by_quantity"
         self._consume_task: asyncio.Task | None = None
+        self._managed_process: Any | None = None
         self._stop_requested = False
 
     async def start(
@@ -62,6 +74,7 @@ class DouyinLiveSessionService:
         danmaku_user_limit_max_triggers: int = 0,
         danmaku_min_guard_level: int = 0,
         douyin_ws_base_url: str = "",
+        douyin_executable_path: str = "",
     ) -> None:
         room_id = value.strip()
         if not room_id:
@@ -71,6 +84,7 @@ class DouyinLiveSessionService:
 
         self.room_id = room_id
         self.ws_base_url = str(douyin_ws_base_url or DEFAULT_DOUYIN_WS_BASE_URL).strip()
+        self.executable_path = self._resolve_executable_path(douyin_executable_path)
         self.output_mode = str(output_mode or "im")
         self.trigger_mode = trigger_mode
         self._configure_dispatchers(
@@ -91,6 +105,7 @@ class DouyinLiveSessionService:
         self.last_event_at = 0
         self._stop_requested = False
         self._reset_dispatchers()
+        await self._ensure_douyin_service_started()
         self.status = SessionStatus.STARTING
         self._consume_task = asyncio.create_task(self._consume_loop())
 
@@ -113,6 +128,7 @@ class DouyinLiveSessionService:
                     pass
                 self._consume_task = None
         finally:
+            await self._stop_managed_process()
             self.status = SessionStatus.IDLE
             self.room_id = ""
             self.anchor_name = ""
@@ -129,6 +145,7 @@ class DouyinLiveSessionService:
             "last_command_message": self.last_command_message,
             "trigger_mode": self.trigger_mode,
             "douyin_ws_base_url": self.ws_base_url,
+            "douyin_executable_path": self.executable_path,
             "command_dispatch_enabled": bool(
                 (self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False))
                 or (self.danmaku_dispatcher is not None and getattr(self.danmaku_dispatcher, "is_enabled", False))
@@ -188,6 +205,29 @@ class DouyinLiveSessionService:
             self._publish_bluetooth_dispatch_diagnostic(dispatch_result)
         self.event_hub.publish(event)
 
+    async def _ensure_douyin_service_started(self) -> None:
+        endpoint = self._resolve_local_endpoint(self.ws_base_url)
+        if endpoint is None or not self.executable_path:
+            return
+        host, port = endpoint
+        if self.port_checker(host, port):
+            return
+
+        executable_path = Path(self.executable_path).expanduser()
+        if not executable_path.exists() or not executable_path.is_file():
+            raise ValueError("douyinLive.exe 路径不存在")
+
+        # 仅在本机端口未监听时拉起 douyinLive，避免重复启动已有服务。
+        self._managed_process = self.process_launcher(executable_path, port)
+        for _ in range(25):
+            if self.port_checker(host, port):
+                LOGGER.info("douyinLive 已自动拉起 port=%s", port)
+                return
+            if self._process_has_exited(self._managed_process):
+                break
+            await asyncio.sleep(0.2)
+        raise ValueError("douyinLive 自动拉起失败，请检查 exe 是否能正常启动")
+
     def _configure_dispatchers(self, **kwargs: Any) -> None:
         if self.gift_dispatcher is not None and hasattr(self.gift_dispatcher, "set_trigger_mode"):
             self.gift_dispatcher.set_trigger_mode(kwargs["trigger_mode"])
@@ -245,3 +285,54 @@ class DouyinLiveSessionService:
                 "payload": dispatch_result,
             }
         )
+
+    def _resolve_local_endpoint(self, base_url: str) -> tuple[str, int] | None:
+        parsed = urlparse(str(base_url or DEFAULT_DOUYIN_WS_BASE_URL).strip())
+        host = parsed.hostname or ""
+        if host not in {"127.0.0.1", "localhost", "::1"}:
+            return None
+        port = parsed.port or (443 if parsed.scheme == "wss" else 80)
+        return host, port
+
+    def _resolve_executable_path(self, value: str) -> str:
+        configured_path = str(value or "").strip()
+        if configured_path:
+            return configured_path
+        if os.name != "nt":
+            return ""
+        bundled_path = resolve_bundle_path("vendor/douyinLive/windows-amd64/douyinLive.exe")
+        return str(bundled_path) if bundled_path.exists() else ""
+
+    def _can_connect_to_service(self, host: str, port: int) -> bool:
+        try:
+            with socket.create_connection((host, port), timeout=0.35):
+                return True
+        except OSError:
+            return False
+
+    def _launch_process(self, executable_path: Path, port: int) -> subprocess.Popen:
+        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        return subprocess.Popen(
+            [str(executable_path), "--port", str(port)],
+            cwd=str(executable_path.parent),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags,
+        )
+
+    def _process_has_exited(self, process: Any | None) -> bool:
+        return process is not None and hasattr(process, "poll") and process.poll() is not None
+
+    async def _stop_managed_process(self) -> None:
+        process = self._managed_process
+        self._managed_process = None
+        if process is None or self._process_has_exited(process):
+            return
+        try:
+            process.terminate()
+            await asyncio.to_thread(process.wait, timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        except Exception as exc:  # pragma: no cover - 真实进程退出容错
+            LOGGER.warning("关闭 douyinLive 自动拉起进程失败 error=%s", exc)

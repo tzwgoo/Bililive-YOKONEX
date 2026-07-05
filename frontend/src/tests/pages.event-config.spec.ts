@@ -225,12 +225,14 @@ describe("EventConfigPage", () => {
     await wrapper.get('[data-testid="event-tab-douyin"]').trigger("click");
     await wrapper.get('[data-testid="douyin-ws-base-url"]').setValue("ws://127.0.0.1:1088");
     await wrapper.get('[data-testid="douyin-room-id"]').setValue("516466932480");
+    await wrapper.get('[data-testid="douyin-executable-path"]').setValue("D:\\tools\\douyinLive\\douyinLive.exe");
     await wrapper.get('[data-testid="save-douyin-config"]').trigger("click");
 
     expect(JSON.parse(window.localStorage.getItem("biliLive.sessionDraft") || "{}")).toMatchObject({
       mode: "douyin",
       value: "516466932480",
       douyin_ws_base_url: "ws://127.0.0.1:1088",
+      douyin_executable_path: "D:\\tools\\douyinLive\\douyinLive.exe",
     });
     expect(wrapper.text()).toContain("抖音配置已保存");
   });

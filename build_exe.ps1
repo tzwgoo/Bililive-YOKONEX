@@ -87,6 +87,7 @@ $pyInstallerArgs = @(
     "--add-data", "app/templates;app/templates",
     "--add-data", "app/static;app/static",
     "--add-data", "frontend/dist;frontend/dist",
+    "--add-data", "vendor/douyinLive;vendor/douyinLive",
     "run_app.py"
 )
 
@@ -132,7 +133,8 @@ if (-not (Test-Path $exePath)) {
 $requiredPackageFiles = @(
     (Join-Path $packageRoot ".env.example"),
     (Join-Path $packageRoot "config/gift_command_mappings.json"),
-    (Join-Path $packageRoot "config/gift_command_mappings.example.json")
+    (Join-Path $packageRoot "config/gift_command_mappings.example.json"),
+    (Join-Path $packageRoot "_internal/vendor/douyinLive/windows-amd64/douyinLive.exe")
 )
 foreach ($requiredFile in $requiredPackageFiles) {
     # Fail early if a template file is missing from the packaged app.

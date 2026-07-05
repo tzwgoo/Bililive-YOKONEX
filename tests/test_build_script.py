@@ -24,3 +24,5 @@ def test_build_script_includes_bilibili_client_hidden_imports() -> None:
     assert '& $npmCommand ci' in script
     assert '& $npmCommand run build' in script
     assert '--add-data", "frontend/dist;frontend/dist"' in script
+    assert '--add-data", "vendor/douyinLive;vendor/douyinLive"' in script
+    assert 'vendor/douyinLive/windows-amd64/douyinLive.exe' in script
