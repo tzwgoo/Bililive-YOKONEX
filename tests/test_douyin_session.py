@@ -27,9 +27,21 @@ class FakeDouyinWsClient:
 
 
 class FakeGiftDispatcher:
+    def __init__(self) -> None:
+        self.called_with: dict | None = None
+
     @property
     def is_enabled(self) -> bool:
         return True
+
+    async def dispatch_gift_event(self, event: dict) -> dict:
+        self.called_with = event
+        return {
+            "matched": True,
+            "command_id": "gift_trigger",
+            "success": True,
+            "message": "礼物指令发送成功",
+        }
 
     async def dispatch_like_event(self, event: dict) -> dict:
         return {
@@ -100,6 +112,44 @@ async def test_douyin_session_consumes_like_and_dispatches_command() -> None:
 
     await service.stop()
     assert ws_client.disconnect_called is True
+
+
+@pytest.mark.anyio
+async def test_douyin_session_consumes_binding_gift_and_dispatches_command() -> None:
+    event_hub = EventHub()
+    ws_client = FakeDouyinWsClient(
+        [
+            {
+                "method": "WebcastBindingGiftMessage",
+                "msg": {
+                    "giftId": "889",
+                    "repeatCount": "3",
+                    "fanTicketCount": "300",
+                    "user": {"nickname": "送礼用户"},
+                    "gift": {"name": "粉丝团礼物", "diamondCount": "100"},
+                },
+            }
+        ]
+    )
+    gift_dispatcher = FakeGiftDispatcher()
+    service = DouyinLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=gift_dispatcher,
+        ws_client=ws_client,
+    )
+
+    await service.start(value="516466932480", douyin_ws_base_url="ws://127.0.0.1:1088")
+    await asyncio.sleep(0.05)
+
+    events = event_hub.snapshot()
+
+    assert gift_dispatcher.called_with is not None
+    assert gift_dispatcher.called_with["event_type"] == "gift"
+    assert events[-1]["event_type"] == "gift"
+    assert events[-1]["payload"]["gift_name"] == "粉丝团礼物"
+    assert events[-1]["command_dispatch"]["command_id"] == "gift_trigger"
+
+    await service.stop()
 
 
 @pytest.mark.anyio

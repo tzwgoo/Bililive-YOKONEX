@@ -58,6 +58,7 @@ class DouyinLiveSessionService:
         self._consume_task: asyncio.Task | None = None
         self._managed_process: Any | None = None
         self._stop_requested = False
+        self._unmapped_methods_logged: set[str] = set()
 
     async def start(
         self,
@@ -104,6 +105,7 @@ class DouyinLiveSessionService:
         self.last_command_message = ""
         self.last_event_at = 0
         self._stop_requested = False
+        self._unmapped_methods_logged.clear()
         self._reset_dispatchers()
         await self._ensure_douyin_service_started()
         self.status = SessionStatus.STARTING
@@ -185,6 +187,7 @@ class DouyinLiveSessionService:
         self._hydrate_room_profile_from_message(message)
         event = map_douyin_message(message, room_id=self.room_id)
         if event is None:
+            self._log_unmapped_message_once(message)
             return
         event_type = normalize_event_type_value(event.get("event_type", ""))
         if self.output_mode == "im" and event_type in GIFT_LIKE_EVENT_TYPES and self.gift_dispatcher is not None:
@@ -272,6 +275,14 @@ class DouyinLiveSessionService:
         self.last_command_id = dispatch_result.get("command_id", "")
         self.last_command_message = dispatch_result.get("message", "")
         event["command_dispatch"] = dispatch_result
+
+    def _log_unmapped_message_once(self, message: dict[str, Any]) -> None:
+        method = str(message.get("method", "") or "").strip()
+        if "gift" not in method.lower() or method in self._unmapped_methods_logged:
+            return
+        self._unmapped_methods_logged.add(method)
+        # 只输出字段名，不输出完整消息，避免日志里混入用户隐私和超长 payload。
+        LOGGER.warning("抖音礼物类消息未映射 room_id=%s method=%s keys=%s", self.room_id, method, sorted(message.keys()))
 
     def _publish_bluetooth_dispatch_diagnostic(self, dispatch_result: Any) -> None:
         if not isinstance(dispatch_result, dict):

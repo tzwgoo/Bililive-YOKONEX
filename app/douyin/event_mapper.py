@@ -11,6 +11,7 @@ DANMAKU_METHODS = {
 }
 GIFT_METHODS = {
     "WebcastGiftMessage",
+    "WebcastBindingGiftMessage",
     "WebcastLightGiftMessage",
 }
 INTERACT_METHODS = {
@@ -43,16 +44,28 @@ def map_douyin_message(message: dict[str, Any], *, room_id: str) -> dict[str, An
         )
 
     if method in GIFT_METHODS:
-        user = _read_dict(message, "user")
-        gift = _read_dict(message, "gift")
-        gift_num = _first_int(message, "repeatCount", "comboCount", "count", "groupCount", fallback=1)
-        unit_price = _first_int(gift, "diamondCount", "describeScore", "price")
+        # douyinLive 的绑定礼物会把真实 GiftMessage 放在 msg 里，这里先拆出来再按普通礼物处理。
+        gift_message = _read_dict(message, "msg") if method == "WebcastBindingGiftMessage" else message
+        user = _read_dict(gift_message, "user")
+        gift = _read_first_dict(gift_message, "gift", "giftStruct", "gift_struct")
+        gift_info = _read_first_dict(gift_message, "giftInfo", "gift_info")
+        gift_num = _first_int(gift_message, "repeatCount", "comboCount", "count", "groupCount", fallback=1)
+        unit_price = _first_int(gift, "diamondCount", "describeScore", "price") or _first_int(
+            gift_info,
+            "diamondCount",
+            "price",
+        )
         total_price = _first_int(
-            message,
+            gift_message,
             "fanTicketCount",
             "totalCount",
             "diamondCount",
             fallback=unit_price * max(1, gift_num),
+        )
+        gift_id = (
+            _first_int(gift_message, "giftId", "gift_id")
+            or _first_int(gift, "id", "giftId", "gift_id")
+            or _first_int(gift_info, "giftId", "gift_id")
         )
         return _build_event(
             event_type="gift",
@@ -60,9 +73,9 @@ def map_douyin_message(message: dict[str, Any], *, room_id: str) -> dict[str, An
             room_id=room_id,
             uname=_read_user_name(user),
             open_id=_read_user_open_id(user),
-            timestamp=_read_timestamp(message),
+            timestamp=_read_timestamp(gift_message) or _read_timestamp(message),
             payload={
-                "gift_id": _first_int(message, "giftId", "gift_id") or _first_int(gift, "id"),
+                "gift_id": gift_id,
                 "gift_name": _first_text(gift, "name", "describe", "displayName") or "抖音礼物",
                 "gift_num": max(1, gift_num),
                 "price": unit_price,
@@ -195,6 +208,14 @@ def _read_timestamp(message: dict[str, Any]) -> int:
 def _read_dict(container: dict[str, Any], key: str) -> dict[str, Any]:
     value = container.get(key)
     return value if isinstance(value, dict) else {}
+
+
+def _read_first_dict(container: dict[str, Any], *keys: str) -> dict[str, Any]:
+    for key in keys:
+        value = _read_dict(container, key)
+        if value:
+            return value
+    return {}
 
 
 def _first_text(container: dict[str, Any], *keys: str) -> str:
