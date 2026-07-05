@@ -84,6 +84,7 @@ describe("DashboardPage", () => {
     expect(startSessionSpy).toHaveBeenCalledWith({
       mode: "third_party",
       value: "123456",
+      douyin_ws_base_url: "ws://127.0.0.1:1088",
       trigger_mode: "by_quantity",
       like_multiple: 100,
       danmaku_enabled: false,
@@ -95,7 +96,7 @@ describe("DashboardPage", () => {
     });
   });
 
-  it("fixes the dashboard session source to third-party stream", async () => {
+  it("renders dashboard session source selector", async () => {
     vi.spyOn(sessionService, "fetchSessionStatus").mockResolvedValue({
       status: "idle",
       can_start: true,
@@ -113,7 +114,8 @@ describe("DashboardPage", () => {
     const wrapper = mount(DashboardPage);
     await flushPromises();
 
-    expect(wrapper.text()).not.toContain("消息源");
+    expect(wrapper.text()).toContain("监听来源");
+    expect(wrapper.text()).toContain("B 站第三方流");
     expect(wrapper.text()).toContain("房间号 ID");
     expect(wrapper.text()).not.toContain("主播身份码");
   });

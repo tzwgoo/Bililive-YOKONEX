@@ -26,6 +26,7 @@ class FakeSession:
     def __init__(self) -> None:
         self.started_with: str | None = None
         self.stopped = False
+        self.douyin_ws_base_url = ""
         self.trigger_mode = "by_quantity"
         self.output_mode = "im"
         self.status_payload = {
@@ -58,10 +59,12 @@ class FakeSession:
         danmaku_user_limit_window_seconds: int = 0,
         danmaku_user_limit_max_triggers: int = 0,
         danmaku_min_guard_level: int = 0,
+        douyin_ws_base_url: str = "",
     ) -> None:
         self.started_with = value
         self.trigger_mode = trigger_mode
         self.output_mode = output_mode
+        self.douyin_ws_base_url = douyin_ws_base_url
         self.status_payload = {
             **self.status_payload,
             "status": "running",
@@ -98,12 +101,26 @@ def create_manager(
     bluetooth_connected: bool = False,
 ) -> tuple[LiveSessionManager, FakeSession]:
     third_party = FakeSession()
+    douyin = FakeSession()
     manager = LiveSessionManager(
         third_party_session=third_party,
+        douyin_session=douyin,
         command_session=FakeCommandSession(connected=command_connected),
         bluetooth_service=FakeBluetoothService(connected=bluetooth_connected),
     )
     return manager, third_party
+
+
+def create_manager_with_douyin() -> tuple[LiveSessionManager, FakeSession, FakeSession]:
+    third_party = FakeSession()
+    douyin = FakeSession()
+    manager = LiveSessionManager(
+        third_party_session=third_party,
+        douyin_session=douyin,
+        command_session=FakeCommandSession(connected=False),
+        bluetooth_service=FakeBluetoothService(connected=False),
+    )
+    return manager, third_party, douyin
 
 
 @pytest.mark.anyio
@@ -126,6 +143,23 @@ async def test_manager_defaults_blank_mode_to_third_party() -> None:
     assert manager.mode == "third_party"
     assert third_party.started_with == "123456"
     assert third_party.output_mode == "bluetooth"
+
+
+@pytest.mark.anyio
+async def test_manager_routes_douyin_start() -> None:
+    manager, third_party, douyin = create_manager_with_douyin()
+
+    await manager.start(
+        mode="douyin",
+        value="516466932480",
+        output_mode="im",
+        douyin_ws_base_url="ws://127.0.0.1:1088",
+    )
+
+    assert third_party.started_with is None
+    assert douyin.started_with == "516466932480"
+    assert douyin.douyin_ws_base_url == "ws://127.0.0.1:1088"
+    assert manager.mode == "douyin"
 
 
 @pytest.mark.anyio

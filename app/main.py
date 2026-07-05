@@ -15,6 +15,7 @@ from app.runtime import ensure_persistent_file, resolve_bundle_path, resolve_per
 from app.services.command_session import CommandSessionService
 from app.services.command_rule_service import CommandRuleService
 from app.services.danmaku_dispatcher import DanmakuCommandDispatcher
+from app.services.douyin_session import DouyinLiveSessionService
 from app.services.event_hub import EventHub
 from app.services.gift_dispatcher import GiftCommandDispatcher
 from app.services.live_session_manager import LiveSessionManager
@@ -64,8 +65,15 @@ def create_app() -> FastAPI:
         danmaku_dispatcher=danmaku_dispatcher,
         bluetooth_dispatcher=bluetooth_dispatcher,
     )
+    douyin_session = DouyinLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=gift_dispatcher,
+        danmaku_dispatcher=danmaku_dispatcher,
+        bluetooth_dispatcher=bluetooth_dispatcher,
+    )
     session_service = LiveSessionManager(
         third_party_session=third_party_session,
+        douyin_session=douyin_session,
         command_session=command_session,
         bluetooth_service=bluetooth_service,
     )

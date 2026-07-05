@@ -29,6 +29,7 @@ def _spa_index_response() -> FileResponse | None:
 class StartSessionRequest(BaseModel):
     mode: str = "third_party"
     value: str
+    douyin_ws_base_url: str = ""
     connection_mode: str | None = None
     output_mode: str | None = None
     trigger_mode: str = "by_quantity"
@@ -402,6 +403,7 @@ async def start_session(request: Request, payload: StartSessionRequest) -> dict:
             danmaku_user_limit_window_seconds=payload.danmaku_user_limit_window_seconds,
             danmaku_user_limit_max_triggers=payload.danmaku_user_limit_max_triggers,
             danmaku_min_guard_level=payload.danmaku_min_guard_level,
+            douyin_ws_base_url=payload.douyin_ws_base_url,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

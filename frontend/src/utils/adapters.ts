@@ -17,6 +17,7 @@ export function adaptSessionStatus(payload: SessionStatusResponse): SessionStatu
     canStart: Boolean(payload.can_start),
     canStop: Boolean(payload.can_stop),
     mode: payload.mode || "third_party",
+    douyinWsBaseUrl: payload.douyin_ws_base_url || "ws://127.0.0.1:1088",
     connectionMode: payload.connection_mode || payload.output_mode || "im",
     triggerMode: payload.trigger_mode || "by_quantity",
     likeMultiple: Number(payload.like_multiple || 100),

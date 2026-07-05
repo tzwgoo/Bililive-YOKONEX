@@ -83,6 +83,7 @@ const bluetoothStore = useBluetoothStore();
 const sessionStorage = useLocalDraft<SessionStartPayload>("biliLive.sessionDraft", {
   mode: "third_party",
   value: "",
+  douyin_ws_base_url: "ws://127.0.0.1:1088",
   trigger_mode: "by_quantity",
   like_multiple: 100,
   danmaku_enabled: false,
@@ -100,8 +101,6 @@ const commandStorage = useLocalDraft<CommandConnectPayload>("biliLive.commandDra
 
 const sessionForm = reactive(sessionStorage.load());
 const commandForm = reactive(commandStorage.load());
-// 首页只保留第三方消息流，进入页面时统一纠正旧草稿里的历史模式值。
-sessionForm.mode = "third_party";
 
 const startingSession = ref(false);
 const connectingCommand = ref(false);
@@ -141,7 +140,8 @@ watch(
   (status) => {
     sessionMessage.value = status.message || (status.canStop ? "监听运行中" : "等待启动");
     if (status.canStop) {
-      sessionForm.mode = "third_party";
+      sessionForm.mode = status.mode;
+      sessionForm.douyin_ws_base_url = status.douyinWsBaseUrl;
       sessionForm.trigger_mode = status.triggerMode;
       sessionForm.like_multiple = status.likeMultiple;
       sessionForm.danmaku_enabled = status.danmakuEnabled;

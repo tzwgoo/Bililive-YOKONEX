@@ -9,11 +9,13 @@ from app.services.gift_dispatcher import normalize_trigger_mode
 
 class LiveSessionManager:
     MODE_THIRD_PARTY = "third_party"
+    MODE_DOUYIN = "douyin"
     OUTPUT_MODE_IM = "im"
     OUTPUT_MODE_BLUETOOTH = "bluetooth"
 
     MODE_LABELS = {
         MODE_THIRD_PARTY: "第三方房间消息流",
+        MODE_DOUYIN: "抖音直播消息流",
     }
 
     OUTPUT_MODE_LABELS = {
@@ -25,13 +27,15 @@ class LiveSessionManager:
         self,
         *,
         third_party_session: Any,
+        douyin_session: Any | None = None,
         command_session: Any | None = None,
         bluetooth_service: Any | None = None,
     ) -> None:
         self.third_party_session = third_party_session
+        self.douyin_session = douyin_session
         self.command_session = command_session
         self.bluetooth_service = bluetooth_service
-        # 核心业务约束：当前版本只允许第三方消息流作为唯一直播事件入口。
+        # 核心业务入口：默认保持 B 站第三方流，抖音通过独立适配层按需启用。
         self.mode = self.MODE_THIRD_PARTY
         self._active_mode: str | None = None
         self.output_mode = self.OUTPUT_MODE_IM
@@ -60,6 +64,7 @@ class LiveSessionManager:
         danmaku_user_limit_window_seconds: int = 0,
         danmaku_user_limit_max_triggers: int = 0,
         danmaku_min_guard_level: int = 0,
+        douyin_ws_base_url: str = "",
     ) -> None:
         normalized_mode = self._normalize_mode(mode)
         normalized_value = value.strip()
@@ -89,25 +94,28 @@ class LiveSessionManager:
         self.danmaku_user_limit_window_seconds = normalized_danmaku_user_limit_window_seconds
         self.danmaku_user_limit_max_triggers = normalized_danmaku_user_limit_max_triggers
         self.danmaku_min_guard_level = normalized_danmaku_min_guard_level
-        await self.third_party_session.start(
-            value=normalized_value,
-            output_mode=normalized_output_mode,
-            trigger_mode=normalized_trigger_mode,
-            like_multiple=normalized_like_multiple,
-            danmaku_enabled=normalized_danmaku_enabled,
-            danmaku_keywords=normalized_danmaku_keywords,
-            danmaku_command_id=normalized_danmaku_command_id,
-            danmaku_cooldown_seconds=normalized_danmaku_cooldown_seconds,
-            danmaku_user_limit_window_seconds=normalized_danmaku_user_limit_window_seconds,
-            danmaku_user_limit_max_triggers=normalized_danmaku_user_limit_max_triggers,
-            danmaku_min_guard_level=normalized_danmaku_min_guard_level,
-        )
+        session_kwargs = {
+            "value": normalized_value,
+            "output_mode": normalized_output_mode,
+            "trigger_mode": normalized_trigger_mode,
+            "like_multiple": normalized_like_multiple,
+            "danmaku_enabled": normalized_danmaku_enabled,
+            "danmaku_keywords": normalized_danmaku_keywords,
+            "danmaku_command_id": normalized_danmaku_command_id,
+            "danmaku_cooldown_seconds": normalized_danmaku_cooldown_seconds,
+            "danmaku_user_limit_window_seconds": normalized_danmaku_user_limit_window_seconds,
+            "danmaku_user_limit_max_triggers": normalized_danmaku_user_limit_max_triggers,
+            "danmaku_min_guard_level": normalized_danmaku_min_guard_level,
+        }
+        if normalized_mode == self.MODE_DOUYIN:
+            session_kwargs["douyin_ws_base_url"] = douyin_ws_base_url
+        await self._resolve_session(normalized_mode).start(**session_kwargs)
         self._active_mode = normalized_mode
 
     async def stop(self) -> None:
         if self._active_mode is None:
             return
-        await self.third_party_session.stop()
+        await self._resolve_session(self._active_mode).stop()
         self._active_mode = None
 
     def handle_bluetooth_connected(self) -> None:
@@ -116,7 +124,7 @@ class LiveSessionManager:
         self._set_output_mode(self.OUTPUT_MODE_BLUETOOTH)
 
     def get_status_payload(self) -> dict[str, Any]:
-        payload = dict(self.third_party_session.get_status_payload())
+        payload = dict(self._current_session().get_status_payload())
         payload["mode"] = self.mode
         payload["mode_label"] = self.MODE_LABELS[self.mode]
         payload["output_mode"] = self.output_mode
@@ -148,8 +156,9 @@ class LiveSessionManager:
     def _set_output_mode(self, output_mode: str) -> None:
         normalized_output_mode = self._normalize_output_mode(output_mode)
         self.output_mode = normalized_output_mode
-        if hasattr(self.third_party_session, "output_mode"):
-            self.third_party_session.output_mode = normalized_output_mode
+        active_session = self._current_session()
+        if hasattr(active_session, "output_mode"):
+            active_session.output_mode = normalized_output_mode
 
     def _resolve_output_mode(self, output_mode: str) -> str:
         normalized_output_mode = str(output_mode or "").strip()
@@ -174,3 +183,15 @@ class LiveSessionManager:
         if not isinstance(payload, dict):
             return False
         return bool(payload.get("connected"))
+
+    def _resolve_session(self, mode: str) -> Any:
+        if mode == self.MODE_THIRD_PARTY:
+            return self.third_party_session
+        if mode == self.MODE_DOUYIN and self.douyin_session is not None:
+            return self.douyin_session
+        raise ValueError("不支持的监听模式")
+
+    def _current_session(self) -> Any:
+        if self._active_mode is not None:
+            return self._resolve_session(self._active_mode)
+        return self._resolve_session(self.mode)

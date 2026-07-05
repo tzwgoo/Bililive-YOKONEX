@@ -63,7 +63,7 @@
         />
 
         <BluetoothEventRulePanel
-          v-else
+          v-else-if="activeTab === 'bluetooth'"
           :rule-group="currentBluetoothGroup"
           :ems-waveform-options="emsWaveformOptions"
           :toy-waveform-options="toyWaveformOptions"
@@ -71,6 +71,45 @@
           @update-max-price="updateMaxPriceFilter"
           @update-guard-waveform="updateGuardWaveform"
         />
+
+        <ACard v-else title="抖音直播接入" :bordered="false" class="douyin-config-panel">
+          <div class="douyin-config-grid">
+            <label class="douyin-field">
+              <span>douyinLive 服务地址</span>
+              <Input
+                v-model:value="sessionDraft.douyin_ws_base_url"
+                data-testid="douyin-ws-base-url"
+                placeholder="ws://127.0.0.1:1088"
+              />
+            </label>
+            <label class="douyin-field">
+              <span>直播间标识</span>
+              <Input
+                v-model:value="sessionDraft.value"
+                data-testid="douyin-room-id"
+                placeholder="live.douyin.com 后面的那段 ID"
+              />
+            </label>
+          </div>
+          <div class="douyin-event-map">
+            <article>
+              <strong>弹幕</strong>
+              <span>WebcastChatMessage -> 普通弹幕</span>
+            </article>
+            <article>
+              <strong>礼物</strong>
+              <span>WebcastGiftMessage -> 礼物档位</span>
+            </article>
+            <article>
+              <strong>点赞</strong>
+              <span>WebcastLikeMessage -> 点赞触发</span>
+            </article>
+            <article>
+              <strong>互动</strong>
+              <span>进场 / 关注 -> 互动事件</span>
+            </article>
+          </div>
+        </ACard>
       </div>
 
       <ASidebarCard :bordered="false" class="event-config-sidebar">
@@ -114,7 +153,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { Alert as AAlert, Button, Card as ACard, Empty as AEmpty, Switch } from "ant-design-vue";
+import { Alert as AAlert, Button, Card as ACard, Empty as AEmpty, Input, Switch } from "ant-design-vue";
 import BluetoothEventRulePanel from "@/components/events/BluetoothEventRulePanel.vue";
 import EventConfigTabs from "@/components/events/EventConfigTabs.vue";
 import ImRuleGroupsPanel from "@/components/events/ImRuleGroupsPanel.vue";
@@ -128,8 +167,9 @@ import type { SessionStartPayload } from "@/types/session";
 
 const ASidebarCard = ACard;
 
-type EventTabKey = "shared" | "im" | "bluetooth";
+type EventTabKey = "shared" | "im" | "bluetooth" | "douyin";
 type SharedConfigKey = "like" | "danmaku";
+type DouyinConfigKey = "connection" | "events";
 
 type EventListItem = {
   key: string;
@@ -142,6 +182,7 @@ type EventListItem = {
 const defaultSessionDraft: SessionStartPayload = {
   mode: "third_party",
   value: "",
+  douyin_ws_base_url: "ws://127.0.0.1:1088",
   trigger_mode: "by_quantity",
   like_multiple: 100,
   danmaku_enabled: false,
@@ -175,6 +216,7 @@ const draftRules = ref<CommandStudioRule[]>([]);
 const draftRuleGroups = ref<BluetoothRuleGroup[]>([]);
 const sessionDraft = reactive(sessionDraftStorage.load());
 const selectedSharedConfig = ref<SharedConfigKey>("like");
+const selectedDouyinConfig = ref<DouyinConfigKey>("connection");
 const selectedImEventType = ref("");
 const selectedBluetoothGroupId = ref("");
 
@@ -182,6 +224,7 @@ const tabs = [
   { key: "shared", label: "通用" },
   { key: "im", label: "IM" },
   { key: "bluetooth", label: "蓝牙" },
+  { key: "douyin", label: "抖音" },
 ] as const;
 
 const groupedRules = computed(() => {
@@ -243,17 +286,39 @@ const bluetoothEventItems = computed<EventListItem[]>(() =>
     toggleable: true,
   })),
 );
+const douyinEventItems = computed<EventListItem[]>(() => [
+  {
+    key: "connection",
+    label: "连接服务",
+    enabled: Boolean(sessionDraft.douyin_ws_base_url && sessionDraft.value),
+    description: sessionDraft.douyin_ws_base_url || "默认 ws://127.0.0.1:1088",
+    toggleable: false,
+  },
+  {
+    key: "events",
+    label: "事件映射",
+    enabled: true,
+    description: "弹幕、礼物、点赞、互动",
+    toggleable: false,
+  },
+]);
 const currentEventItems = computed(() => {
   if (activeTab.value === "shared") {
     return sharedEventItems.value;
   }
-  return activeTab.value === "im" ? imEventItems.value : bluetoothEventItems.value;
+  if (activeTab.value === "im") {
+    return imEventItems.value;
+  }
+  return activeTab.value === "bluetooth" ? bluetoothEventItems.value : douyinEventItems.value;
 });
 const currentSelectedKey = computed(() => {
   if (activeTab.value === "shared") {
     return selectedSharedConfig.value;
   }
-  return activeTab.value === "im" ? selectedImEventType.value : selectedBluetoothGroupId.value;
+  if (activeTab.value === "im") {
+    return selectedImEventType.value;
+  }
+  return activeTab.value === "bluetooth" ? selectedBluetoothGroupId.value : selectedDouyinConfig.value;
 });
 const currentImGroup = computed(() =>
   groupedRules.value.find((group) => group.eventType === selectedImEventType.value) || null,
@@ -265,7 +330,10 @@ const currentSectionLabel = computed(() => {
   if (activeTab.value === "shared") {
     return "通用事件";
   }
-  return activeTab.value === "im" ? "IM 事件" : "蓝牙事件";
+  if (activeTab.value === "im") {
+    return "IM 事件";
+  }
+  return activeTab.value === "bluetooth" ? "蓝牙事件" : "抖音接入";
 });
 const currentPanelTitle = computed(() => {
   if (activeTab.value === "shared") {
@@ -274,25 +342,37 @@ const currentPanelTitle = computed(() => {
   if (activeTab.value === "im") {
     return currentImGroup.value?.label || "请选择 IM 事件";
   }
-  return currentBluetoothGroup.value?.group_label || "请选择蓝牙事件";
+  if (activeTab.value === "bluetooth") {
+    return currentBluetoothGroup.value?.group_label || "请选择蓝牙事件";
+  }
+  return selectedDouyinConfig.value === "connection" ? "连接服务配置" : "抖音事件映射";
 });
 const currentSaveLabel = computed(() => {
   if (activeTab.value === "shared") {
     return "保存通用配置";
   }
-  return activeTab.value === "im" ? "保存 IM 规则" : "保存蓝牙规则";
+  if (activeTab.value === "im") {
+    return "保存 IM 规则";
+  }
+  return activeTab.value === "bluetooth" ? "保存蓝牙规则" : "保存抖音配置";
 });
 const currentSaveButtonTestId = computed(() => {
   if (activeTab.value === "shared") {
     return "save-shared-config";
   }
-  return activeTab.value === "im" ? "command-save" : "save-rules";
+  if (activeTab.value === "im") {
+    return "command-save";
+  }
+  return activeTab.value === "bluetooth" ? "save-rules" : "save-douyin-config";
 });
 const currentSaveLoading = computed(() => {
   if (activeTab.value === "shared") {
     return savingSharedConfig.value;
   }
-  return activeTab.value === "im" ? savingCommandRules.value : savingBluetoothRules.value;
+  if (activeTab.value === "im") {
+    return savingCommandRules.value;
+  }
+  return activeTab.value === "bluetooth" ? savingBluetoothRules.value : savingSharedConfig.value;
 });
 
 watch(activeTab, (value) => {
@@ -371,6 +451,10 @@ function handleSelectEvent(key: string) {
     selectedImEventType.value = key;
     return;
   }
+  if (activeTab.value === "douyin") {
+    selectedDouyinConfig.value = key as DouyinConfigKey;
+    return;
+  }
   selectedBluetoothGroupId.value = key;
 }
 
@@ -381,6 +465,9 @@ function handleToggleEvent(key: string, enabled: boolean) {
   }
   if (activeTab.value === "im") {
     setImGroupEnabled(key, enabled);
+    return;
+  }
+  if (activeTab.value === "douyin") {
     return;
   }
   setBluetoothGroupEnabled(key, enabled);
@@ -520,13 +607,16 @@ async function handlePrimarySave() {
     await handleSaveImRules();
     return;
   }
-  await handleSaveBluetoothRules();
+  if (activeTab.value === "bluetooth") {
+    await handleSaveBluetoothRules();
+    return;
+  }
+  await handleSaveDouyinConfig();
 }
 
 async function handleSaveSharedConfig() {
   savingSharedConfig.value = true;
   try {
-    sessionDraft.mode = "third_party";
     sessionDraft.like_multiple = Math.max(1, Math.round(Number(sessionDraft.like_multiple || 1)));
     sessionDraft.danmaku_cooldown_seconds = normalizeNonNegative(sessionDraft.danmaku_cooldown_seconds);
     sessionDraft.danmaku_user_limit_window_seconds = normalizeNonNegative(sessionDraft.danmaku_user_limit_window_seconds);
@@ -536,6 +626,21 @@ async function handleSaveSharedConfig() {
     message.value = "通用事件配置已保存，主控台启动监听时会复用这份草稿";
   } catch (error) {
     message.value = error instanceof Error ? error.message : "保存通用事件配置失败";
+  } finally {
+    savingSharedConfig.value = false;
+  }
+}
+
+async function handleSaveDouyinConfig() {
+  savingSharedConfig.value = true;
+  try {
+    sessionDraft.mode = "douyin";
+    sessionDraft.douyin_ws_base_url = (sessionDraft.douyin_ws_base_url || "ws://127.0.0.1:1088").trim();
+    sessionDraft.value = String(sessionDraft.value || "").trim();
+    sessionDraftStorage.save({ ...sessionDraft });
+    message.value = "抖音配置已保存，主控台启动监听时会使用这份配置";
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : "保存抖音配置失败";
   } finally {
     savingSharedConfig.value = false;
   }
@@ -765,6 +870,55 @@ onMounted(async () => {
   max-width: none;
 }
 
+.douyin-config-panel :deep(.ant-card-body) {
+  display: grid;
+  gap: 18px;
+}
+
+.douyin-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.douyin-field {
+  display: grid;
+  gap: 8px;
+  color: #44403c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.douyin-field :deep(.ant-input) {
+  border-radius: 12px;
+}
+
+.douyin-event-map {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.douyin-event-map article {
+  display: grid;
+  gap: 4px;
+  min-height: 76px;
+  padding: 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(31, 16, 37, 0.92), rgba(14, 9, 18, 0.96));
+}
+
+.douyin-event-map strong {
+  color: var(--app-text);
+}
+
+.douyin-event-map span {
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 @media (max-width: 1100px) {
   .event-config-layout {
     grid-template-columns: 1fr;
@@ -783,6 +937,11 @@ onMounted(async () => {
   .editor-shell-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .douyin-config-grid,
+  .douyin-event-map {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -88,6 +88,7 @@ describe("EventConfigPage", () => {
     expect(wrapper.text()).toContain("通用");
     expect(wrapper.text()).toContain("IM");
     expect(wrapper.text()).toContain("蓝牙");
+    expect(wrapper.find('[data-testid="event-tab-douyin"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="workspace-summary-card"]').text()).toContain("事件配置");
     expect(wrapper.get('[data-testid="save-shared-config"]').text()).toContain("保存通用配置");
     expect(wrapper.get('[data-testid="event-item-like"]').text()).toContain("点赞触发");
@@ -107,6 +108,13 @@ describe("EventConfigPage", () => {
     expect(wrapper.text()).toContain("最低价格");
     expect(wrapper.text()).toContain("最高价格");
     expect(wrapper.get('[data-testid="event-item-super_chat"]').text()).toContain("醒目留言");
+
+    await wrapper.get('[data-testid="event-tab-douyin"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="save-douyin-config"]').text()).toContain("保存抖音配置");
+    expect(wrapper.get('[data-testid="event-item-connection"]').text()).toContain("连接服务");
+    expect(wrapper.text()).toContain("WebcastChatMessage");
   });
 
   it("restores the last active event-config tab from localStorage", async () => {
@@ -189,8 +197,41 @@ describe("EventConfigPage", () => {
 
     expect(JSON.parse(window.localStorage.getItem("biliLive.sessionDraft") || "{}")).toMatchObject({
       mode: "third_party",
+      douyin_ws_base_url: "ws://127.0.0.1:1088",
       danmaku_enabled: true,
     });
     expect(wrapper.text()).toContain("通用事件配置已保存");
+  });
+
+  it("saves douyin settings back to the session draft", async () => {
+    vi.spyOn(commandService, "fetchCommandStudio").mockResolvedValue({
+      rules: [],
+      like_command_id: "like_trigger",
+      interact_command_id: "interact_trigger",
+      danmaku_command_ids: {},
+      command_slots: ["command_one"],
+      event_types: [],
+      danmaku_event_types: [],
+    });
+    vi.spyOn(bluetoothService, "fetchBluetoothStudio").mockResolvedValue({
+      ems_waveforms: [],
+      toy_waveforms: [],
+      rule_groups: [],
+    });
+
+    const wrapper = mount(EventConfigPage);
+    await flushPromises();
+
+    await wrapper.get('[data-testid="event-tab-douyin"]').trigger("click");
+    await wrapper.get('[data-testid="douyin-ws-base-url"]').setValue("ws://127.0.0.1:1088");
+    await wrapper.get('[data-testid="douyin-room-id"]').setValue("516466932480");
+    await wrapper.get('[data-testid="save-douyin-config"]').trigger("click");
+
+    expect(JSON.parse(window.localStorage.getItem("biliLive.sessionDraft") || "{}")).toMatchObject({
+      mode: "douyin",
+      value: "516466932480",
+      douyin_ws_base_url: "ws://127.0.0.1:1088",
+    });
+    expect(wrapper.text()).toContain("抖音配置已保存");
   });
 });

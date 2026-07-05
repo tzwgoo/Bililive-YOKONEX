@@ -8,12 +8,20 @@
     <ACard title="监听主参数" :bordered="false">
       <div class="session-inline-wrap">
         <div class="session-inline-row">
+        <label class="field session-mode-field">
+          <span>监听来源</span>
+          <Select
+            data-testid="session-mode-select"
+            v-model:value="sessionForm.mode"
+            :options="modeOptions"
+          />
+        </label>
         <label class="field session-room-field">
-          <span>房间号 ID</span>
+          <span>{{ roomFieldLabel }}</span>
           <Input
             data-testid="session-value-input"
             v-model:value="sessionForm.value"
-            placeholder="请输入直播间房间号 ID room_id"
+            :placeholder="roomFieldPlaceholder"
           />
         </label>
         <div class="session-actions">
@@ -28,7 +36,8 @@
 </template>
 
 <script setup lang="ts">
-import { Alert as AAlert, Button, Card as ACard, Input } from "ant-design-vue";
+import { computed } from "vue";
+import { Alert as AAlert, Button, Card as ACard, Input, Select } from "ant-design-vue";
 import type { SessionStartPayload } from "@/types/session";
 
 const props = defineProps<{
@@ -42,8 +51,17 @@ defineEmits<{
   stop: [];
 }>();
 
-// 首页只负责启动监听，因此这里固定消息源，公共触发参数统一在事件配置页维护。
-props.sessionForm.mode = "third_party";
+const modeOptions = [
+  { label: "B 站第三方流", value: "third_party" },
+  { label: "抖音直播", value: "douyin" },
+];
+
+const roomFieldLabel = computed(() => (props.sessionForm.mode === "douyin" ? "抖音直播间标识" : "房间号 ID"));
+const roomFieldPlaceholder = computed(() =>
+  props.sessionForm.mode === "douyin"
+    ? "请输入 live.douyin.com 后面的直播间标识"
+    : "请输入直播间房间号 ID room_id",
+);
 </script>
 
 <style scoped>
@@ -82,6 +100,10 @@ props.sessionForm.mode = "third_party";
   flex: 1 1 640px;
 }
 
+.session-mode-field {
+  flex: 0 0 180px;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -91,6 +113,10 @@ props.sessionForm.mode = "third_party";
 }
 
 .field :deep(.ant-input) {
+  border-radius: 12px;
+}
+
+.field :deep(.ant-select-selector) {
   border-radius: 12px;
 }
 

@@ -109,6 +109,7 @@ class FakeSessionManager:
         danmaku_user_limit_window_seconds: int = 0,
         danmaku_user_limit_max_triggers: int = 0,
         danmaku_min_guard_level: int = 0,
+        douyin_ws_base_url: str = "",
     ) -> None:
         self.start_called_with = {
             "mode": mode,
@@ -122,6 +123,7 @@ class FakeSessionManager:
             "danmaku_user_limit_window_seconds": danmaku_user_limit_window_seconds,
             "danmaku_user_limit_max_triggers": danmaku_user_limit_max_triggers,
             "danmaku_min_guard_level": danmaku_min_guard_level,
+            "douyin_ws_base_url": douyin_ws_base_url,
         }
         self.status = {
             **self.status,
@@ -330,6 +332,7 @@ def test_session_start_endpoint_uses_mode_and_value_payload() -> None:
         "danmaku_user_limit_window_seconds": 60,
         "danmaku_user_limit_max_triggers": 2,
         "danmaku_min_guard_level": 2,
+        "douyin_ws_base_url": "",
     }
 
 
