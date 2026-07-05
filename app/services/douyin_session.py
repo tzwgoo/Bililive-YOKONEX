@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import threading
 import time
 from typing import Any
 from urllib.parse import urlparse
@@ -22,6 +23,7 @@ from app.services.third_party_session import GIFT_LIKE_EVENT_TYPES
 
 
 LOGGER = logging.getLogger("bili_live.douyin")
+GIFT_DEDUP_TTL_SECONDS = 10.0
 
 
 class DouyinLiveSessionService:
@@ -61,6 +63,7 @@ class DouyinLiveSessionService:
         self._stop_requested = False
         self._unmapped_methods_logged: set[str] = set()
         self._seen_methods: dict[str, int] = {}
+        self._recent_gift_keys: dict[tuple[Any, ...], float] = {}
 
     async def start(
         self,
@@ -111,6 +114,7 @@ class DouyinLiveSessionService:
         self._stop_requested = False
         self._unmapped_methods_logged.clear()
         self._seen_methods.clear()
+        self._recent_gift_keys.clear()
         self._reset_dispatchers()
         await self._ensure_douyin_service_started()
         self.status = SessionStatus.STARTING
@@ -199,6 +203,8 @@ class DouyinLiveSessionService:
             self._log_unmapped_message_once(message)
             return
         event_type = normalize_event_type_value(event.get("event_type", ""))
+        if event_type == "gift" and self._should_skip_duplicate_gift(event):
+            return
         if self.output_mode == "im" and event_type in GIFT_LIKE_EVENT_TYPES and self.gift_dispatcher is not None:
             dispatch_result = await self.gift_dispatcher.dispatch_gift_event(event)
             self._record_command_result(event, dispatch_result)
@@ -231,6 +237,7 @@ class DouyinLiveSessionService:
 
         # 仅在本机端口未监听时拉起 douyinLive，避免重复启动已有服务。
         self._managed_process = self.process_launcher(executable_path, port)
+        self._forward_process_logs(self._managed_process)
         for _ in range(25):
             if self.port_checker(host, port):
                 LOGGER.info("douyinLive 已自动拉起 port=%s", port)
@@ -292,6 +299,57 @@ class DouyinLiveSessionService:
         # 记录 douyinLive 原始 method，现场能直接判断礼物是否在上游层进来。
         self._seen_methods[method] = self._seen_methods.get(method, 0) + 1
 
+    def _should_skip_duplicate_gift(self, event: dict[str, Any]) -> bool:
+        key = self._build_gift_dedup_key(event)
+        if key is None:
+            return False
+        now = time.monotonic()
+        self._prune_recent_gift_keys(now)
+        if key in self._recent_gift_keys:
+            LOGGER.info("跳过重复抖音礼物事件 room_id=%s key=%s", self.room_id, key)
+            return True
+        self._recent_gift_keys[key] = now
+        return False
+
+    def _build_gift_dedup_key(self, event: dict[str, Any]) -> tuple[Any, ...] | None:
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            return None
+        # 优先使用 douyinLive 原始唯一字段；缺失时再退回到送礼人和礼物信息。
+        for field in ("log_id", "trace_id"):
+            value = str(payload.get(field, "") or "").strip()
+            if value:
+                return ("douyin_gift", self.room_id, field, value)
+        group_id = int(payload.get("group_id") or 0)
+        if group_id > 0:
+            return (
+                "douyin_gift",
+                self.room_id,
+                "group",
+                group_id,
+                payload.get("gift_id"),
+                event.get("open_id") or event.get("uname"),
+            )
+        return (
+            "douyin_gift",
+            self.room_id,
+            "fallback",
+            event.get("open_id") or event.get("uname"),
+            payload.get("gift_id"),
+            payload.get("gift_name"),
+            payload.get("gift_num"),
+            payload.get("price"),
+            payload.get("r_price"),
+        )
+
+    def _prune_recent_gift_keys(self, now: float) -> None:
+        expired_keys = [
+            key for key, seen_at in self._recent_gift_keys.items()
+            if now - seen_at > GIFT_DEDUP_TTL_SECONDS
+        ]
+        for key in expired_keys:
+            self._recent_gift_keys.pop(key, None)
+
     def _log_unmapped_message_once(self, message: dict[str, Any]) -> None:
         method = str(message.get("method", "") or "").strip()
         if "gift" not in method.lower() or method in self._unmapped_methods_logged:
@@ -343,10 +401,30 @@ class DouyinLiveSessionService:
             [str(executable_path), "--port", str(port)],
             cwd=str(executable_path.parent),
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             creationflags=creation_flags,
         )
+
+    def _forward_process_logs(self, process: Any | None) -> None:
+        stream = getattr(process, "stdout", None)
+        if stream is None:
+            return
+
+        def pump_logs() -> None:
+            try:
+                for line in iter(stream.readline, ""):
+                    line = str(line or "").strip()
+                    if line:
+                        # douyinLive 自身日志是定位握手、Cookie 和上游连接问题的关键。
+                        LOGGER.info("douyinLive: %s", line)
+            except Exception as exc:  # pragma: no cover - 后台日志转发容错
+                LOGGER.warning("读取 douyinLive 日志失败 error=%s", exc)
+
+        threading.Thread(target=pump_logs, name="douyinLive-log-forwarder", daemon=True).start()
 
     def _process_has_exited(self, process: Any | None) -> bool:
         return process is not None and hasattr(process, "poll") and process.poll() is not None

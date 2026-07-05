@@ -34,6 +34,11 @@ def test_map_douyin_gift_message_to_price_event() -> None:
             "giftId": 888,
             "repeatCount": 2,
             "fanTicketCount": 199,
+            "logId": "gift-log-1",
+            "traceId": "gift-trace-1",
+            "groupId": "100",
+            "repeatEnd": 1,
+            "sendTime": 1714113037,
             "user": {
                 "nickname": "送礼用户",
             },
@@ -52,6 +57,11 @@ def test_map_douyin_gift_message_to_price_event() -> None:
     assert event["payload"]["gift_num"] == 2
     assert event["payload"]["price"] == 1
     assert event["payload"]["r_price"] == 199
+    assert event["payload"]["log_id"] == "gift-log-1"
+    assert event["payload"]["trace_id"] == "gift-trace-1"
+    assert event["payload"]["group_id"] == 100
+    assert event["payload"]["repeat_end"] == 1
+    assert event["payload"]["send_time"] == 1714113037
 
 
 def test_map_douyin_binding_gift_message_to_price_event() -> None:

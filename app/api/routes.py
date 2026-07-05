@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -13,6 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(resolve_bundle_path("app/templates")))
 
 router = APIRouter()
+LOGGER = logging.getLogger("bili_live.api")
 
 
 def _spa_index_path() -> Path:
@@ -280,6 +282,7 @@ async def update_bluetooth_rules(request: Request, payload: UpdateBluetoothRules
             [item.model_dump() for item in payload.rules]
         )
     except ValueError as exc:
+        LOGGER.warning("启动监听失败 mode=%s value=%s error=%s", payload.mode, payload.value, exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

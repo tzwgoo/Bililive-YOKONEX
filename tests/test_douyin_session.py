@@ -31,6 +31,7 @@ class FakeDouyinWsClient:
 class FakeGiftDispatcher:
     def __init__(self) -> None:
         self.called_with: dict | None = None
+        self.calls: list[dict] = []
 
     @property
     def is_enabled(self) -> bool:
@@ -38,6 +39,7 @@ class FakeGiftDispatcher:
 
     async def dispatch_gift_event(self, event: dict) -> dict:
         self.called_with = event
+        self.calls.append(event)
         return {
             "matched": True,
             "command_id": "gift_trigger",
@@ -67,6 +69,7 @@ class FakeManagedProcess:
     def __init__(self) -> None:
         self.terminated = False
         self.killed = False
+        self.stdout = None
 
     def poll(self):
         return None
@@ -156,6 +159,81 @@ async def test_douyin_session_consumes_binding_gift_and_dispatches_command() -> 
 
 
 @pytest.mark.anyio
+async def test_douyin_session_skips_duplicate_gift_by_log_id() -> None:
+    event_hub = EventHub()
+    gift_message = {
+        "method": "WebcastGiftMessage",
+        "giftId": "888",
+        "repeatCount": "1",
+        "fanTicketCount": "1",
+        "logId": "same-log-id",
+        "user": {"nickname": "送礼用户"},
+        "gift": {"name": "小心心", "diamondCount": "1"},
+    }
+    ws_client = FakeDouyinWsClient([gift_message, dict(gift_message)])
+    gift_dispatcher = FakeGiftDispatcher()
+    service = DouyinLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=gift_dispatcher,
+        ws_client=ws_client,
+    )
+
+    await service.start(value="516466932480", douyin_ws_base_url="ws://127.0.0.1:1088")
+    await asyncio.sleep(0.05)
+
+    events = [event for event in event_hub.snapshot() if event["event_type"] == "gift"]
+
+    assert len(gift_dispatcher.calls) == 1
+    assert len(events) == 1
+    assert events[0]["payload"]["log_id"] == "same-log-id"
+
+    await service.stop()
+
+
+@pytest.mark.anyio
+async def test_douyin_session_keeps_distinct_gifts_with_different_log_id() -> None:
+    event_hub = EventHub()
+    ws_client = FakeDouyinWsClient(
+        [
+            {
+                "method": "WebcastGiftMessage",
+                "giftId": "888",
+                "repeatCount": "1",
+                "fanTicketCount": "1",
+                "logId": "log-1",
+                "user": {"nickname": "送礼用户"},
+                "gift": {"name": "小心心", "diamondCount": "1"},
+            },
+            {
+                "method": "WebcastGiftMessage",
+                "giftId": "888",
+                "repeatCount": "1",
+                "fanTicketCount": "1",
+                "logId": "log-2",
+                "user": {"nickname": "送礼用户"},
+                "gift": {"name": "小心心", "diamondCount": "1"},
+            },
+        ]
+    )
+    gift_dispatcher = FakeGiftDispatcher()
+    service = DouyinLiveSessionService(
+        event_hub=event_hub,
+        gift_dispatcher=gift_dispatcher,
+        ws_client=ws_client,
+    )
+
+    await service.start(value="516466932480", douyin_ws_base_url="ws://127.0.0.1:1088")
+    await asyncio.sleep(0.05)
+
+    events = [event for event in event_hub.snapshot() if event["event_type"] == "gift"]
+
+    assert len(gift_dispatcher.calls) == 2
+    assert len(events) == 2
+
+    await service.stop()
+
+
+@pytest.mark.anyio
 async def test_douyin_session_launches_configured_executable_when_local_port_is_closed(tmp_path) -> None:
     event_hub = EventHub()
     ws_client = FakeDouyinWsClient([])
@@ -191,6 +269,34 @@ async def test_douyin_session_launches_configured_executable_when_local_port_is_
 
     await service.stop()
     assert process.terminated is True
+
+
+@pytest.mark.anyio
+async def test_douyin_session_launch_path_tolerates_process_without_stdout(tmp_path) -> None:
+    event_hub = EventHub()
+    ws_client = FakeDouyinWsClient([])
+    executable_path = tmp_path / "douyinLive.exe"
+    executable_path.write_text("fake exe", encoding="utf-8")
+    process = FakeManagedProcess()
+    checks = iter([False, True, True])
+
+    service = DouyinLiveSessionService(
+        event_hub=event_hub,
+        ws_client=ws_client,
+        port_checker=lambda host, port: next(checks, True),
+        process_launcher=lambda path, port: process,
+    )
+
+    await service.start(
+        value="516466932480",
+        douyin_ws_base_url="ws://127.0.0.1:1088",
+        douyin_executable_path=str(executable_path),
+    )
+    await asyncio.sleep(0.05)
+
+    assert ws_client.connected_room_id == "516466932480"
+
+    await service.stop()
 
 
 @pytest.mark.anyio
