@@ -98,6 +98,14 @@
                 placeholder="留空使用项目内置 douyinLive.exe，也可填写自定义路径"
               />
             </label>
+            <label class="douyin-field douyin-field-full">
+              <span>抖音 Cookie</span>
+              <Input
+                v-model:value="sessionDraft.douyin_cookie"
+                data-testid="douyin-cookie"
+                placeholder="可选。礼物收不到时，填 live.douyin.com 登录后的完整 Cookie"
+              />
+            </label>
           </div>
           <div class="douyin-event-map">
             <article>
@@ -192,6 +200,7 @@ const defaultSessionDraft: SessionStartPayload = {
   value: "",
   douyin_ws_base_url: "ws://127.0.0.1:1088",
   douyin_executable_path: "",
+  douyin_cookie: "",
   trigger_mode: "by_quantity",
   like_multiple: 100,
   danmaku_enabled: false,
@@ -646,6 +655,7 @@ async function handleSaveDouyinConfig() {
     sessionDraft.mode = "douyin";
     sessionDraft.douyin_ws_base_url = (sessionDraft.douyin_ws_base_url || "ws://127.0.0.1:1088").trim();
     sessionDraft.douyin_executable_path = String(sessionDraft.douyin_executable_path || "").trim();
+    sessionDraft.douyin_cookie = String(sessionDraft.douyin_cookie || "").trim();
     sessionDraft.value = String(sessionDraft.value || "").trim();
     sessionDraftStorage.save({ ...sessionDraft });
     message.value = "抖音配置已保存，主控台启动监听时会使用这份配置";

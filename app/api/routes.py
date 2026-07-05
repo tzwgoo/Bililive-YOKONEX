@@ -31,6 +31,7 @@ class StartSessionRequest(BaseModel):
     value: str
     douyin_ws_base_url: str = ""
     douyin_executable_path: str = ""
+    douyin_cookie: str = ""
     connection_mode: str | None = None
     output_mode: str | None = None
     trigger_mode: str = "by_quantity"
@@ -406,6 +407,7 @@ async def start_session(request: Request, payload: StartSessionRequest) -> dict:
             danmaku_min_guard_level=payload.danmaku_min_guard_level,
             douyin_ws_base_url=payload.douyin_ws_base_url,
             douyin_executable_path=payload.douyin_executable_path,
+            douyin_cookie=payload.douyin_cookie,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

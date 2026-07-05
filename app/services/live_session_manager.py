@@ -66,6 +66,7 @@ class LiveSessionManager:
         danmaku_min_guard_level: int = 0,
         douyin_ws_base_url: str = "",
         douyin_executable_path: str = "",
+        douyin_cookie: str = "",
     ) -> None:
         normalized_mode = self._normalize_mode(mode)
         normalized_value = value.strip()
@@ -111,6 +112,7 @@ class LiveSessionManager:
         if normalized_mode == self.MODE_DOUYIN:
             session_kwargs["douyin_ws_base_url"] = douyin_ws_base_url
             session_kwargs["douyin_executable_path"] = douyin_executable_path
+            session_kwargs["douyin_cookie"] = douyin_cookie
         await self._resolve_session(normalized_mode).start(**session_kwargs)
         self._active_mode = normalized_mode
 

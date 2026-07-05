@@ -85,6 +85,7 @@ const sessionStorage = useLocalDraft<SessionStartPayload>("biliLive.sessionDraft
   value: "",
   douyin_ws_base_url: "ws://127.0.0.1:1088",
   douyin_executable_path: "",
+  douyin_cookie: "",
   trigger_mode: "by_quantity",
   like_multiple: 100,
   danmaku_enabled: false,

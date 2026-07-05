@@ -47,6 +47,7 @@ class DouyinLiveSessionService:
         self.room_id = ""
         self.ws_base_url = DEFAULT_DOUYIN_WS_BASE_URL
         self.executable_path = ""
+        self.douyin_cookie = ""
         self.anchor_name = ""
         self.last_error = ""
         self.last_event_at = 0
@@ -59,6 +60,7 @@ class DouyinLiveSessionService:
         self._managed_process: Any | None = None
         self._stop_requested = False
         self._unmapped_methods_logged: set[str] = set()
+        self._seen_methods: dict[str, int] = {}
 
     async def start(
         self,
@@ -76,6 +78,7 @@ class DouyinLiveSessionService:
         danmaku_min_guard_level: int = 0,
         douyin_ws_base_url: str = "",
         douyin_executable_path: str = "",
+        douyin_cookie: str = "",
     ) -> None:
         room_id = value.strip()
         if not room_id:
@@ -86,6 +89,7 @@ class DouyinLiveSessionService:
         self.room_id = room_id
         self.ws_base_url = str(douyin_ws_base_url or DEFAULT_DOUYIN_WS_BASE_URL).strip()
         self.executable_path = self._resolve_executable_path(douyin_executable_path)
+        self.douyin_cookie = str(douyin_cookie or "").strip()
         self.output_mode = str(output_mode or "im")
         self.trigger_mode = trigger_mode
         self._configure_dispatchers(
@@ -106,6 +110,7 @@ class DouyinLiveSessionService:
         self.last_event_at = 0
         self._stop_requested = False
         self._unmapped_methods_logged.clear()
+        self._seen_methods.clear()
         self._reset_dispatchers()
         await self._ensure_douyin_service_started()
         self.status = SessionStatus.STARTING
@@ -148,6 +153,8 @@ class DouyinLiveSessionService:
             "trigger_mode": self.trigger_mode,
             "douyin_ws_base_url": self.ws_base_url,
             "douyin_executable_path": self.executable_path,
+            "douyin_cookie_configured": bool(self.douyin_cookie),
+            "douyin_seen_methods": dict(sorted(self._seen_methods.items())),
             "command_dispatch_enabled": bool(
                 (self.gift_dispatcher is not None and getattr(self.gift_dispatcher, "is_enabled", False))
                 or (self.danmaku_dispatcher is not None and getattr(self.danmaku_dispatcher, "is_enabled", False))
@@ -164,6 +171,7 @@ class DouyinLiveSessionService:
                 await self.ws_client.connect_and_consume(
                     room_id=self.room_id,
                     base_url=self.ws_base_url,
+                    douyin_cookie=self.douyin_cookie,
                     on_message=self._handle_raw_message,
                 )
                 if self._stop_requested:
@@ -184,6 +192,7 @@ class DouyinLiveSessionService:
 
     async def _handle_raw_message(self, message: dict[str, Any]) -> None:
         self.last_event_at = int(time.time())
+        self._record_seen_method(message)
         self._hydrate_room_profile_from_message(message)
         event = map_douyin_message(message, room_id=self.room_id)
         if event is None:
@@ -275,6 +284,13 @@ class DouyinLiveSessionService:
         self.last_command_id = dispatch_result.get("command_id", "")
         self.last_command_message = dispatch_result.get("message", "")
         event["command_dispatch"] = dispatch_result
+
+    def _record_seen_method(self, message: dict[str, Any]) -> None:
+        method = str(message.get("method", "") or message.get("event", "") or message.get("type", "") or "").strip()
+        if not method:
+            return
+        # 记录 douyinLive 原始 method，现场能直接判断礼物是否在上游层进来。
+        self._seen_methods[method] = self._seen_methods.get(method, 0) + 1
 
     def _log_unmapped_message_once(self, message: dict[str, Any]) -> None:
         method = str(message.get("method", "") or "").strip()

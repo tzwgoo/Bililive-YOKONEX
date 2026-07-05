@@ -13,11 +13,13 @@ class FakeDouyinWsClient:
         self.messages = messages
         self.connected_room_id = ""
         self.base_url = ""
+        self.douyin_cookie = ""
         self.disconnect_called = False
 
-    async def connect_and_consume(self, *, room_id: str, base_url: str, on_message) -> None:
+    async def connect_and_consume(self, *, room_id: str, base_url: str, douyin_cookie: str = "", on_message) -> None:
         self.connected_room_id = room_id
         self.base_url = base_url
+        self.douyin_cookie = douyin_cookie
         for message in self.messages:
             await on_message(message)
         await asyncio.sleep(0)
@@ -109,6 +111,7 @@ async def test_douyin_session_consumes_like_and_dispatches_command() -> None:
     assert events[-1]["source"] == "douyin_ws"
     assert events[-1]["event_type"] == "like"
     assert events[-1]["command_dispatch"]["command_id"] == "like_trigger"
+    assert service.get_status_payload()["douyin_seen_methods"] == {"WebcastLikeMessage": 1}
 
     await service.stop()
     assert ws_client.disconnect_called is True
@@ -188,3 +191,25 @@ async def test_douyin_session_launches_configured_executable_when_local_port_is_
 
     await service.stop()
     assert process.terminated is True
+
+
+@pytest.mark.anyio
+async def test_douyin_session_passes_cookie_to_ws_client() -> None:
+    event_hub = EventHub()
+    ws_client = FakeDouyinWsClient([])
+    service = DouyinLiveSessionService(
+        event_hub=event_hub,
+        ws_client=ws_client,
+    )
+
+    await service.start(
+        value="516466932480",
+        douyin_ws_base_url="ws://127.0.0.1:1088",
+        douyin_cookie="sessionid=demo",
+    )
+    await asyncio.sleep(0.05)
+
+    assert ws_client.douyin_cookie == "sessionid=demo"
+    assert service.get_status_payload()["douyin_cookie_configured"] is True
+
+    await service.stop()

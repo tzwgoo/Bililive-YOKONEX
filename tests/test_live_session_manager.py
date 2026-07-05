@@ -28,6 +28,7 @@ class FakeSession:
         self.stopped = False
         self.douyin_ws_base_url = ""
         self.douyin_executable_path = ""
+        self.douyin_cookie = ""
         self.trigger_mode = "by_quantity"
         self.output_mode = "im"
         self.status_payload = {
@@ -62,12 +63,14 @@ class FakeSession:
         danmaku_min_guard_level: int = 0,
         douyin_ws_base_url: str = "",
         douyin_executable_path: str = "",
+        douyin_cookie: str = "",
     ) -> None:
         self.started_with = value
         self.trigger_mode = trigger_mode
         self.output_mode = output_mode
         self.douyin_ws_base_url = douyin_ws_base_url
         self.douyin_executable_path = douyin_executable_path
+        self.douyin_cookie = douyin_cookie
         self.status_payload = {
             **self.status_payload,
             "status": "running",
@@ -158,12 +161,14 @@ async def test_manager_routes_douyin_start() -> None:
         output_mode="im",
         douyin_ws_base_url="ws://127.0.0.1:1088",
         douyin_executable_path="D:\\tools\\douyinLive\\douyinLive.exe",
+        douyin_cookie="sessionid=demo",
     )
 
     assert third_party.started_with is None
     assert douyin.started_with == "516466932480"
     assert douyin.douyin_ws_base_url == "ws://127.0.0.1:1088"
     assert douyin.douyin_executable_path == "D:\\tools\\douyinLive\\douyinLive.exe"
+    assert douyin.douyin_cookie == "sessionid=demo"
     assert manager.mode == "douyin"
 
 

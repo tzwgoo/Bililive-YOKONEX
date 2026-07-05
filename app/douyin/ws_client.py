@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any, Awaitable, Callable
 from urllib.parse import quote
+from urllib.parse import parse_qsl
+from urllib.parse import urlencode
 from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
 import websockets
 
@@ -22,8 +26,9 @@ class DouyinWsClient:
         room_id: str,
         on_message: Callable[[dict[str, Any]], Awaitable[None]],
         base_url: str = "",
+        douyin_cookie: str = "",
     ) -> None:
-        ws_url = self._build_ws_url(room_id=room_id, base_url=base_url or self.base_url)
+        ws_url = self._build_ws_url(room_id=room_id, base_url=base_url or self.base_url, douyin_cookie=douyin_cookie)
         async with websockets.connect(ws_url, ping_interval=None) as ws:
             self._ws = ws
             try:
@@ -40,14 +45,23 @@ class DouyinWsClient:
             await self._ws.close()
             self._ws = None
 
-    def _build_ws_url(self, *, room_id: str, base_url: str) -> str:
+    def _build_ws_url(self, *, room_id: str, base_url: str, douyin_cookie: str = "") -> str:
         normalized_base_url = self._normalize_base_url(base_url)
         normalized_room_id = quote(str(room_id or "").strip(), safe="")
         if not normalized_room_id:
             raise ValueError("抖音直播间标识不能为空")
-        if "/ws/" in normalized_base_url:
-            return normalized_base_url.rstrip("/") + "/" + normalized_room_id
-        return normalized_base_url.rstrip("/") + "/ws/" + normalized_room_id
+        parsed = urlparse(normalized_base_url)
+        path = parsed.path.rstrip("/")
+        if "/ws/" in path or path.endswith("/ws"):
+            path = path + "/" + normalized_room_id
+        else:
+            path = path + "/ws/" + normalized_room_id
+        query_items = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key not in {"cookie", "cookie_b64"}]
+        if douyin_cookie.strip():
+            # douyinLive 原生支持 cookie_b64，避免直接把长 Cookie 放进 URL 时被特殊字符截断。
+            cookie_b64 = base64.urlsafe_b64encode(douyin_cookie.strip().encode("utf-8")).decode("ascii")
+            query_items.append(("cookie_b64", cookie_b64))
+        return urlunparse((parsed.scheme, parsed.netloc, path, "", urlencode(query_items), ""))
 
     def _normalize_base_url(self, value: str) -> str:
         normalized = str(value or DEFAULT_DOUYIN_WS_BASE_URL).strip().rstrip("/")
