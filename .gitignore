@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!.env.management.example
 
 __pycache__/
 *.py[cod]
@@ -40,6 +41,8 @@ job-*-logs.zip
 .DS_Store
 Thumbs.db
 config/bluetooth_settings.json
+config/remote_control_identity.json
+data/
 
 *.spec
 *.egg-info/

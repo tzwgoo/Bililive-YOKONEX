@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import asdict
+import hashlib
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -396,6 +399,166 @@ class BluetoothService:
             "ems_waveforms": payload_dict["ems_waveforms"],
             "toy_waveforms": payload_dict["toy_waveforms"],
             "rule_groups": grouped_rules,
+        }
+
+    def get_remote_capabilities_payload(self) -> dict:
+        """返回管理端需要的波形摘要，避免上传完整波形步骤。"""
+        waveforms: list[dict[str, Any]] = []
+        for waveform in self.payload.ems_waveforms:
+            waveforms.append(self._build_remote_waveform_summary(waveform))
+        for waveform in self.payload.toy_waveforms:
+            waveforms.append(self._build_remote_waveform_summary(waveform))
+        revision_source = json.dumps(waveforms, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return {
+            "waveform_revision": hashlib.sha256(revision_source.encode("utf-8")).hexdigest(),
+            "waveforms": waveforms,
+        }
+
+    def get_remote_waveform_summary(self, waveform_id: str) -> dict[str, Any]:
+        """按 ID 获取当前波形摘要，供远程命令执行前做二次校验。"""
+        return self._build_remote_waveform_summary(self._find_waveform_any(waveform_id))
+
+    async def stop_waveform(self, device_id: str | None = None) -> dict[str, Any]:
+        """停止指定设备的活动波形；取消任务后运行时会发送停止包。"""
+        target_device_ids = [device_id] if device_id else list(self._active_waveforms)
+        stopped_device_ids: list[str] = []
+        tasks: list[asyncio.Task[None]] = []
+        async with self._waveform_lock:
+            for target_device_id in target_device_ids:
+                state = self._active_waveforms.get(str(target_device_id or ""))
+                if state is None or state.task is None or state.task.done():
+                    continue
+                stopped_device_ids.append(str(target_device_id))
+                tasks.append(state.task)
+                state.task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        return {
+            "success": True,
+            "device_ids": stopped_device_ids,
+            "message": "已停止设备输出" if stopped_device_ids else "当前没有正在执行的波形",
+        }
+
+    async def trigger_fixed_output(
+        self,
+        *,
+        device_id: str,
+        strength: int,
+        duration_seconds: int,
+    ) -> dict[str, Any]:
+        """按固定强度持续输出指定秒数，不写入用户波形库。"""
+        connected_device = next(
+            (item for item in self.get_connected_devices() if item.device_id == device_id),
+            None,
+        )
+        if connected_device is None:
+            raise ValueError("目标设备未连接")
+        if not 1 <= int(duration_seconds) <= 60:
+            raise ValueError("固定输出时长只能是 1 到 60 秒")
+
+        normalized_strength = int(strength)
+        duration_ms = int(duration_seconds) * 1000
+        if connected_device.device_type == "toy":
+            if "gcq" in connected_device.protocol:
+                raise ValueError("灌肠机不支持单一固定强度控制")
+            if not 1 <= normalized_strength <= 20:
+                raise ValueError("Toy 设备强度只能是 1 到 20")
+            waveform: EmsWaveform | ToyWaveform = ToyWaveform(
+                id="remote-fixed-output",
+                name=f"固定强度 {normalized_strength}",
+                builtin=True,
+                editable=False,
+                device_family="toy",
+                steps=[ToyWaveformStep(
+                    duration_ms=duration_ms,
+                    motor_a=normalized_strength,
+                    motor_b=normalized_strength,
+                    motor_c=normalized_strength,
+                )],
+            )
+        else:
+            if not 1 <= normalized_strength <= 180:
+                raise ValueError("EMS 设备强度只能是 1 到 180")
+            waveform = EmsWaveform(
+                id="remote-fixed-output",
+                name=f"固定强度 {normalized_strength}",
+                builtin=True,
+                editable=False,
+                execution_mode="fixed",
+                steps=[EmsWaveformStep(
+                    duration_ms=duration_ms,
+                    channel_a=normalized_strength,
+                    channel_b=normalized_strength,
+                )],
+            )
+
+        request_id = uuid.uuid4().hex
+        async with self._waveform_lock:
+            state = self._get_active_waveform_state(device_id)
+            if state.task is not None and not state.task.done():
+                state.task.cancel()
+            task = asyncio.create_task(
+                self._play_waveform_with_runtime_compat(device_id, waveform)
+            )
+            state.task = task
+            state.request_id = request_id
+            state.waveform_id = waveform.id
+            state.strength = normalized_strength
+            state.deadline = time.monotonic() + duration_seconds
+        try:
+            await task
+        except asyncio.CancelledError:
+            current_task = asyncio.current_task()
+            if current_task is not None and current_task.cancelling():
+                raise
+            return {
+                "success": True,
+                "message": "固定强度输出已提前停止",
+                "device_id": device_id,
+                "strength": normalized_strength,
+                "duration_seconds": duration_seconds,
+            }
+        finally:
+            async with self._waveform_lock:
+                state = self._get_active_waveform_state(device_id)
+                if state.request_id == request_id:
+                    self._reset_active_waveform_state(device_id)
+
+        result = {
+            "success": True,
+            "message": f"已按强度 {normalized_strength} 输出 {duration_seconds} 秒",
+            "device_id": device_id,
+            "strength": normalized_strength,
+            "duration_seconds": duration_seconds,
+        }
+        self._publish_bluetooth_control({
+            "matched": True,
+            "event_type": "remote_fixed_output",
+            "waveform_id": waveform.id,
+            "waveform_name": waveform.name,
+            "max_strength": normalized_strength,
+            **result,
+        })
+        return result
+
+    @staticmethod
+    def _build_remote_waveform_summary(waveform: EmsWaveform | ToyWaveform) -> dict[str, Any]:
+        waveform_payload = asdict(waveform)
+        version_source = json.dumps(
+            waveform_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        is_toy = isinstance(waveform, ToyWaveform)
+        return {
+            "waveform_id": waveform.id,
+            "name": waveform.name,
+            "waveform_type": "toy" if is_toy else "ems",
+            "device_family": waveform.device_family if is_toy else "ems",
+            "builtin": bool(waveform.builtin),
+            "editable": bool(waveform.editable),
+            "version_hash": hashlib.sha256(version_source.encode("utf-8")).hexdigest(),
         }
 
     def save_rules(self, rules: list[dict]) -> dict:

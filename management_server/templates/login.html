@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>设备管理中心 · 登录</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="login-intro">
+      <p class="eyebrow">BILILIVE / DEVICE OPERATIONS</p>
+      <h1>设备控制，<br><span>一处完成。</span></h1>
+      <p class="login-copy">查看在线客户端、已连接设备与可用波形。所有操作都会留下结果记录。</p>
+      <div class="signal-line" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    </section>
+    <section class="login-panel">
+      <div class="panel-index">ACCESS / 01</div>
+      <h2>管理员登录</h2>
+      <p>输入管理服务器配置的账号。</p>
+      <form id="login-form">
+        <label>用户名<input id="username" name="username" autocomplete="username" required></label>
+        <label>密码<input id="password" name="password" type="password" autocomplete="current-password" required></label>
+        <p id="login-error" class="form-error" role="alert"></p>
+        <button type="submit" class="primary-button">进入管理中心 <span>→</span></button>
+      </form>
+      <p class="transport-note">支持 HTTP/HTTPS。公网 HTTP 会暴露登录和控制数据。</p>
+    </section>
+  </main>
+  <script src="/admin/static/login.js" defer></script>
+</body>
+</html>

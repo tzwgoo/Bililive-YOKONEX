@@ -12,6 +12,8 @@ from app.command_gateway.mapping import GiftCommandMapper
 from app.config import Settings, load_settings
 from app.logging_config import setup_logging
 from app.runtime import ensure_persistent_file, resolve_bundle_path, resolve_persistent_path
+from app.remote_control.client import RemoteControlClient
+from app.remote_control.identity import DeviceIdentityStore
 from app.services.command_session import CommandSessionService
 from app.services.command_rule_service import CommandRuleService
 from app.services.danmaku_dispatcher import DanmakuCommandDispatcher
@@ -77,12 +79,27 @@ def create_app() -> FastAPI:
         command_session=command_session,
         bluetooth_service=bluetooth_service,
     )
+    remote_control_client = RemoteControlClient(
+        ws_url=settings.management_ws_url,
+        registration_token=settings.management_registration_token,
+        client_name=settings.management_client_name,
+        heartbeat_seconds=settings.management_heartbeat_seconds,
+        identity_store=DeviceIdentityStore(
+            resolve_persistent_path("config/remote_control_identity.json")
+        ),
+        command_session=command_session,
+        bluetooth_service=bluetooth_service,
+    )
 
     app.state.event_hub = event_hub
     app.state.bluetooth_service = bluetooth_service
     app.state.command_session = command_session
     app.state.command_rule_service = command_rule_service
     app.state.session_service = session_service
+    app.state.remote_control_client = remote_control_client
+    # 远控代理跟随本地服务生命周期静默启动，不向客户端页面暴露控制入口。
+    app.add_event_handler("startup", remote_control_client.start)
+    app.add_event_handler("shutdown", remote_control_client.stop)
     app.include_router(router)
     app.mount("/static", StaticFiles(directory=str(resolve_bundle_path("app/static"))), name="static")
     frontend_assets_dir = resolve_bundle_path("frontend/dist/assets")

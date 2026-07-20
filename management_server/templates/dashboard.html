@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>设备管理中心</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body>
+  <div class="app-frame">
+    <aside class="side-rail">
+      <div class="brand-block">
+        <span class="brand-code">YKX</span>
+        <div><strong>DEVICE OPS</strong><small>BiliLive 管理中心</small></div>
+      </div>
+      <div class="rail-status"><i></i><span>控制服务器运行中</span></div>
+      <nav><a class="active" href="#clients">客户端</a><a href="#activity">操作记录</a></nav>
+      <div class="rail-bottom"><span id="admin-name">ADMIN</span><button id="logout-button" class="text-button">退出登录</button></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-header">
+        <div><p class="eyebrow">LIVE OPERATIONS</p><h1>设备运行总览</h1></div>
+        <div class="clock-block"><span>服务器时间</span><strong id="clock">--:--:--</strong></div>
+      </header>
+
+      <section class="metric-grid" aria-label="运行指标">
+        <article><span>在线客户端</span><strong id="online-count">0</strong><small>ONLINE</small></article>
+        <article><span>全部客户端</span><strong id="total-count">0</strong><small>REGISTERED</small></article>
+        <article><span>已连接设备</span><strong id="device-count">0</strong><small>CONNECTED</small></article>
+        <article><span>可用波形</span><strong id="waveform-count">0</strong><small>AVAILABLE</small></article>
+      </section>
+
+      <section id="clients" class="operations-grid">
+        <article class="client-column surface">
+          <div class="section-heading"><div><p class="eyebrow">CLIENT DIRECTORY</p><h2>客户端</h2></div><button id="refresh-button" class="icon-button" title="刷新">↻</button></div>
+          <div id="client-list" class="client-list"><p class="empty-state">正在读取客户端...</p></div>
+        </article>
+
+        <article class="detail-column surface">
+          <div id="detail-empty" class="detail-empty"><span>01</span><h2>选择一个客户端</h2><p>查看设备、波形和远程控制能力。</p></div>
+          <div id="client-detail" hidden>
+            <div class="detail-header">
+              <div><div class="status-line"><i id="detail-status-dot"></i><span id="detail-status">离线</span></div><h2 id="detail-name">-</h2><code id="detail-id">-</code></div>
+              <div class="detail-meta"><span>当前用户<strong id="detail-user">未登录</strong></span><span>最后心跳<strong id="detail-last-seen">-</strong></span></div>
+            </div>
+
+            <section class="control-section">
+              <div class="section-heading compact"><div><p class="eyebrow">COMMAND CHANNEL</p><h3>固定指令</h3></div><span id="command-channel" class="status-chip">未连接</span></div>
+              <div id="command-grid" class="command-grid"></div>
+            </section>
+
+            <section class="control-section">
+              <div class="section-heading compact"><div><p class="eyebrow">CONNECTED HARDWARE</p><h3>设备与波形</h3></div><span id="waveform-summary" class="status-chip">0 个波形</span></div>
+              <div id="device-list" class="device-list"></div>
+            </section>
+
+            <section id="activity" class="control-section">
+              <div class="section-heading compact"><div><p class="eyebrow">AUDIT TRAIL</p><h3>最近操作</h3></div></div>
+              <div id="command-history" class="history-list"></div>
+            </section>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/admin/static/admin.js" defer></script>
+</body>
+</html>
